@@ -5,7 +5,6 @@ import { getCodexAuthStatus } from "./codex.js";
 import { analyzeWithCodex, buildFallbackAnalysis } from "./analyze.js";
 import { importConversation } from "./conversation.js";
 import { GitReader } from "./git.js";
-import { startReviewServer } from "./http.js";
 import { ReviewStore } from "./store.js";
 import { installSkill } from "./skill.js";
 import { writeReviewArtifact } from "./artifact.js";
@@ -70,9 +69,6 @@ async function runCodexLogin(): Promise<void> {
 async function runReview(args: string[]): Promise<void> {
   const targetRef = extractTargetRef(args) ?? "WORKTREE";
   const noOpen = args.includes("--no-open");
-  const live = args.includes("--live");
-  const portIndex = args.indexOf("--port");
-  const port = portIndex === -1 ? 0 : parsePort(args[portIndex + 1]);
   const repoPath = optionValue(args, "--repo") ?? process.cwd();
   const baseRef = optionValue(args, "--base");
   const lensId = optionValue(args, "--lens") ?? "default";
@@ -97,21 +93,10 @@ async function runReview(args: string[]): Promise<void> {
   }
   const meaningfulFiles = input.files.filter((file) => file.signal === "meaningful").length;
   process.stdout.write(`merge-base=${input.mergeBase.slice(0, 12)} files=${input.files.length} meaningful-files=${meaningfulFiles} hunks=${input.hunks.length}${conversation === undefined ? "" : ` conversation=${conversation.messages.length}`}\n`);
-  if (!live) {
-    const artifactPath = await writeReviewArtifact(session, revision, { directory: join(repoPath, ".ndrstnd") });
-    process.stdout.write(`ndrstnd artifact: ${artifactPath}\n`);
-    process.stdout.write("This self-contained file is in the Git-ignored .ndrstnd directory and expires after seven days.\n");
-    if (!noOpen) openBrowser(pathToFileURL(artifactPath).href);
-    store.close();
-    return;
-  }
-
-  const server = await startReviewServer({ port, session, revision, store });
-  process.stdout.write(`ndrstnd live session: ${server.url}\n`);
-  process.stdout.write("Press Ctrl-C to stop the local server.\n");
-  if (!noOpen) openBrowser(server.url);
-  await new Promise<void>((resolve) => { process.once("SIGINT", resolve); process.once("SIGTERM", resolve); });
-  await server.close();
+  const artifactPath = await writeReviewArtifact(session, revision, { directory: join(repoPath, ".ndrstnd") });
+  process.stdout.write(`ndrstnd artifact: ${artifactPath}\n`);
+  process.stdout.write("This self-contained file is in the Git-ignored .ndrstnd directory and expires after seven days.\n");
+  if (!noOpen) openBrowser(pathToFileURL(artifactPath).href);
   store.close();
 }
 
@@ -125,11 +110,7 @@ function openBrowser(url: string): void {
 function extractTargetRef(args: string[]): string | undefined {
   for (let index = 0; index < args.length; index += 1) {
     const argument = args[index];
-    if (argument === "--no-open" || argument === "--live") {
-      continue;
-    }
-    if (argument === "--port") {
-      index += 1;
+    if (argument === "--no-open") {
       continue;
     }
     if (argument === "--repo") {
@@ -165,16 +146,8 @@ function optionValue(args: string[], option: string): string | undefined {
   return value;
 }
 
-function parsePort(value: string | undefined): number {
-  const port = Number(value);
-  if (!Number.isInteger(port) || port < 0 || port > 65535) {
-    fail("--port must be an integer from 0 through 65535.");
-  }
-  return port;
-}
-
 function printHelp(): void {
-  process.stdout.write(`ndrstnd — understand agent-produced branch changes\n\nUsage:\n  ndrstnd auth <status|login>\n  ndrstnd skill install [--force]\n  ndrstnd review <branch> [--base <branch>] [--repo <path>] [--conversation <path>] [--lens <id>] [--no-open]\n  ndrstnd review <branch> --live [--port <number>]\n\nBy default ndrstnd writes a self-contained artifact outside the repository. Use --live only for server-backed re-analysis and questions.\n`);
+  process.stdout.write(`ndrstnd — understand agent-produced branch changes\n\nUsage:\n  ndrstnd auth <status|login>\n  ndrstnd skill install [--force]\n  ndrstnd review <branch> [--base <branch>] [--repo <path>] [--conversation <path>] [--lens <id>] [--no-open]\n\nndrstnd always writes a self-contained, Git-ignored artifact.\n`);
 }
 
 function fail(message: string): never {
