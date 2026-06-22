@@ -1,0 +1,4 @@
+interface:
+  display_name: "ndrstnd"
+  short_description: "Open ndrstnd after agent implementation"
+  default_prompt: "Launch ndrstnd for the branch I just changed."
