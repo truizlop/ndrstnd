@@ -39,17 +39,34 @@ describe("ndrstnd workspace interactions", () => {
   });
 });
 
-it("changes the portable Story surface at each zoom level", () => {
+it("changes the portable Story surface at every zoom level with staged expansion and collapse", async () => {
   const window = new Window();
   const document = window.document;
-  document.body.innerHTML = `<div id="map" hidden></div><div id="zoom-control"><output id="zoom-label"></output><button data-zoom="0"></button><button data-zoom="1"></button><button data-zoom="2"></button><button data-zoom="3"></button><button data-zoom="4"></button></div><button data-zoom-step="1"></button><button class="zoom-info"></button><dialog id="zoom-dialog"></dialog><div id="selection-menu" hidden></div><article class="chapter"><button class="chapter-toggle"></button><div class="chapter-detail" hidden><div class="evidence-stack"></div></div></article>`;
+  document.body.innerHTML = `<div id="map" hidden></div><div id="zoom-control"><div id="zoom-callout"><output id="zoom-label"></output><span id="zoom-description"></span></div><button data-zoom="0"></button><button data-zoom="1"></button><button data-zoom="2"></button><button data-zoom="3"></button><button data-zoom="4"></button></div><button data-zoom-step="1"></button><div id="selection-menu" hidden></div><article class="chapter"><button class="chapter-toggle"></button><div class="chapter-detail" hidden><div class="evidence-stack"></div></div></article>`;
   window.eval(`${artifactClientScript}${portableEnhancements}`);
-  document.querySelector<HTMLElement>('[data-zoom="0"]')?.click();
-  expect(document.body.classList.contains("story-level-0")).toBe(true);
-  expect(document.querySelector<HTMLElement>("#map")?.hidden).toBe(false);
-  document.querySelector<HTMLElement>('[data-zoom="3"]')?.click();
-  expect(document.body.classList.contains("story-level-3")).toBe(true);
-  expect([...document.body.classList].filter((name) => name.startsWith("story-level-"))).toEqual(["story-level-3"]);
-  expect(document.querySelector("#zoom-label")?.textContent).toBe("Evidence");
-  expect(document.querySelector<HTMLElement>("#map")?.hidden).toBe(true);
+  const cases = [
+    [0, "Map", "Themes and risk distribution", false],
+    [1, "Summary", "Story claims and summaries", false],
+    [2, "Explanation", "Before and after meaning", true],
+    [3, "Evidence", "Focused code excerpts", true],
+    [4, "Raw", "Complete change evidence", true],
+  ] as const;
+
+  for (const [level, label, description, expanded] of cases) {
+    document.querySelector<HTMLElement>(`[data-zoom="${level}"]`)?.click();
+    expect([...document.body.classList].filter((name) => name.startsWith("story-level-"))).toEqual([`story-level-${level}`]);
+    expect(document.querySelector("#zoom-label")?.textContent).toBe(label);
+    expect(document.querySelector("#zoom-description")?.textContent).toBe(description);
+    expect(document.querySelector<HTMLElement>("#zoom-callout")?.style.getPropertyValue("--zoom-position")).toBe(String(level / 4));
+    expect(document.querySelector<HTMLElement>("#zoom-callout")?.dataset.edge).toBe(level === 0 ? "start" : level === 4 ? "end" : "");
+    expect(document.querySelector<HTMLElement>(`[data-zoom="${level}"]`)?.getAttribute("aria-pressed")).toBe("true");
+    expect(document.querySelector(".chapter")?.classList.contains("open")).toBe(expanded);
+    expect(document.querySelector<HTMLElement>("#map")?.hidden).toBe(level !== 0);
+  }
+
+  document.querySelector<HTMLElement>('[data-zoom="1"]')?.click();
+  expect(document.querySelector(".chapter")?.classList.contains("open")).toBe(false);
+  expect(document.querySelector<HTMLElement>(".chapter-detail")?.hidden).toBe(false);
+  await new Promise((resolve) => window.setTimeout(resolve, 280));
+  expect(document.querySelector<HTMLElement>(".chapter-detail")?.hidden).toBe(true);
 });
