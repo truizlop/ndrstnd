@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { renderWorkspace, styles } from "../src/web/page.js";
+import { renderArtifact, renderWorkspace, styles } from "../src/web/page.js";
 import { buildFallbackAnalysis } from "../src/server/analyze.js";
 import type { StoredReviewSession } from "../src/server/store.js";
 
@@ -22,5 +22,16 @@ describe("renderWorkspace", () => {
     expect(styles).toContain("min-height:44px");
     expect(styles).toContain("overflow-x:auto");
     expect(styles).toContain("-webkit-overflow-scrolling:touch");
+  });
+
+  it("renders the zoom rail and callout to the approved shape", () => {
+    const session: StoredReviewSession = {
+      id: "session", repoPath: "/repo", targetRef: "agent-change", baseRef: "main", mergeBase: "abcdef123456", inputHash: "hash", createdAt: "now",
+      input: { repoPath: "/repo", targetRef: "agent-change", baseRef: "main", mergeBase: "abcdef123456", files: [], hunks: [] },
+    };
+    const page = renderArtifact(session, { id: "revision", sessionId: "session", source: "fallback", status: "partial", document: buildFallbackAnalysis(session.input), createdAt: "now" });
+    expect(page.match(/<div class="story-zoom-controls">[\s\S]*?<\/div><\/div><\/header>/)?.[0]).toMatchSnapshot();
+    expect(page).not.toContain('class="zoom-info"');
+    expect(page).not.toContain('<dialog id="zoom-dialog"');
   });
 });
