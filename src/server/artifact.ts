@@ -18,7 +18,7 @@ export async function writeReviewArtifact(session: StoredReviewSession, revision
   await cleanupArtifacts(directory, options.now);
   const timestamp = (options.now ?? new Date()).toISOString().replace(/[:.]/g, "-");
   const filePath = join(directory, `${artifactPrefix}${timestamp}-${revision.id.slice(0, 8)}.html`);
-  await writeFile(filePath, renderArtifact(session, revision), { encoding: "utf8", mode: 0o600 });
+  await writeFile(filePath, await renderArtifact(session, revision), { encoding: "utf8", mode: 0o600 });
   return filePath;
 }
 

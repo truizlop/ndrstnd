@@ -106,7 +106,7 @@ export async function startReviewServer({ port = 0, session, revision, store }: 
       "content-type": "text/html; charset=utf-8",
       "cache-control": "no-store",
     });
-    response.end(session === undefined || activeRevision === undefined ? "ndrstnd is waiting for a review session." : renderWorkspace(session, activeRevision, launchToken));
+    response.end(session === undefined || activeRevision === undefined ? "ndrstnd is waiting for a review session." : await renderWorkspace(session, activeRevision, launchToken));
   });
 
   await new Promise<void>((resolve, reject) => {

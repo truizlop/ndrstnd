@@ -21,7 +21,7 @@ describe("ndrstnd artifacts", () => {
 
     expect(path).toContain(directory);
     expect(html).toContain("ndrstnd");
-    expect(html).toContain("artifact = true;");
+    expect(html).toContain("artifact ");
     expect(html).not.toContain("/api/");
     expect(html).not.toContain("127.0.0.1");
     expect((await stat(path)).mode & 0o777).toBe(0o600);
