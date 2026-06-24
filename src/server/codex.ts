@@ -75,9 +75,13 @@ export class CodexAppServerClient {
       this.notificationListeners.add(listener);
     });
 
-    await this.request("turn/start", { threadId, cwd, approvalPolicy: "never", input: [{ type: "text", text: prompt }] });
-    await completed;
-    return text;
+    try {
+      await this.request("turn/start", { threadId, cwd, approvalPolicy: "never", input: [{ type: "text", text: prompt }] });
+      await completed;
+      return text;
+    } finally {
+      await this.request("thread/archive", { threadId }).catch(() => undefined);
+    }
   }
 
   private async start(): Promise<void> {
