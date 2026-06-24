@@ -9,7 +9,7 @@ The primary reading surface is a portable, self-contained HTML artifact. It must
 ## Artifact workflow
 
 - Generate artifacts under the Git-ignored `.ndrstnd/` directory in the reviewed workspace. Never write them to a tracked path.
-- After every user-visible implementation change, build the project and generate a fresh artifact with `ndrstnd review --base empty --repo <repo> --no-open` (or the appropriate base). Link that new artifact in the handoff so the user can test the actual current output.
+- Generate a fresh artifact with `ndrstnd review --base empty --repo <repo> --no-open` (or the appropriate base) only when the user explicitly requests a review or artifact. Link that artifact in the handoff so the user can test the current output.
 - Keep all reader-facing interactions usable without a server: tabs, Story disclosure, zoom/detail changes, Timeline jumps, Test Plan jumps, diff expansion, review state, and export.
 - When an action needs Codex context that a static artifact cannot call directly, make the action copy a concise, evidence-grounded prompt suitable for pasting into Codex. Never leave a button that only produces an empty toast.
 
