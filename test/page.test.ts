@@ -59,8 +59,9 @@ describe("renderWorkspace", () => {
     expect(page).toContain("Base <strong>main</strong>");
     expect(page).not.toContain("⌘ repo");
     expect(page).toContain('.sidebar.collapsed .nav-item{display:grid;place-items:center;width:42px;height:42px;min-height:42px;padding:0;line-height:1}');
-    expect(page).toContain('.sidebar.collapsed .nav-item span{display:grid;place-items:center;width:20px;height:20px;font-size:16px;line-height:1;text-align:center;transform:none}');
-    expect(page).toContain('.sidebar.collapsed .nav-item[data-view="tests"] span{font-size:14px;transform:translateY(-.5px)}');
+    expect(page).toContain('<span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 18 18">');
+    expect(page).toContain('.sidebar.collapsed .nav-item .nav-icon{display:grid;place-items:center;width:20px;height:20px;line-height:1;text-align:center;transform:none}');
+    expect(page).toContain('.sidebar.collapsed .nav-item .nav-icon svg{width:16px;height:16px}');
     expect(page).toContain(".story-level-0 .chapter-list{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))");
     expect(page).not.toContain("chapter-impact");
     expect(page.match(/\.sidebar\.collapsed nav\{[^`]+?text-align:center;transform:none\}/)?.[0]).toMatchSnapshot();
