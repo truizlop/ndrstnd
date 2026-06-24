@@ -2,6 +2,7 @@ import { mkdir, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import type { AnalysisRevision, StoredReviewSession } from "./store.js";
+import { createReviewPresentationData } from "./review-presentation.js";
 import { renderArtifact } from "../web/page.js";
 
 const artifactPrefix = "ndrstnd-";
@@ -18,7 +19,7 @@ export async function writeReviewArtifact(session: StoredReviewSession, revision
   await cleanupArtifacts(directory, options.now);
   const timestamp = (options.now ?? new Date()).toISOString().replace(/[:.]/g, "-");
   const filePath = join(directory, `${artifactPrefix}${timestamp}-${revision.id.slice(0, 8)}.html`);
-  await writeFile(filePath, await renderArtifact(session, revision), { encoding: "utf8", mode: 0o600 });
+  await writeFile(filePath, await renderArtifact(createReviewPresentationData(session, revision)), { encoding: "utf8", mode: 0o600 });
   return filePath;
 }
 

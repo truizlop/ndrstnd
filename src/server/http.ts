@@ -3,6 +3,7 @@ import { createServer, type Server } from "node:http";
 import type { AnalysisRevision, ReviewStore, StoredReviewSession } from "./store.js";
 import { analyzeWithCodex, answerQuestionWithCodex } from "./analyze.js";
 import { renderWorkspace } from "../web/page.js";
+import { createReviewPresentationData } from "./review-presentation.js";
 
 export interface ReviewServer {
   url: string;
@@ -106,7 +107,7 @@ export async function startReviewServer({ port = 0, session, revision, store }: 
       "content-type": "text/html; charset=utf-8",
       "cache-control": "no-store",
     });
-    response.end(session === undefined || activeRevision === undefined ? "ndrstnd is waiting for a review session." : await renderWorkspace(session, activeRevision, launchToken));
+    response.end(session === undefined || activeRevision === undefined ? "ndrstnd is waiting for a review session." : await renderWorkspace(createReviewPresentationData(session, activeRevision), launchToken));
   });
 
   await new Promise<void>((resolve, reject) => {

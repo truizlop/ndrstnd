@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { renderArtifact, renderWorkspace, styles } from "../src/web/page.js";
+import { createReviewPresentationData } from "../src/server/review-presentation.js";
 import { buildFallbackAnalysis } from "../src/server/analyze.js";
 import type { StoredReviewSession } from "../src/server/store.js";
+import { frozenReviewData } from "./fixtures/review-data.js";
 
 describe("renderWorkspace", () => {
   it("renders the three review modes and evidence-backed data", async () => {
@@ -9,7 +11,7 @@ describe("renderWorkspace", () => {
       id: "session", repoPath: "/repo", targetRef: "agent-change", baseRef: "main", mergeBase: "abcdef123456", inputHash: "hash", createdAt: "now",
       input: { repoPath: "/repo", targetRef: "agent-change", baseRef: "main", mergeBase: "abcdef123456", files: [{ id: "file", path: "app.ts", status: "modified", binary: false, signal: "meaningful" }], hunks: [{ id: "hunk", fileId: "file", oldStart: 1, newStart: 1, lines: [{ kind: "addition", content: "trailer = true;", newLine: 1 }] }] },
     };
-    const page = await renderWorkspace(session, { id: "revision", sessionId: "session", source: "fallback", status: "partial", document: buildFallbackAnalysis(session.input), createdAt: "now" }, "token");
+    const page = await renderWorkspace(createReviewPresentationData(session, { id: "revision", sessionId: "session", source: "fallback", status: "partial", document: buildFallbackAnalysis(session.input), createdAt: "now" }), "token");
     expect(page).toContain("Story");
     expect(page).toContain("Timeline");
     expect(page).toContain("Full diff");
@@ -29,7 +31,7 @@ describe("renderWorkspace", () => {
       id: "session", repoPath: "/repo", targetRef: "agent-change", baseRef: "main", mergeBase: "abcdef123456", inputHash: "hash", createdAt: "now",
       input: { repoPath: "/repo", targetRef: "agent-change", baseRef: "main", mergeBase: "abcdef123456", files: [], hunks: [] },
     };
-    const page = await renderArtifact(session, { id: "revision", sessionId: "session", source: "fallback", status: "partial", document: buildFallbackAnalysis(session.input), createdAt: "now" });
+    const page = await renderArtifact(createReviewPresentationData(session, { id: "revision", sessionId: "session", source: "fallback", status: "partial", document: buildFallbackAnalysis(session.input), createdAt: "now" }));
     expect(page).toContain('class="collapse-sidebar panel-toggle"');
     expect(page).toContain('class="collapse-inspector panel-toggle"');
     expect(page).toContain('class="mobile-inspector-toggle panel-toggle"');
@@ -43,7 +45,7 @@ describe("renderWorkspace", () => {
       id: "session", repoPath: "/repo", targetRef: "agent-change", baseRef: "main", mergeBase: "abcdef123456", inputHash: "hash", createdAt: "now",
       input: { repoPath: "/repo", targetRef: "agent-change", baseRef: "main", mergeBase: "abcdef123456", files: [], hunks: [] },
     };
-    const page = await renderArtifact(session, { id: "revision", sessionId: "session", source: "fallback", status: "partial", document: buildFallbackAnalysis(session.input), createdAt: "now" });
+    const page = await renderArtifact(createReviewPresentationData(session, { id: "revision", sessionId: "session", source: "fallback", status: "partial", document: buildFallbackAnalysis(session.input), createdAt: "now" }));
     expect(page).toContain("width:38px;height:38px;border:1px solid #dfe4e8");
     expect(page).toContain("font-size:20px;line-height:1");
     expect(page).toContain("background:linear-gradient(90deg,#e6f2ff 0%,#f1f8ff 48%,#f6f7f8 100%)");
@@ -73,7 +75,7 @@ describe("renderWorkspace", () => {
       id: "session", repoPath: "/repo", targetRef: "agent-change", baseRef: "main", mergeBase: "abcdef123456", inputHash: "hash", createdAt: "now",
       input: { repoPath: "/repo", targetRef: "agent-change", baseRef: "main", mergeBase: "abcdef123456", files: [], hunks: [] },
     };
-    const page = await renderArtifact(session, { id: "revision", sessionId: "session", source: "fallback", status: "partial", document: buildFallbackAnalysis(session.input), createdAt: "now" });
+    const page = await renderArtifact(createReviewPresentationData(session, { id: "revision", sessionId: "session", source: "fallback", status: "partial", document: buildFallbackAnalysis(session.input), createdAt: "now" }));
     expect(page.match(/<div class="story-zoom-controls">[\s\S]*?<\/div><\/div><\/header>/)?.[0]).toMatchSnapshot();
     expect(page).not.toContain('class="zoom-info"');
     expect(page).not.toContain('<dialog id="zoom-dialog"');
@@ -107,7 +109,7 @@ describe("renderWorkspace", () => {
         ],
       },
     };
-    const page = await renderArtifact(session, { id: "revision", sessionId: "session", source: "fallback", status: "partial", document: buildFallbackAnalysis(session.input), createdAt: "now" });
+    const page = await renderArtifact(createReviewPresentationData(session, { id: "revision", sessionId: "session", source: "fallback", status: "partial", document: buildFallbackAnalysis(session.input), createdAt: "now" }));
     const focusedExcerpt = page.match(/<article class="evidence focused-evidence">[\s\S]*?<\/article>/)?.[0] ?? "";
     expect(focusedExcerpt).toContain("Focused excerpt");
     expect(focusedExcerpt).toContain("execute");
@@ -119,4 +121,11 @@ describe("renderWorkspace", () => {
     expect(page).toContain(".gitignore");
     expect(page).toContain("+1");
   });
+});
+
+it("renders the frozen presentation fixture without Git, analysis, or the review store", async () => {
+  const page = await renderArtifact(frozenReviewData);
+  expect(page).toContain("frozen-ui-change");
+  expect(page).toContain("Run the supplied job");
+  expect(page).toContain("Cover job execution");
 });
