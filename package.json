@@ -12,7 +12,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "npm run typecheck"
+    "lint": "npm run typecheck",
+    "preview:fixture": "tsx src/server/preview-fixture.ts"
   },
   "files": [
     "dist",

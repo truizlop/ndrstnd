@@ -3,7 +3,7 @@ import { renderArtifact, renderWorkspace, styles } from "../src/web/page.js";
 import { createReviewPresentationData } from "../src/server/review-presentation.js";
 import { buildFallbackAnalysis } from "../src/server/analyze.js";
 import type { StoredReviewSession } from "../src/server/store.js";
-import { frozenReviewData } from "./fixtures/review-data.js";
+import { frozenReviewData } from "../src/web/frozen-review-data.js";
 
 describe("renderWorkspace", () => {
   it("renders the three review modes and evidence-backed data", async () => {

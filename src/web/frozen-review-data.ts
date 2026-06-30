@@ -1,4 +1,4 @@
-import type { ReviewPresentationData } from "../../src/web/review-data.js";
+import type { ReviewPresentationData } from "./review-data.js";
 
 /** A stable, intentionally representative review for presentation and visual tests. */
 export const frozenReviewData: ReviewPresentationData = {
