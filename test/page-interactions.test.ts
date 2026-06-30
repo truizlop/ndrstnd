@@ -25,6 +25,7 @@ describe("ndrstnd workspace interactions", () => {
     expect(document.querySelector("#timeline")?.classList.contains("active")).toBe(true);
     expect(document.querySelector("#trailer")?.classList.contains("active")).toBe(false);
 
+    document.body.dataset.storyLevel = "2";
     document.querySelector<HTMLElement>(".chapter-toggle")?.click();
     expect(document.querySelector(".chapter")?.classList.contains("open")).toBe(true);
     expect(document.querySelector<HTMLElement>(".chapter-detail")?.hidden).toBe(false);
@@ -42,7 +43,7 @@ describe("ndrstnd workspace interactions", () => {
 it("changes the portable Story surface at every zoom level with staged expansion and collapse", async () => {
   const window = new Window();
   const document = window.document;
-  document.body.innerHTML = `<div id="map" hidden></div><div id="zoom-control"><div id="zoom-callout"><output id="zoom-label"></output><span id="zoom-description"></span></div><button data-zoom="0"></button><button data-zoom="1"></button><button data-zoom="2"></button><button data-zoom="3"></button><button data-zoom="4"></button></div><button data-zoom-step="1"></button><div id="selection-menu" hidden></div><article class="chapter"><button class="chapter-toggle"></button><div class="chapter-detail" hidden><div class="evidence-stack"></div></div></article>`;
+  document.body.innerHTML = `<button data-view="trailer" class="nav-item active"></button><button data-view="timeline" class="nav-item"></button><section id="trailer" class="view active"></section><section id="timeline" class="view"></section><div id="map" hidden></div><div class="story-zoom-controls"><div id="zoom-control"><div id="zoom-callout"><output id="zoom-label"></output><span id="zoom-description"></span></div><button data-zoom="0"></button><button data-zoom="1"></button><button data-zoom="2"></button><button data-zoom="3"></button><button data-zoom="4"></button></div><button data-zoom-step="1"></button></div><div id="selection-menu" hidden></div><article class="chapter"><button class="chapter-toggle"></button><div class="chapter-detail" hidden><div class="evidence-stack"></div></div></article>`;
   window.eval(`${artifactClientScript}${portableEnhancements}`);
   const cases = [
     [0, "Map", "Themes and risk distribution", false],
@@ -65,10 +66,39 @@ it("changes the portable Story surface at every zoom level with staged expansion
   }
 
   document.querySelector<HTMLElement>('[data-zoom="1"]')?.click();
+  document.querySelector<HTMLElement>(".chapter-toggle")?.click();
   expect(document.querySelector(".chapter")?.classList.contains("open")).toBe(false);
   expect(document.querySelector<HTMLElement>(".chapter-detail")?.hidden).toBe(false);
   await new Promise((resolve) => window.setTimeout(resolve, 280));
   expect(document.querySelector<HTMLElement>(".chapter-detail")?.hidden).toBe(true);
+
+  document.querySelector<HTMLElement>('[data-zoom="0"]')?.click();
+  document.querySelector<HTMLElement>(".chapter-toggle")?.click();
+  expect(document.querySelector(".chapter")?.classList.contains("open")).toBe(false);
+
+  document.querySelector<HTMLElement>('[data-view="timeline"]')?.click();
+  expect(document.querySelector<HTMLElement>(".story-zoom-controls")?.hidden).toBe(true);
+  document.querySelector<HTMLElement>('[data-view="trailer"]')?.click();
+  expect(document.querySelector<HTMLElement>(".story-zoom-controls")?.hidden).toBe(false);
+});
+
+it("exports a portable review file from the inspector actions", () => {
+  const window = new Window({ url: "http://127.0.0.1:3000/" });
+  const document = window.document;
+  const downloads: string[] = [];
+  Object.defineProperty(window.URL, "createObjectURL", { configurable: true, value: () => "blob:review" });
+  Object.defineProperty(window.URL, "revokeObjectURL", { configurable: true, value: () => undefined });
+  document.title = "ndrstnd · agent-change";
+  document.body.innerHTML = `<main class="main"><section id="trailer">Implementation story</section></main><button data-action="export"></button><button data-action="copy-summary"></button><div id="selection-menu" hidden></div><div id="toast" hidden></div>`;
+  window.HTMLAnchorElement.prototype.click = function click() { downloads.push(this.download); };
+  Object.defineProperty(window.navigator, "clipboard", { configurable: true, value: { writeText: async (value: string) => { downloads.push(value); } } });
+
+  window.eval(`${artifactClientScript}`);
+  document.querySelector<HTMLElement>('[data-action="export"]')?.click();
+  expect(downloads).toContain("ndrstnd-agent-change.html");
+
+  document.querySelector<HTMLElement>('[data-action="copy-summary"]')?.click();
+  expect(downloads.at(-1)).toContain("Use this ndrstnd review summary");
 });
 
 it("collapses each desktop rail and opens the review details as a mobile sheet", () => {
