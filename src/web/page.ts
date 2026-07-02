@@ -1,9 +1,12 @@
 import type { AnalysisDocument } from "../shared/analysis-schema.js";
 import type { ChangedFile, DiffHunk, DiffLine } from "../shared/domain.js";
 import type { ReviewPresentationData } from "./review-data.js";
+import { attentionCounts, categoryCounts, chapterMetrics, focusedEvidenceLines, isSupportingFile, linePrefix, toUnifiedDiff } from "./evidence-model.js";
+import { resolveLanguage, syntaxHighlighter } from "./language.js";
+import { buildTestThemes, deriveTestSummary, focusedTestLines, isTestPath, testTypeLabel, type TestThemeModel } from "./test-plan-model.js";
 import { parse as parseDiff } from "diff2html";
 import type { DiffBlock, DiffLine as ParsedDiffLine } from "diff2html/lib/types.js";
-import { getSingletonHighlighter, type BundledLanguage, type Highlighter } from "shiki";
+import type { BundledLanguage, Highlighter } from "shiki";
 
 const riskIcon: Record<string, string> = {
   formatting: "🧹", refactor: "🔧", behavior: "🔁", performance: "⚡", security: "🔐",
@@ -49,20 +52,6 @@ function renderChapters(document: AnalysisDocument, hunks: DiffHunk[], filePaths
       .join("");
     return `<article class="chapter" data-chapter="${escapeHtml(chapter.id)}"><button class="chapter-toggle" aria-expanded="false"><span class="chapter-number attention-${escapeHtml(chapter.attention)}">${index + 1}</span><span class="chapter-copy"><strong>${escapeHtml(chapter.title)}</strong><small>${escapeHtml(chapter.synopsis)}</small><span class="chapter-tags">${chapter.riskCategories.map((risk) => `<span class="chapter-tag">${categoryIcon(risk)}${escapeHtml(risk)}</span>`).join("")}</span>${renderChapterMapMetrics(metrics)}</span><span class="chevron">⌄</span></button><div class="chapter-detail" hidden>${renderSemantic(chapter.before, chapter.after)}${focusedEvidence ? `<div class="evidence-stack">${focusedEvidence}</div>` : ""}</div></article>`;
   }).join("");
-}
-
-function chapterMetrics(chapter: AnalysisDocument["chapters"][number], hunks: DiffHunk[]): { additions: number; deletions: number; files: number; hunks: number; addShare: number; deleteShare: number } {
-  const seen = new Set<string>();
-  const chapterHunks = chapter.evidenceIds.flatMap((id) => {
-    if (seen.has(id)) return [];
-    seen.add(id);
-    return [requireHunk(hunks, id)];
-  });
-  const additions = chapterHunks.flatMap((hunk) => hunk.lines).filter((line) => line.kind === "addition").length;
-  const deletions = chapterHunks.flatMap((hunk) => hunk.lines).filter((line) => line.kind === "deletion").length;
-  const total = additions + deletions;
-  const addShare = total === 0 ? 0 : Math.round((additions / total) * 100);
-  return { additions, deletions, files: new Set(chapterHunks.map((hunk) => hunk.fileId)).size, hunks: chapterHunks.length, addShare, deleteShare: total === 0 ? 0 : 100 - addShare };
 }
 
 function renderChapterMapMetrics(metrics: ReturnType<typeof chapterMetrics>): string {
@@ -122,48 +111,6 @@ function renderOmission(): string {
   return `<span class="line omission" aria-label="Routine lines omitted"><span class="omission-divider"><i></i><b>⌁</b><i></i></span></span>`;
 }
 
-function focusedEvidenceLines(lines: DiffLine[]): Array<{ line: DiffLine; index: number }> {
-  const changed = lines
-    .map((line, index) => ({ line, index, score: evidenceLineScore(line) }))
-    .filter(({ line, score }) => line.kind !== "context" && score > 0)
-    .sort((left, right) => right.score - left.score || left.index - right.index)
-    .slice(0, 10)
-    .sort((left, right) => left.index - right.index);
-  if (changed.length === 0) return [];
-
-  const selected = new Set(changed.map(({ index }) => index));
-  for (const { index } of changed) {
-    for (const neighbour of [index - 1, index + 1]) {
-      const line = lines[neighbour];
-      if (line?.kind === "context" && !isRoutineLine(line.content)) selected.add(neighbour);
-    }
-  }
-  return [...selected].sort((left, right) => left - right).map((index) => ({ line: lines[index]!, index }));
-}
-
-function evidenceLineScore(line: DiffLine): number {
-  if (line.kind === "context" || isRoutineLine(line.content)) return 0;
-  const source = line.content.trim();
-  let score = 10;
-  if (/\b(?:export|function|class|interface|type|return|throw|await|if|switch|for|while|catch)\b/.test(source)) score += 8;
-  if (/=>|\w+\s*\(/.test(source)) score += 4;
-  if (/\b(?:TODO|FIXME|NOTE)\b/.test(source)) score += 2;
-  return score;
-}
-
-function isRoutineLine(source: string): boolean {
-  const line = source.trim();
-  return line.length === 0
-    || /^[{}[\]();,]+$/.test(line)
-    || /^(?:get|set)\s+[A-Za-z_$][\w$]*\s*\(/.test(line)
-    || /^(?:constructor|init)\s*\([^)]*\)\s*\{\s*\}$/.test(line)
-    || /^(?:(?:public|private|protected|readonly|static|declare|abstract|override)\s+)*(?:[A-Za-z_$][\w$]*[!?]?\s*(?::[^=;]+)?\s*=\s*(?:undefined|null|true|false|0|""|''|\[\]|\{\})\s*;?)$/.test(line);
-}
-
-function isSupportingFile(file: ChangedFile | undefined): boolean {
-  return file?.signal === "low-signal" || /(?:^|\/)(?:\.gitignore|license(?:\.[^/]+)?|readme(?:\.[^/]+)?)$/i.test(file?.path ?? "");
-}
-
 function renderOtherFilesChanged(files: ChangedFile[], hunks: DiffHunk[]): string {
   const rows = files.flatMap((file) => {
     if (!isSupportingFile(file)) return [];
@@ -183,17 +130,6 @@ function renderFullDiff(file: ChangedFile, hunks: DiffHunk[], highlighter: Highl
   return `<details class="file full-diff-file" open><summary><span>▱ ${escapeHtml(file.path)}</span><small>${escapeHtml(file.signalReason ?? file.status)}</small></summary>${parsed.blocks.map((block) => renderDiffBlock(block, language, highlighter)).join("")}</details>`;
 }
 
-function toUnifiedDiff(file: ChangedFile, hunks: DiffHunk[]): string {
-  const path = file.path.replace(/\\/g, "/");
-  const header = [`diff --git a/${path} b/${path}`, `--- a/${path}`, `+++ b/${path}`];
-  const blocks = hunks.map((hunk) => {
-    const oldCount = hunk.lines.filter((line) => line.kind !== "addition").length;
-    const newCount = hunk.lines.filter((line) => line.kind !== "deletion").length;
-    return [`@@ -${hunk.oldStart},${oldCount} +${hunk.newStart},${newCount} @@`, ...hunk.lines.map((line) => `${linePrefix(line.kind)}${line.content}`)].join("\n");
-  });
-  return [...header, ...blocks].join("\n");
-}
-
 function renderDiffBlock(block: DiffBlock, language: BundledLanguage, highlighter: Highlighter): string {
   const tokenLines = highlighter.codeToTokens(block.lines.map((line) => line.content.slice(1)).join("\n"), { lang: language, theme: "github-light" }).tokens;
   return `<div class="diff-block"><div class="diff-hunk-header">${escapeHtml(block.header)}</div><pre>${block.lines.map((line, index) => renderDiffLine(line, tokenLines[index] ?? [])).join("")}</pre></div>`;
@@ -204,10 +140,6 @@ function renderDiffLine(line: ParsedDiffLine, tokens: Array<{ content: string; c
   return `<span class="line ${kind}"><b>${line.oldNumber ?? ""}</b><b>${line.newNumber ?? ""}</b><code><span class="diff-prefix">${escapeHtml(line.content.slice(0, 1))}</span>${renderTokens(tokens)}</code></span>`;
 }
 
-function linePrefix(kind: DiffLine["kind"]): string {
-  return kind === "addition" ? "+" : kind === "deletion" ? "-" : " ";
-}
-
 function highlightCode(source: string, language: BundledLanguage, highlighter: Highlighter): string {
   return renderTokens(highlighter.codeToTokens(source, { lang: language, theme: "github-light" }).tokens[0] ?? []);
 }
@@ -216,40 +148,9 @@ function renderTokens(tokens: Array<{ content: string; color?: string; fontStyle
   return tokens.map((token) => `<span${token.color === undefined ? "" : ` style="color:${token.color}"`}${token.fontStyle === 1 ? ' class="token-italic"' : ""}>${escapeHtml(token.content)}</span>`).join("");
 }
 
-async function syntaxHighlighter(files: ChangedFile[]): Promise<Highlighter> {
-  const highlighter = await getSingletonHighlighter({ themes: ["github-light"], langs: [] });
-  await Promise.all([...new Set(files.map((file) => resolveLanguage(file.path)))].map((language) => highlighter.loadLanguage(language)));
-  return highlighter;
-}
-
-function resolveLanguage(path: string): BundledLanguage {
-  const byExtension: Record<string, BundledLanguage> = {
-    ts: "typescript", tsx: "tsx", js: "javascript", jsx: "jsx", json: "json", css: "css", html: "html", htm: "html", md: "markdown", mdx: "mdx", yml: "yaml", yaml: "yaml", swift: "swift", py: "python", rb: "ruby", go: "go", rs: "rust", java: "java", kt: "kotlin", kts: "kotlin", c: "c", h: "c", cpp: "cpp", hpp: "cpp", cs: "csharp", sh: "shellscript", zsh: "shellscript", bash: "shellscript", sql: "sql", xml: "xml", vue: "vue", svelte: "svelte",
-  };
-  const extension = path.toLowerCase().split(".").at(-1) ?? "";
-  return byExtension[extension] ?? "text";
-}
-
 function renderOmitted(document: AnalysisDocument, hunks: DiffHunk[]): string {
   const count = document.omittedGroups.reduce((sum, group) => sum + group.evidenceIds.length, 0);
   return count === 0 ? "" : `<details class="omitted"><summary>${count} low-signal hunks collapsed</summary>${document.omittedGroups.map((group) => `<p><strong>${escapeHtml(group.title)}</strong> · ${escapeHtml(group.reason)}</p>`).join("")}</details>`;
-}
-
-interface TestCaseModel {
-  id: string;
-  name: string;
-  filePath: string;
-  hunk: DiffHunk;
-  chapter: AnalysisDocument["chapters"][number];
-}
-
-interface TestThemeModel {
-  id: string;
-  title: string;
-  synopsis: string;
-  storyClaims: AnalysisDocument["chapters"];
-  testChapters: AnalysisDocument["chapters"];
-  cases: TestCaseModel[];
 }
 
 function renderTestPlan(document: AnalysisDocument, hunks: DiffHunk[], filePaths: Map<string, string>, files: ChangedFile[], highlighter: Highlighter): string {
@@ -266,33 +167,6 @@ function renderTestPlan(document: AnalysisDocument, hunks: DiffHunk[], filePaths
     "Run result not observed",
   ].map((item) => `<span>${escapeHtml(item)}</span>`).join("");
   return `<div class="test-plan-summary">${summary}</div><div class="test-plan-level test-plan-map">${renderTestPlanMap(themes)}</div><div class="test-plan-level test-plan-summary-level">${renderTestPlanSummary(themes)}</div><div class="test-plan-level test-plan-explanation">${renderTestPlanExplanation(themes)}</div><div class="test-plan-level test-plan-evidence">${renderTestPlanEvidence(themes, highlighter)}</div><div class="test-plan-level test-plan-raw">${renderTestPlanRaw(themes, highlighter)}</div>`;
-}
-
-function buildTestThemes(document: AnalysisDocument, hunks: DiffHunk[], filePaths: Map<string, string>): TestThemeModel[] {
-  const testChapters = document.chapters.filter((chapter) => chapter.kind === "test");
-  const storyClaims = document.chapters.filter((chapter) => chapter.kind !== "test");
-  const casesByChapter = new Map(testChapters.map((chapter) => [chapter.id, buildTestCases(chapter, hunks, filePaths)]));
-  const fallbackClaims = storyClaims.length > 0 ? storyClaims : testChapters;
-  if (fallbackClaims.length === 0) return [];
-  return fallbackClaims.map((claim, index) => {
-    const matchingTests = storyClaims.length === 1 ? testChapters : testChapters.filter((testChapter) => sharesAny(testChapter.riskCategories, claim.riskCategories));
-    const selectedTests = matchingTests.length > 0 ? matchingTests : (index === 0 ? testChapters : []);
-    const cases = selectedTests.flatMap((chapter) => casesByChapter.get(chapter.id) ?? []);
-    return { id: claim.id, title: claim.title, synopsis: claim.synopsis, storyClaims: storyClaims.includes(claim) ? [claim] : [], testChapters: selectedTests, cases };
-  }).filter((theme, index, all) => theme.cases.length > 0 || all.length === 1);
-}
-
-function buildTestCases(chapter: AnalysisDocument["chapters"][number], hunks: DiffHunk[], filePaths: Map<string, string>): TestCaseModel[] {
-  const evidence = chapter.evidenceIds.map((id) => requireHunk(hunks, id));
-  const cases = evidence.flatMap((hunk) => {
-    const filePath = filePaths.get(hunk.fileId) ?? hunk.fileId;
-    const names = hunk.lines
-      .filter((line) => line.kind === "addition")
-      .map((line) => line.content.match(/(?:it|test|describe)\s*\(\s*["'`]([^"'`]+)/)?.[1])
-      .filter((name): name is string => name !== undefined);
-    return (names.length > 0 ? names : [`Verify ${basename(filePath)}`]).map((name, index) => ({ id: `${hunk.id}-${index}`, name, filePath, hunk, chapter }));
-  });
-  return cases;
 }
 
 function renderTestPlanMap(themes: TestThemeModel[]): string {
@@ -326,54 +200,9 @@ function renderTestPlanRaw(themes: TestThemeModel[], highlighter: Highlighter): 
 
 function renderTestExcerpt(hunk: DiffHunk, filePath: string, highlighter: Highlighter, raw: boolean): string {
   const language = resolveLanguage(filePath);
-  const focused = focusedEvidenceLines(hunk.lines).map(({ line }) => line);
-  const lines = raw || focused.length === 0 ? hunk.lines : focused;
+  const lines = focusedTestLines(hunk, raw);
   const rendered = lines.map((line) => renderEvidenceLine(line, language, highlighter)).join("");
   return `<article class="evidence focused-evidence"><header><span>▱ ${escapeHtml(filePath)}</span><span>${raw ? "Complete test artifact" : "Focused test excerpt"} · @@ −${hunk.oldStart} +${hunk.newStart} @@</span></header><pre>${rendered}</pre></article>`;
-}
-
-function deriveTestSummary(themes: TestThemeModel[]): string | undefined {
-  const cases = themes.flatMap((theme) => theme.cases);
-  if (cases.length === 0) return undefined;
-  const themesWithCases = themes.filter((theme) => theme.cases.length > 0).map((theme) => theme.title);
-  const topFile = mostCommon(cases.map((testCase) => testCase.filePath));
-  return `Testing focused on ${listPhrase(themesWithCases.slice(0, 2))}. Most test activity was implemented in ${topFile}.`;
-}
-
-function testTypeLabel(cases: TestCaseModel[]): string {
-  if (cases.length === 0) return "Type unavailable";
-  const labels = [...new Set(cases.map((testCase) => inferTestType(testCase.filePath)))];
-  return labels.join(", ");
-}
-
-function inferTestType(path: string): string {
-  const lower = path.toLowerCase();
-  if (/(e2e|end-to-end|playwright|cypress)/.test(lower)) return "End-to-end";
-  if (/(integration|http|server)/.test(lower)) return "Integration";
-  if (/(lint|eslint)/.test(lower)) return "Static analysis";
-  if (/(typecheck|tsc)/.test(lower)) return "Type check";
-  if (/(build)/.test(lower)) return "Build";
-  return "Unit";
-}
-
-function isTestPath(path: string): boolean {
-  return /(?:^|\/)(?:test|tests|__tests__)\/|(?:\.test|\.spec)\.[^.]+$/i.test(path);
-}
-
-function sharesAny(left: readonly string[], right: readonly string[]): boolean {
-  return left.some((value) => right.includes(value));
-}
-
-function mostCommon(values: string[]): string {
-  const counts = new Map<string, number>();
-  for (const value of values) counts.set(value, (counts.get(value) ?? 0) + 1);
-  return [...counts.entries()].sort((left, right) => right[1] - left[1] || left[0].localeCompare(right[0]))[0]?.[0] ?? "test evidence";
-}
-
-function listPhrase(values: string[]): string {
-  if (values.length === 0) return "changed behavior";
-  if (values.length === 1) return values[0]!;
-  return `${values.slice(0, -1).join(", ")} and ${values.at(-1)}`;
 }
 
 function requireHunk(hunks: DiffHunk[], id: string): DiffHunk {
@@ -382,19 +211,6 @@ function requireHunk(hunks: DiffHunk[], id: string): DiffHunk {
   return hunk;
 }
 
-function attentionCounts(document: AnalysisDocument): Record<string, number> {
-  const counts: Record<string, number> = { low: 0, contained: 0, elevated: 0, high: 0, critical: 0 };
-  for (const chapter of document.chapters) counts[chapter.attention] += 1;
-  return counts;
-}
-
-function categoryCounts(document: AnalysisDocument): Record<string, number> {
-  const counts: Record<string, number> = {};
-  for (const chapter of document.chapters) for (const category of chapter.riskCategories) counts[category] = (counts[category] ?? 0) + 1;
-  return counts;
-}
-
-function basename(path: string): string { return path.split("/").filter(Boolean).at(-1) ?? path; }
 function escapeHtml(value: string): string { return value.replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char] ?? char); }
 
 export const styles = `
