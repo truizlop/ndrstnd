@@ -73,6 +73,9 @@ describe("renderWorkspace", () => {
     expect(page).toContain('.sidebar.collapsed .nav-item .nav-icon{display:grid;place-items:center;width:20px;height:20px;line-height:1;text-align:center;transform:none}');
     expect(page).toContain('.sidebar.collapsed .nav-item .nav-icon svg{width:16px;height:16px}');
     expect(page).toContain(".chapter-number.attention-low{background:#e8f7ed;color:#178a4b}");
+    expect(page).toContain(".chapter-map-meta,.chapter-churn-bar{display:none}");
+    expect(page).toContain(".story-level-0 .chapter-map-meta{display:flex");
+    expect(page).toContain(".story-level-0 .chapter-churn-bar .additions{width:calc(var(--add) * 1%);background:#8fd0a4}");
     expect(page).toContain(".story-level-0 .chapter-list{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))");
     expect(page).toContain(".story-level-0 .chapter-list{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;max-height:none;overflow:visible;border:0;border-radius:0;opacity:1;transform:none;pointer-events:none}");
     expect(page).toContain(".story-level-1 .chevron{display:none}");
@@ -141,6 +144,55 @@ describe("renderWorkspace", () => {
     expect(page).toContain("Other files changed");
     expect(page).toContain(".gitignore");
     expect(page).toContain("+1");
+  });
+
+  it("shows Map cards with per-chapter churn, file, and hunk context", async () => {
+    const session: StoredReviewSession = {
+      id: "session", repoPath: "/repo", targetRef: "agent-change", baseRef: "main", mergeBase: "abcdef123456", inputHash: "hash", createdAt: "now",
+      input: {
+        repoPath: "/repo", targetRef: "agent-change", baseRef: "main", mergeBase: "abcdef123456",
+        files: [
+          { id: "runner", path: "src/runner.ts", status: "modified", binary: false, signal: "meaningful" },
+          { id: "test", path: "test/runner.test.ts", status: "modified", binary: false, signal: "meaningful" },
+        ],
+        hunks: [
+          {
+            id: "runner-hunk", fileId: "runner", oldStart: 8, newStart: 8,
+            lines: [
+              { kind: "deletion", content: "runLegacyJob(job);", oldLine: 8 },
+              { kind: "addition", content: "runQueuedJob(job);", newLine: 8 },
+              { kind: "addition", content: "recordRun(job.id);", newLine: 9 },
+            ],
+          },
+          {
+            id: "test-hunk", fileId: "test", oldStart: 3, newStart: 3,
+            lines: [{ kind: "addition", content: "test(\"runs queued jobs\", () => {});", newLine: 3 }],
+          },
+        ],
+      },
+    };
+    const document = {
+      summary: "Runner work is grouped into one story card.",
+      chapters: [{
+        id: "runner-story",
+        title: "Runner queue behavior",
+        kind: "behavior" as const,
+        synopsis: "Queued jobs now record run state.",
+        confidence: "high" as const,
+        attention: "contained" as const,
+        riskCategories: ["behavior" as const],
+        evidenceIds: ["runner-hunk", "test-hunk"],
+      }],
+      omittedGroups: [],
+      unclassifiedEvidenceIds: [],
+    };
+    const page = await renderArtifact(createReviewPresentationData(session, { id: "revision", sessionId: "session", source: "codex", status: "complete", document, createdAt: "now" }));
+    const card = page.match(/<article class="chapter" data-chapter="runner-story"><button class="chapter-toggle"[\s\S]*?<\/button>/)?.[0] ?? "";
+    expect(card).toContain('class="chapter-map-meta" aria-label="3 additions, 1 deletion, 2 files, 2 hunks"');
+    expect(card).toContain('<b class="additions">+3</b><b class="deletions">−1</b>');
+    expect(card).toContain("<span>2 files</span><span>2 hunks</span>");
+    expect(card).toContain('class="chapter-churn-bar" aria-hidden="true" style="--add:75;--delete:25"');
+    expect(card).toMatchSnapshot();
   });
 });
 
