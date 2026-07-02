@@ -72,6 +72,7 @@ describe("renderWorkspace", () => {
     expect(page).toContain('<span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 18 18">');
     expect(page).toContain('.sidebar.collapsed .nav-item .nav-icon{display:grid;place-items:center;width:20px;height:20px;line-height:1;text-align:center;transform:none}');
     expect(page).toContain('.sidebar.collapsed .nav-item .nav-icon svg{width:16px;height:16px}');
+    expect(page).toContain(".chapter-number.attention-low{background:#e8f7ed;color:#178a4b}");
     expect(page).toContain(".story-level-0 .chapter-list{display:grid;grid-template-columns:repeat(3,minmax(0,1fr))");
     expect(page).toContain(".story-level-0 .chapter-list{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;max-height:none;overflow:visible;border:0;border-radius:0;opacity:1;transform:none;pointer-events:none}");
     expect(page).toContain(".story-level-1 .chevron{display:none}");
@@ -148,4 +149,5 @@ it("renders the frozen presentation fixture without Git, analysis, or the review
   expect(page).toContain("frozen-ui-change");
   expect(page).toContain("Run the supplied job");
   expect(page).toContain("Cover job execution");
+  expect(page).toContain('class="chapter-number attention-low"');
 });
