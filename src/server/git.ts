@@ -11,6 +11,7 @@ export interface CollectedReviewInput {
   targetRef: string;
   baseRef: string;
   mergeBase: string;
+  includesWorkingTree?: boolean;
   files: ChangedFile[];
   hunks: DiffHunk[];
 }
@@ -25,7 +26,8 @@ export class GitReader implements GitRepositoryReader {
     const workingTreeTarget = targetRef === "WORKTREE";
     if (!workingTreeTarget) await git(repoPath, ["rev-parse", "--verify", targetRef]);
 
-    const baseRef = explicitBaseRef === "empty" ? EMPTY_TREE : explicitBaseRef ?? await resolveBaseRef(repoPath, targetRef);
+    const baseTargetRef = workingTreeTarget ? await resolveWorktreeTargetRef(repoPath) : targetRef;
+    const baseRef = explicitBaseRef === "empty" ? EMPTY_TREE : explicitBaseRef ?? await resolveBaseRef(repoPath, baseTargetRef);
     if (baseRef !== EMPTY_TREE) await git(repoPath, ["rev-parse", "--verify", baseRef]);
     const head = await gitOptional(repoPath, ["rev-parse", "HEAD"]);
     const target = workingTreeTarget ? head?.trim() : (await git(repoPath, ["rev-parse", targetRef])).trim();
@@ -49,7 +51,7 @@ export class GitReader implements GitRepositoryReader {
       file.signalReason = classification.reason;
     }
 
-    return { repoPath, targetRef, baseRef: explicitBaseRef === "empty" ? "empty" : baseRef, mergeBase, files, hunks };
+    return { repoPath, targetRef, baseRef: explicitBaseRef === "empty" ? "empty" : baseRef, mergeBase, includesWorkingTree: includeWorkingTree, files, hunks };
   }
 }
 
@@ -84,6 +86,11 @@ async function resolveBaseRef(repoPath: string, targetRef: string): Promise<stri
     }
   }
   throw new Error(`Cannot infer a base for ${targetRef}. Check out its base branch or configure an upstream branch.`);
+}
+
+async function resolveWorktreeTargetRef(repoPath: string): Promise<string> {
+  const branch = await gitOptional(repoPath, ["symbolic-ref", "--quiet", "--short", "HEAD"]);
+  return branch?.trim() || "HEAD";
 }
 
 async function git(repoPath: string, args: string[]): Promise<string> {

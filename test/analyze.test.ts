@@ -19,6 +19,37 @@ describe("analysis documents", () => {
     expect(buildFallbackAnalysis(input)).toMatchObject({ chapters: [{ evidenceIds: ["source-hunk"] }], omittedGroups: [{ evidenceIds: ["lock-hunk"] }] });
   });
 
+  it("groups fallback chapters by semantic area instead of mirroring files and hunks", () => {
+    const groupedInput: CollectedReviewInput = {
+      ...input,
+      files: [
+        { id: "git", path: "src/server/git.ts", status: "modified", binary: false, signal: "meaningful" },
+        { id: "page", path: "src/web/page.ts", status: "modified", binary: false, signal: "meaningful" },
+        { id: "page-test", path: "test/page.test.ts", status: "modified", binary: false, signal: "meaningful" },
+        { id: "git-test", path: "test/git.test.ts", status: "modified", binary: false, signal: "meaningful" },
+      ],
+      hunks: [
+        { id: "git-range", fileId: "git", oldStart: 1, newStart: 1, lines: [{ kind: "addition", content: "const baseRef = resolveWorktreeTargetRef(repoPath);", newLine: 1 }] },
+        { id: "git-diff", fileId: "git", oldStart: 20, newStart: 20, lines: [{ kind: "addition", content: "return git diff --stat for the worktree;", newLine: 20 }] },
+        { id: "page-map", fileId: "page", oldStart: 1, newStart: 1, lines: [{ kind: "addition", content: "render Story Map cards with chapter metrics", newLine: 1 }] },
+        { id: "page-zoom", fileId: "page", oldStart: 40, newStart: 40, lines: [{ kind: "addition", content: "story zoom controls stay hidden outside Story", newLine: 40 }] },
+        { id: "page-test-map", fileId: "page-test", oldStart: 1, newStart: 1, lines: [{ kind: "addition", content: "it(\"shows Map cards with per-chapter churn\", () => {})", newLine: 1 }] },
+        { id: "git-test-worktree", fileId: "git-test", oldStart: 1, newStart: 1, lines: [{ kind: "addition", content: "it(\"includes worktree changes\", () => {})", newLine: 1 }] },
+      ],
+    };
+
+    const fallback = buildFallbackAnalysis(groupedInput);
+
+    expect(fallback.summary).toBe("The branch changes review input collection, review presentation, and test coverage across 4 files.");
+    expect(fallback.chapters.map((chapter) => chapter.title)).toEqual(["Review input collection", "Review presentation", "Test coverage"]);
+    expect(fallback.chapters).toHaveLength(3);
+    expect(fallback.chapters.map((chapter) => chapter.title)).not.toContain("src/server/git.ts");
+    expect(fallback.chapters.find((chapter) => chapter.title === "Review input collection")?.evidenceIds).toEqual(["git-range", "git-diff"]);
+    expect(fallback.chapters.find((chapter) => chapter.title === "Review presentation")?.evidenceIds).toEqual(["page-map", "page-zoom"]);
+    expect(fallback.chapters.find((chapter) => chapter.title === "Test coverage")?.evidenceIds).toEqual(["page-test-map", "git-test-worktree"]);
+    expect(new Set(fallback.chapters.flatMap((chapter) => chapter.evidenceIds))).toEqual(new Set(groupedInput.hunks.map((hunk) => hunk.id)));
+  });
+
   it("rejects fabricated evidence", () => {
     expect(() => parseAnalysisDocument({ summary: "x", chapters: [{ id: "one", title: "x", kind: "other", synopsis: "x", confidence: "low", attention: "low", riskCategories: [], evidenceIds: ["not-real"] }], omittedGroups: [], unclassifiedEvidenceIds: [] }, input)).toThrow("unknown evidence");
   });
@@ -97,6 +128,13 @@ describe("analysis documents", () => {
 
     expect(prompt).toContain("compact manifest");
     expect(prompt.length).toBeLessThan(legacyReviewInput.length / 2);
+  });
+
+  it("uses worktree-inclusive inspection commands when dirty changes are part of the review", () => {
+    const manifest = buildPromptReviewInput({ ...input, includesWorkingTree: true });
+
+    expect(manifest.inspection.summaryCommand).toBe("git diff --stat --find-renames --find-copies main");
+    expect(manifest.inspection.patchCommand).toBe("git diff --no-ext-diff --unified=80 --find-renames --find-copies main -- <path>");
   });
 
   it("asks for compact output that is materially smaller than the full document shape", () => {

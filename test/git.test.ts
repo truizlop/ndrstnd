@@ -59,7 +59,7 @@ describe("GitReader", () => {
     expect(input.files.map((file) => file.path)).toEqual(["change.txt"]);
   });
 
-  it("includes staged, unstaged, and untracked working-tree changes against an explicit base", async () => {
+  it("includes committed, staged, unstaged, and untracked current-branch changes against an explicit base", async () => {
     repository = await mkdtemp(join(tmpdir(), "ndrstnd-git-"));
     await git(repository, ["init", "-b", "main"]);
     await git(repository, ["config", "user.email", "ndrstnd@example.test"]);
@@ -70,15 +70,40 @@ describe("GitReader", () => {
     await git(repository, ["switch", "-c", "agent-change"]);
     await writeFile(join(repository, "app.ts"), "export const version = 2;\n");
     await git(repository, ["add", "app.ts"]);
+    await git(repository, ["commit", "-m", "committed branch change"]);
+    await writeFile(join(repository, "staged.ts"), "export const staged = true;\n");
+    await git(repository, ["add", "staged.ts"]);
     await writeFile(join(repository, "app.ts"), "export const version = 3;\n");
     await writeFile(join(repository, "untracked.ts"), "export const untracked = true;\n");
 
     const input = await new GitReader().collectReviewInput(repository, "agent-change", "main");
 
     expect(input.baseRef).toBe("main");
-    expect(input.files.map((file) => file.path)).toEqual(["app.ts", "untracked.ts"]);
+    expect(input.includesWorkingTree).toBe(true);
+    expect(input.files.map((file) => file.path)).toEqual(["app.ts", "staged.ts", "untracked.ts"]);
+    expect(input.hunks.flatMap((hunk) => hunk.lines)).toContainEqual(expect.objectContaining({ kind: "deletion", content: "export const version = 1;" }));
     expect(input.hunks.flatMap((hunk) => hunk.lines)).toContainEqual(expect.objectContaining({ kind: "addition", content: "export const version = 3;" }));
+    expect(input.hunks.flatMap((hunk) => hunk.lines)).toContainEqual(expect.objectContaining({ kind: "addition", content: "export const staged = true;" }));
     expect(input.hunks.flatMap((hunk) => hunk.lines)).toContainEqual(expect.objectContaining({ kind: "addition", content: "export const untracked = true;" }));
+  });
+
+  it("infers the checked-out branch base for a worktree review", async () => {
+    repository = await mkdtemp(join(tmpdir(), "ndrstnd-git-"));
+    await git(repository, ["init", "-b", "main"]);
+    await git(repository, ["config", "user.email", "ndrstnd@example.test"]);
+    await git(repository, ["config", "user.name", "ndrstnd Test"]);
+    await writeFile(join(repository, "base.txt"), "base\n");
+    await git(repository, ["add", "."]);
+    await git(repository, ["commit", "-m", "base"]);
+    await git(repository, ["switch", "-c", "agent-change"]);
+    await git(repository, ["branch", "--set-upstream-to", "main"]);
+    await writeFile(join(repository, "worktree.txt"), "dirty\n");
+
+    const input = await new GitReader().collectReviewInput(repository, "WORKTREE");
+
+    expect(input.baseRef).toBe("main");
+    expect(input.includesWorkingTree).toBe(true);
+    expect(input.files.map((file) => file.path)).toEqual(["worktree.txt"]);
   });
 
   it("reviews an initial uncommitted repository against the empty tree", async () => {
@@ -89,6 +114,7 @@ describe("GitReader", () => {
     const input = await new GitReader().collectReviewInput(repository, "WORKTREE", "empty");
 
     expect(input.baseRef).toBe("empty");
+    expect(input.includesWorkingTree).toBe(true);
     expect(input.files).toMatchObject([{ path: "first.ts", status: "added" }]);
     expect(input.hunks.flatMap((hunk) => hunk.lines)).toContainEqual(expect.objectContaining({ kind: "addition", content: "export const first = true;" }));
   });

@@ -9,25 +9,100 @@ export function buildFallbackAnalysis(input: CollectedReviewInput): AnalysisDocu
   const filesById = new Map(input.files.map((file) => [file.id, file]));
   const meaningful = input.hunks.filter((hunk) => filesById.get(hunk.fileId)?.signal === "meaningful");
   const lowSignal = input.hunks.filter((hunk) => filesById.get(hunk.fileId)?.signal === "low-signal");
-  const chapters = meaningful.map((hunk) => {
-    const file = filesById.get(hunk.fileId);
-    return {
-      id: `raw-${hunk.id}`,
-      title: file?.path ?? "Changed source",
-      kind: "other" as const,
-      synopsis: `Review the change in ${file?.path ?? "this source file"}. Semantic analysis is not available yet.`,
-      confidence: "low" as const,
-      attention: "contained" as const,
-      riskCategories: ["refactor" as const],
-      evidenceIds: [hunk.id],
-    };
-  });
+  const groups = new Map<string, ReturnType<typeof fallbackGroupForHunk> & { evidenceIds: string[] }>();
+  for (const hunk of meaningful) {
+    const group = fallbackGroupForHunk(hunk, filesById.get(hunk.fileId)?.path);
+    const existing = groups.get(group.id);
+    if (existing === undefined) groups.set(group.id, { ...group, evidenceIds: [hunk.id] });
+    else existing.evidenceIds.push(hunk.id);
+  }
+  const chapters = [...groups.values()].map((group) => ({
+    id: group.id,
+    title: group.title,
+    kind: group.kind,
+    synopsis: group.synopsis,
+    confidence: "low" as const,
+    attention: group.attention,
+    riskCategories: group.riskCategories,
+    evidenceIds: group.evidenceIds,
+  }));
   return {
-    summary: `${input.files.length} changed files; ${meaningful.length} meaningful evidence hunks are ready for review.`,
+    summary: fallbackSummary(input.files.length, chapters.map((chapter) => chapter.title)),
     chapters,
     omittedGroups: lowSignal.length === 0 ? [] : [{ title: "Low-signal changes", reason: "Automatically classified as generated, binary, vendor, or lockfile content.", evidenceIds: lowSignal.map((hunk) => hunk.id) }],
     unclassifiedEvidenceIds: [],
   };
+}
+
+function fallbackGroupForHunk(hunk: CollectedReviewInput["hunks"][number], path: string | undefined) {
+  const normalizedPath = (path ?? "").toLowerCase();
+  const changedText = hunk.lines.filter((line) => line.kind !== "context").map((line) => line.content).join("\n").toLowerCase();
+
+  if (/(^|\/)(?:test|tests|__snapshots__)\//.test(normalizedPath) || /\.(?:test|spec)\.[cm]?[jt]sx?$/.test(normalizedPath) || /\b(?:expect|it|test|describe)\s*\(/.test(changedText)) {
+    return {
+      id: "test-coverage",
+      title: "Test coverage",
+      kind: "test" as const,
+      synopsis: "Tests and snapshots describe the intended behavior changes.",
+      attention: "low" as const,
+      riskCategories: ["behavior" as const],
+    };
+  }
+
+  if (/src\/web|artifact|page|story|zoom|chapter|timeline|diff/.test(normalizedPath) || /\b(?:story|zoom|chapter|artifact|render|snapshot)\b/.test(changedText)) {
+    return {
+      id: "review-presentation",
+      title: "Review presentation",
+      kind: "behavior" as const,
+      synopsis: "The static review artifact changes how the story, evidence, and actions are presented.",
+      attention: "contained" as const,
+      riskCategories: ["behavior" as const],
+    };
+  }
+
+  if (/src\/server\/git|gitreader|worktree|merge-base|mergebase|diff/.test(normalizedPath) || /\b(?:worktree|mergebase|merge-base|baseRef|targetRef|git diff|untracked|staged)\b/i.test(changedText)) {
+    return {
+      id: "review-input-collection",
+      title: "Review input collection",
+      kind: "behavior" as const,
+      synopsis: "Review input collection changes how Git ranges and working-tree evidence are gathered.",
+      attention: "contained" as const,
+      riskCategories: ["behavior" as const],
+    };
+  }
+
+  if (/src\/server\/(?:analyze|codex|conversation)|prompt|analysis/.test(normalizedPath) || /\b(?:prompt|analysis|codex|conversation|evidenceIds)\b/.test(changedText)) {
+    return {
+      id: "analysis-grouping",
+      title: "Analysis grouping",
+      kind: "behavior" as const,
+      synopsis: "Analysis and prompt handling change how evidence becomes a readable review story.",
+      attention: "contained" as const,
+      riskCategories: ["behavior" as const],
+    };
+  }
+
+  return {
+    id: "implementation-support",
+    title: "Implementation support",
+    kind: "other" as const,
+    synopsis: "Supporting source changes contribute to the reviewed behavior.",
+    attention: "contained" as const,
+    riskCategories: ["refactor" as const],
+  };
+}
+
+function fallbackSummary(fileCount: number, titles: string[]): string {
+  if (titles.length === 0) return `${fileCount} changed files are ready for review.`;
+  const visible = titles.slice(0, 3);
+  const tail = titles.length > visible.length ? `, and ${titles.length - visible.length} more area${titles.length - visible.length === 1 ? "" : "s"}` : "";
+  return `The branch changes ${formatList(visible.map((title) => title.toLowerCase()))}${tail} across ${fileCount} file${fileCount === 1 ? "" : "s"}.`;
+}
+
+function formatList(values: string[]): string {
+  if (values.length <= 1) return values[0] ?? "";
+  if (values.length === 2) return `${values[0]} and ${values[1]}`;
+  return `${values.slice(0, -1).join(", ")}, and ${values.at(-1)}`;
 }
 
 export function parseAnalysisDocument(value: unknown, input: CollectedReviewInput): AnalysisDocument {
@@ -226,7 +301,7 @@ function compactText(text: string, limit: number): string {
 }
 
 function diffRange(input: CollectedReviewInput): string {
-  if (input.targetRef === "WORKTREE") return input.baseRef === "empty" ? input.mergeBase : input.baseRef;
+  if (input.includesWorkingTree) return input.baseRef === "empty" ? input.mergeBase : input.baseRef;
   return `${input.mergeBase}...${input.targetRef}`;
 }
 
