@@ -194,6 +194,93 @@ describe("renderWorkspace", () => {
     expect(card).toContain('class="chapter-churn-bar" aria-hidden="true" style="--add:75;--delete:25"');
     expect(card).toMatchSnapshot();
   });
+
+  it("renders Test plan zoom projections from one test information model", async () => {
+    const session: StoredReviewSession = {
+      id: "session", repoPath: "/repo", targetRef: "agent-change", baseRef: "main", mergeBase: "abcdef123456", inputHash: "hash", createdAt: "now",
+      input: {
+        repoPath: "/repo", targetRef: "agent-change", baseRef: "main", mergeBase: "abcdef123456",
+        files: [
+          { id: "source", path: "src/git.ts", status: "modified", binary: false, signal: "meaningful" },
+          { id: "test", path: "test/git.test.ts", status: "modified", binary: false, signal: "meaningful" },
+        ],
+        hunks: [
+          { id: "source-hunk", fileId: "source", oldStart: 10, newStart: 10, lines: [{ kind: "addition", content: "collectWorktreeChanges();", newLine: 10 }] },
+          {
+            id: "test-hunk", fileId: "test", oldStart: 3, newStart: 3,
+            lines: [
+              { kind: "context", content: "describe(\"worktree review\", () => {", oldLine: 3, newLine: 3 },
+              { kind: "addition", content: "  test(\"includes staged and unstaged changes\", () => {", newLine: 4 },
+              { kind: "addition", content: "    expect(input.files).toContain(\"draft.ts\");", newLine: 5 },
+              { kind: "addition", content: "  });", newLine: 6 },
+            ],
+          },
+        ],
+      },
+    };
+    const document = {
+      summary: "Worktree-aware review input.",
+      chapters: [
+        {
+          id: "worktree-theme",
+          title: "Worktree handling",
+          kind: "behavior" as const,
+          synopsis: "Review input now includes local worktree changes.",
+          before: "Review input focused on committed branch differences.",
+          after: "Review input includes local worktree changes.",
+          confidence: "high" as const,
+          attention: "contained" as const,
+          riskCategories: ["behavior" as const],
+          evidenceIds: ["source-hunk"],
+        },
+        {
+          id: "worktree-tests",
+          title: "Exercise worktree handling",
+          kind: "test" as const,
+          synopsis: "Tests show staged and unstaged changes are included in review input.",
+          confidence: "high" as const,
+          attention: "low" as const,
+          riskCategories: ["behavior" as const],
+          evidenceIds: ["test-hunk"],
+        },
+      ],
+      omittedGroups: [],
+      unclassifiedEvidenceIds: [],
+    };
+    const page = await renderArtifact(createReviewPresentationData(session, { id: "revision", sessionId: "session", source: "codex", status: "complete", document, createdAt: "now" }));
+    expect(page).toContain("See how the changed behavior was exercised, from high-level themes to raw test evidence.");
+    expect(page).toContain("1 tested behavior");
+    expect(page).toContain("1 test file");
+    expect(page).toContain("Run result not observed");
+    expect(page).toContain('class="test-plan-level test-plan-map"');
+    expect(page).toContain("Worktree handling");
+    expect(page).toContain("Unit");
+    expect(page).toContain('class="test-plan-level test-plan-summary-level"');
+    expect(page).toContain("includes staged and unstaged changes");
+    expect(page).toContain("Test implementation found");
+    expect(page).toContain('class="test-plan-level test-plan-explanation"');
+    expect(page).toContain("What the test demonstrates");
+    expect(page).toContain("Related story claim");
+    expect(page).toContain('class="test-plan-level test-plan-evidence"');
+    expect(page).toContain("Execution evidence not observed");
+    expect(page).toContain('class="test-plan-level test-plan-raw"');
+    expect(page).toContain("Changed test files");
+    expect(page).toContain("Complete output");
+    expect(page).not.toContain("Coverage gap");
+    expect(page).not.toContain("Suggested test");
+  });
+
+  it("renders a neutral Test plan empty state", async () => {
+    const session: StoredReviewSession = {
+      id: "session", repoPath: "/repo", targetRef: "agent-change", baseRef: "main", mergeBase: "abcdef123456", inputHash: "hash", createdAt: "now",
+      input: { repoPath: "/repo", targetRef: "agent-change", baseRef: "main", mergeBase: "abcdef123456", files: [], hunks: [] },
+    };
+    const page = await renderArtifact(createReviewPresentationData(session, { id: "revision", sessionId: "session", source: "fallback", status: "partial", document: buildFallbackAnalysis(session.input), createdAt: "now" }));
+    expect(page).not.toContain("Test plan</button>");
+    expect(page).toContain("No test activity was captured for this change.");
+    expect(page).not.toContain("No dedicated test change was identified.");
+    expect(page).not.toContain("Missing test");
+  });
 });
 
 it("renders the frozen presentation fixture without Git, analysis, or the review store", async () => {

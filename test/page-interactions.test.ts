@@ -84,12 +84,29 @@ it("changes the portable Story surface at every zoom level with staged expansion
   expect(zoomVisibilityByView).toMatchInlineSnapshot(`
     {
       "diff": true,
-      "tests": true,
+      "tests": false,
       "timeline": true,
       "trailer": false,
     }
   `);
   expect(document.querySelector<HTMLElement>(".story-zoom-controls")?.hidden).toBe(false);
+});
+
+it("uses the shared zoom rail on Test plan and jumps from behavior summary to evidence", async () => {
+  const window = new Window();
+  const document = window.document;
+  document.body.innerHTML = `<button data-view="trailer" class="nav-item active"></button><button data-view="tests" class="nav-item"></button><section id="trailer" class="view active"></section><section id="tests" class="view"><article class="test-behavior"><button data-test-jump="case-1"></button></article><div class="test-plan-evidence"><details data-test-case="case-1"></details></div></section><div id="map" hidden></div><div class="story-zoom-controls"><div id="zoom-control"><div id="zoom-callout"><output id="zoom-label"></output><span id="zoom-description"></span></div><button data-zoom="0"></button><button data-zoom="1"></button><button data-zoom="2"></button><button data-zoom="3"></button><button data-zoom="4"></button></div></div><div id="selection-menu" hidden></div>`;
+  window.eval(`${artifactClientScript}${portableEnhancements}`);
+
+  document.querySelector<HTMLElement>('[data-view="tests"]')?.click();
+  expect(document.querySelector<HTMLElement>(".story-zoom-controls")?.hidden).toBe(false);
+  expect(document.querySelector("#zoom-description")?.textContent).toBe("Tested behaviors");
+
+  document.querySelector<HTMLElement>('[data-test-jump="case-1"]')?.click();
+  await new Promise((resolve) => window.setTimeout(resolve, 0));
+  expect(document.body.dataset.storyLevel).toBe("3");
+  expect(document.querySelector("#zoom-description")?.textContent).toBe("Test cases and excerpts");
+  expect(document.querySelector<HTMLDetailsElement>('[data-test-case="case-1"]')?.open).toBe(true);
 });
 
 it("restores non-Story views with the zoom controls hidden", () => {
@@ -112,6 +129,19 @@ it("restores non-Story views with the zoom controls hidden", () => {
       "zoomHidden": true,
     }
   `);
+});
+
+it("restores the Test plan with zoom controls visible", () => {
+  const window = new Window({ url: "http://127.0.0.1:3000/" });
+  const document = window.document;
+  window.localStorage.setItem("ndrstnd-artifact-ui-preferences-v1", JSON.stringify({ zoom: 2, view: "tests" }));
+  document.body.innerHTML = `<button data-view="trailer" class="nav-item active"></button><button data-view="tests" class="nav-item"></button><section id="trailer" class="view active"></section><section id="tests" class="view"></section><div id="map" hidden></div><div class="story-zoom-controls"><div id="zoom-control"><div id="zoom-callout"><output id="zoom-label"></output><span id="zoom-description"></span></div><button data-zoom="0"></button><button data-zoom="1"></button><button data-zoom="2"></button><button data-zoom="3"></button><button data-zoom="4"></button></div></div><div id="selection-menu" hidden></div>`;
+  window.eval(`${artifactClientScript}${portableEnhancements}`);
+
+  expect(document.querySelector("#tests")?.classList.contains("active")).toBe(true);
+  expect(document.body.dataset.storyLevel).toBe("2");
+  expect(document.querySelector<HTMLElement>(".story-zoom-controls")?.hidden).toBe(false);
+  expect(document.querySelector("#zoom-description")?.textContent).toBe("Behavior meaning");
 });
 
 it("sets zoom-level classes that select focused or raw evidence", () => {
