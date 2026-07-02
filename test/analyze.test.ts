@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { analysisPrompt, buildFallbackAnalysis, buildPromptReviewInput, parseAnalysisDocument } from "../src/server/analyze.js";
+import { analysisPrompt, buildFallbackAnalysis, buildPromptReviewInput, parseAnalysisDocument } from "../src/server/analysis-core.js";
 import type { CollectedReviewInput } from "../src/server/git.js";
 
 const input: CollectedReviewInput = {
