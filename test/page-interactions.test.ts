@@ -219,6 +219,30 @@ it("exports a portable review file from the inspector actions", () => {
   expect(downloads.at(-1)).toContain("Use this ndrstnd review summary");
 });
 
+it("shows the Codex prompt manually when clipboard copy is denied", async () => {
+  const window = new Window({ url: "http://127.0.0.1:3000/" });
+  const document = window.document;
+  const prompts: Array<{ message: string; value?: string }> = [];
+  document.body.innerHTML = `<main class="main"><section id="trailer">Implementation story</section></main><button data-action="copy-summary"></button><div id="selection-menu" hidden></div><div id="toast" hidden></div>`;
+  Object.defineProperty(window.navigator, "clipboard", { configurable: true, value: { writeText: async () => { throw new Error("denied"); } } });
+  window.prompt = (message?: string, value?: string) => {
+    prompts.push({ message: message ?? "", value });
+    return null;
+  };
+
+  window.eval(`${artifactClientScript}`);
+  document.querySelector<HTMLElement>('[data-action="copy-summary"]')?.click();
+  await new Promise((resolve) => window.setTimeout(resolve, 0));
+
+  expect(prompts).toEqual([
+    {
+      message: "Copy this prompt for Codex:",
+      value: expect.stringContaining("Use this ndrstnd review summary"),
+    },
+  ]);
+  expect(document.querySelector("#toast")?.textContent).toBe("Copy prompt shown for Codex.");
+});
+
 it("collapses each desktop rail and opens the review details as a mobile sheet", () => {
   const window = new Window();
   const document = window.document;

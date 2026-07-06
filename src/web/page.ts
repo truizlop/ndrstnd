@@ -274,7 +274,7 @@ export const clientScript = `
     if (questionButton) { const question = questionButton.getAttribute('data-question') || window.prompt('What would you like to understand about these lines?'); if (question && selectedText) await submitQuestion(question); return; }
     const action = target.closest('[data-action]')?.getAttribute('data-action');
     if (action === 'export') { downloadReview(); toast('Review exported as an HTML file.'); return; }
-    if (action === 'copy-summary') { navigator.clipboard?.writeText(summaryPrompt()); toast('Summary prompt copied for Codex.'); return; }
+    if (action === 'copy-summary') { copyPrompt(summaryPrompt(), 'Summary prompt copied for Codex.'); return; }
     if (action === 'settings') { toast('Lens and zoom preferences are saved locally.'); }
   });
 
@@ -283,6 +283,8 @@ export const clientScript = `
   async function submitQuestion(question) { byId('selection-menu').hidden = true; toast('Grounding an answer in the selected evidence…'); try { await api('/api/revision/' + state.revisionId + '/questions', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ selection: selectedText, question }) }); await loadQuestions(); toast('Added an evidence-grounded note.'); } catch (error) { toast(error.message); } }
   function openChapter(chapter, open) { if (!chapter) return; chapter.classList.toggle('open', open); chapter.querySelector('.chapter-detail').hidden = !open; chapter.querySelector('.chapter-toggle').setAttribute('aria-expanded', String(open)); }
   function downloadReview() { const blob = new Blob(['<!doctype html>\\n' + document.documentElement.outerHTML], { type: 'text/html' }); const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = document.title.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase() + '.html'; document.body.append(link); link.click(); link.remove(); window.setTimeout(() => URL.revokeObjectURL(link.href), 1000); }
+  function copyPrompt(text, successMessage) { const write = navigator.clipboard?.writeText?.(text); if (write && typeof write.then === 'function') { write.then(() => toast(successMessage)).catch(() => showManualCopy(text)); return; } showManualCopy(text); }
+  function showManualCopy(text) { window.prompt('Copy this prompt for Codex:', text); toast('Copy prompt shown for Codex.'); }
   function summaryPrompt() { const story = document.querySelector('#trailer')?.innerText?.trim() || document.querySelector('.main')?.innerText?.trim() || document.title; return 'Use this ndrstnd review summary to help me understand the implementation, decisions, risks, and tests.\\n\\n' + story; }
   async function loadLenses() { try { const lenses = await api('/api/lenses'); const select = byId('lens-select'); select.innerHTML = lenses.map((lens) => '<option value="' + escapeAttribute(lens.id) + '">' + escapeText(lens.name) + '</option>').join(''); select.value = lenses.some((lens) => lens.id === selectedLens) ? selectedLens : (lenses[0]?.id || 'default'); selectedLens = select.value; } catch (error) { toast('Could not load review lenses.'); } }
   async function loadQuestions() { try { const cards = await api('/api/revision/' + state.revisionId + '/questions'); const container = byId('question-cards'); container.className = ''; container.innerHTML = cards.length ? cards.map((card) => '<article class="question"><strong>' + escapeText(card.question) + '</strong><br>' + escapeText(card.answer || 'Thinking…') + '<small>' + provenance(card.provenance) + '</small></article>').join('') : 'No notes yet.'; } catch {} }
@@ -307,15 +309,17 @@ export const artifactClientScript = `
     if (viewButton) { setActiveView(viewButton.getAttribute('data-view'), viewButton); return; }
     const chapterButton = target.closest('.chapter-toggle');
     if (chapterButton) { if (currentStoryLevel() <= 1) return; const chapter = chapterButton.closest('.chapter'); openChapter(chapter, !chapter.classList.contains('open')); return; }
-    if (target.closest('[data-question], [data-action="ask"]')) { if (selectedText) { const prompt = (target.getAttribute('data-question') || 'Ask a question about') + "\\n\\nSelected ndrstnd evidence:\\n" + selectedText; navigator.clipboard?.writeText(prompt); toast('Prompt copied — paste it into Codex to continue.'); } return; }
+    if (target.closest('[data-question], [data-action="ask"]')) { if (selectedText) { const prompt = (target.getAttribute('data-question') || 'Ask a question about') + "\\n\\nSelected ndrstnd evidence:\\n" + selectedText; copyPrompt(prompt, 'Prompt copied — paste it into Codex to continue.'); } return; }
     const action = target.closest('[data-action]')?.getAttribute('data-action');
     if (action === 'export') { downloadReview(); toast('Review exported as an HTML file.'); return; }
-    if (action === 'copy-summary') { navigator.clipboard?.writeText(summaryPrompt()); toast('Summary prompt copied for Codex.'); return; }
+    if (action === 'copy-summary') { copyPrompt(summaryPrompt(), 'Summary prompt copied for Codex.'); return; }
     if (action === 'settings') toast('This portable artifact has no server-backed settings.');
   });
   document.addEventListener('selectionchange', () => { const selection = window.getSelection(); const menu = byId('selection-menu'); if (!selection || selection.isCollapsed || !selection.anchorNode || !(selection.anchorNode.parentElement?.closest('.evidence'))) { menu.hidden = true; return; } selectedText = selection.toString().trim(); if (!selectedText) { menu.hidden = true; return; } const rect = selection.getRangeAt(0).getBoundingClientRect(); menu.style.left = Math.max(8, rect.left) + 'px'; menu.style.top = Math.max(8, rect.top - 42) + 'px'; menu.hidden = false; });
   function openChapter(chapter, open) { if (!chapter) return; chapter.classList.toggle('open', open); chapter.querySelector('.chapter-detail').hidden = !open; chapter.querySelector('.chapter-toggle').setAttribute('aria-expanded', String(open)); }
   function downloadReview() { const blob = new Blob(['<!doctype html>\\n' + document.documentElement.outerHTML], { type: 'text/html' }); const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = document.title.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase() + '.html'; document.body.append(link); link.click(); link.remove(); window.setTimeout(() => URL.revokeObjectURL(link.href), 1000); }
+  function copyPrompt(text, successMessage) { const write = navigator.clipboard?.writeText?.(text); if (write && typeof write.then === 'function') { write.then(() => toast(successMessage)).catch(() => showManualCopy(text)); return; } showManualCopy(text); }
+  function showManualCopy(text) { window.prompt('Copy this prompt for Codex:', text); toast('Copy prompt shown for Codex.'); }
   function summaryPrompt() { const story = document.querySelector('#trailer')?.innerText?.trim() || document.querySelector('.main')?.innerText?.trim() || document.title; return 'Use this ndrstnd review summary to help me understand the implementation, decisions, risks, and tests.\\n\\n' + story; }
 })();
 `;
