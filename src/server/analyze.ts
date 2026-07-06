@@ -4,21 +4,48 @@ import type { ConversationContext } from "./conversation.js";
 import { CodexAppServerClient } from "./codex.js";
 import { analysisPrompt, buildPromptReviewInput, extractJson, parseAnalysisDocument } from "./analysis-core.js";
 
-export { analysisPrompt, buildFallbackAnalysis, buildPromptReviewInput, parseAnalysisDocument } from "./analysis-core.js";
+export { analysisPrompt, buildPromptReviewInput, parseAnalysisDocument } from "./analysis-core.js";
+
+const REPAIR_ATTEMPTS = 2;
 
 export async function analyzeWithCodex(input: CollectedReviewInput, conversation?: ConversationContext, onDelta?: (delta: string) => void, lensInstructions?: string) {
-  const client = new CodexAppServerClient();
-  try {
-    const prompt = analysisPrompt(input, conversation, lensInstructions);
-    const text = await client.runTextTurn(input.repoPath, prompt, onDelta);
-    try {
-      return parseAnalysisDocument(JSON.parse(extractJson(text)), input);
-    } catch (error) {
-      const repair = await client.runTextTurn(input.repoPath, `${prompt}\n\nYour prior response failed validation: ${error instanceof Error ? error.message : String(error)}. Return a corrected JSON document only.`, onDelta);
-      return parseAnalysisDocument(JSON.parse(extractJson(repair)), input);
+  const prompt = analysisPrompt(input, conversation, lensInstructions);
+  return withFreshClientRetry(async (client) => {
+    let response = await client.runTextTurn(input.repoPath, prompt, onDelta);
+    let lastError = "";
+    for (let attempt = 0; attempt <= REPAIR_ATTEMPTS; attempt += 1) {
+      try {
+        return parseAnalysisDocument(JSON.parse(extractJson(response)), input);
+      } catch (error) {
+        lastError = error instanceof Error ? error.message : String(error);
+        if (attempt === REPAIR_ATTEMPTS) break;
+        response = await client.runTextTurn(input.repoPath, `${prompt}\n\nYour prior response failed validation: ${lastError} Return only the corrected JSON document, with every other field kept as it was.`, onDelta);
+      }
     }
-  } finally {
-    client.close();
+    throw new Error(`Codex produced an analysis that still failed validation after ${REPAIR_ATTEMPTS} repair turns: ${lastError}`);
+  });
+}
+
+const TRANSIENT_CODEX_FAILURE = /stalled|timed out|exited with status|app-server closed|could not run|not running/i;
+
+async function withFreshClientRetry<T>(run: (client: CodexAppServerClient) => Promise<T>): Promise<T> {
+  const attempt = async (): Promise<T> => {
+    const client = new CodexAppServerClient();
+    try {
+      return await run(client);
+    } finally {
+      client.close();
+    }
+  };
+  try {
+    return await attempt();
+  } catch (error) {
+    if (!TRANSIENT_CODEX_FAILURE.test(error instanceof Error ? error.message : String(error))) throw error;
+    try {
+      return await attempt();
+    } catch (retryError) {
+      throw new Error(`${retryError instanceof Error ? retryError.message : String(retryError)} (already retried once with a fresh Codex app-server)`);
+    }
   }
 }
 

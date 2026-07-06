@@ -23,10 +23,14 @@ export async function getCodexAuthStatus(): Promise<AuthStatus> {
 export class CodexAppServerClient {
   private process: ChildProcessWithoutNullStreams | undefined;
   private buffer = "";
+  private stderrTail = "";
   private initialized = false;
   private nextId = 1;
   private readonly pending = new Map<number, { resolve: (value: unknown) => void; reject: (reason: Error) => void }>();
   private readonly notificationListeners = new Set<(method: string, params: Record<string, unknown>) => void>();
+  private readonly failureListeners = new Set<(error: Error) => void>();
+
+  constructor(private readonly inactivityTimeoutMs = 300_000) {}
 
   async request(method: string, params: Record<string, unknown>): Promise<unknown> {
     await this.start();
@@ -54,25 +58,45 @@ export class CodexAppServerClient {
 
     let text = "";
     const completed = new Promise<void>((resolve, reject) => {
-      const timeout = setTimeout(() => {
-        removeListener();
-        reject(new Error("Codex analysis timed out."));
-      }, 120_000);
+      // Inspecting a large branch takes many quiet-but-active tool turns, so time
+      // out on inactivity across any thread notification rather than total duration.
+      let timeout: NodeJS.Timeout;
+      let notifications = 0;
+      const cleanup = () => {
+        clearTimeout(timeout);
+        this.notificationListeners.delete(listener);
+        this.failureListeners.delete(failureListener);
+      };
+      const failWith = (error: Error) => {
+        cleanup();
+        reject(error);
+      };
+      const armTimeout = () => {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => failWith(new Error(`Codex analysis stalled: no app-server activity for ${Math.round(this.inactivityTimeoutMs / 1_000)}s after ${notifications} thread notifications and ${text.length} draft characters.${this.stderrHint()}`)), this.inactivityTimeoutMs);
+      };
+      const failureListener = (error: Error) => failWith(error);
       const listener = (method: string, params: Record<string, unknown>) => {
         if (params["threadId"] !== threadId) return;
+        notifications += 1;
+        armTimeout();
         if (method === "item/agentMessage/delta") {
           const delta = typeof params["delta"] === "string" ? params["delta"] : "";
           text += delta;
           onDelta?.(delta);
         }
+        if (method === "turn/failed") {
+          const reason = asObject(params["error"])["message"];
+          failWith(new Error(`Codex analysis turn failed: ${typeof reason === "string" && reason !== "" ? reason : "the app-server reported no reason"}.${this.stderrHint()}`));
+        }
         if (method === "turn/completed") {
-          clearTimeout(timeout);
-          removeListener();
+          cleanup();
           resolve();
         }
       };
-      const removeListener = () => this.notificationListeners.delete(listener);
+      armTimeout();
       this.notificationListeners.add(listener);
+      this.failureListeners.add(failureListener);
     });
 
     try {
@@ -89,9 +113,11 @@ export class CodexAppServerClient {
     const process = spawn("codex", ["app-server"], { stdio: "pipe" });
     this.process = process;
     process.stdout.on("data", (chunk: Buffer) => this.handleOutput(chunk.toString("utf8")));
-    process.stderr.on("data", () => undefined);
-    process.once("error", (error) => this.rejectPending(error));
-    process.once("exit", (code) => this.rejectPending(new Error(`Codex app-server exited with status ${code ?? "unknown"}.`)));
+    process.stderr.on("data", (chunk: Buffer) => {
+      this.stderrTail = `${this.stderrTail}${chunk.toString("utf8")}`.slice(-4_000);
+    });
+    process.once("error", (error) => this.fail(new Error(`Codex app-server could not run: ${error.message}${this.stderrHint()}`)));
+    process.once("exit", (code) => this.fail(new Error(`Codex app-server exited with status ${code ?? "unknown"}.${this.stderrHint()}`)));
   }
 
   private sendRequest(method: string, params: Record<string, unknown>): Promise<unknown> {
@@ -137,6 +163,16 @@ export class CodexAppServerClient {
       if (message.error !== undefined) pending.reject(new Error(message.error.message ?? "Codex app-server returned an error."));
       else pending.resolve(message.result);
     }
+  }
+
+  private fail(error: Error): void {
+    this.rejectPending(error);
+    for (const listener of [...this.failureListeners]) listener(error);
+  }
+
+  private stderrHint(): string {
+    const tail = this.stderrTail.trim().slice(-600);
+    return tail === "" ? "" : ` Codex app-server reported: ${tail}`;
   }
 
   private rejectPending(error: Error): void {
