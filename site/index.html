@@ -1,0 +1,855 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ndrstnd — understand what your coding agent actually did</title>
+<meta name="description" content="ndrstnd turns large agent-produced branch diffs into an evidence-linked story: semantic chapters, color-coded impact, a reading-order timeline, a test plan, and the full diff. Local, private, open source.">
+<link rel="canonical" href="https://truizlop.github.io/ndrstnd/">
+<meta property="og:title" content="ndrstnd — understand what your coding agent actually did">
+<meta property="og:description" content="A local comprehension workspace that turns agent-produced branch diffs into an evidence-linked story.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://truizlop.github.io/ndrstnd/">
+<link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 22"><g fill="none" stroke="%231c2126" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.4 3.4 10 7.6l5.6-4.2"/><path d="M4.4 8.9 10 13.1l5.6-4.2"/><path d="M4.4 14.4 10 18.6l5.6-4.2" stroke="%232757cf"/></g></svg>'>
+<style>
+/*
+ * The ndrstnd landing galley. Same system as the artifact it sells:
+ * sans speaks UI chrome, mono speaks identifiers, serif speaks the story.
+ * Light paper surfaces, hairline rules, a single cobalt accent, no gradients.
+ */
+:root{
+  --sans:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",system-ui,sans-serif;
+  --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+  --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif;
+  --surface:#fff;--rail:#f6f6f4;--well:#fafaf8;
+  --ink:#1c2126;--ink-2:#4a5258;--ink-3:#7d858c;--faint:#b4bac0;
+  --hair:#e8e7e3;--hair-2:#d7d6d1;
+  --accent:#2757cf;--wash:#eef2fb;
+  --low:#2e8f53;--contained:#4d94c9;--elevated:#a97c15;--high:#b85f2e;--critical:#bf4840;
+  --add-ink:#1c7a41;--add-bg:#eefaf1;--del-ink:#b04a3d;--del-bg:#fdf1ee;
+  --shadow:0 18px 44px #191e2821;
+  --tk:#24292e;--tk-k:#cf222e;--tk-s:#0a3069;--tk-f:#8250df;--tk-c:#0550ae;--tk-m:#6e7781;
+}
+*{box-sizing:border-box}
+html{overflow-x:hidden;scroll-behavior:smooth}
+body{margin:0;min-width:320px;background:var(--surface);color:var(--ink);font:15px/1.6 var(--sans);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+[hidden]{display:none!important}
+::selection{background:#d9e3f8}
+a{color:var(--accent);text-decoration:none}
+a:hover{text-decoration:underline}
+button{font-family:inherit}
+button:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+.wrap{max-width:1080px;margin:0 auto;padding:0 28px}
+.skip{position:absolute;left:-9999px;top:0;background:var(--ink);color:#fff;padding:10px 14px;z-index:100}
+.skip:focus{left:12px;top:12px}
+
+/* ---------- shared voices ---------- */
+.overline{margin:0 0 14px;font:600 11px/1 var(--mono);letter-spacing:.18em;text-transform:uppercase;color:var(--ink-3)}
+.overline::before{content:"";display:inline-block;width:18px;height:2px;margin:0 10px 3px 0;border-radius:2px;background:var(--accent)}
+h2.display{margin:0 0 14px;font:600 clamp(28px,4.4vw,42px)/1.15 var(--serif);letter-spacing:-.015em;color:var(--ink);text-wrap:balance}
+.lede{margin:0;max-width:46em;font:400 16px/1.65 var(--sans);color:var(--ink-2)}
+.mono-note{font:400 12px/1.6 var(--mono);color:var(--ink-3)}
+
+/* ---------- brand ---------- */
+.brand{display:inline-flex;align-items:center;gap:9px;color:var(--ink)}
+.brand svg{width:19px;height:21px;flex:none}
+.brand svg path{fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.brand svg .mark-deep{stroke:var(--accent)}
+.brand b{font:600 15px/1 var(--mono);letter-spacing:-.02em;font-weight:600}
+
+/* ---------- header ---------- */
+.site-head{position:sticky;top:0;z-index:50;background:#ffffffeb;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-bottom:1px solid transparent;transition:border-color 180ms ease,box-shadow 180ms ease}
+.site-head.stuck{border-bottom-color:var(--hair);box-shadow:0 6px 20px #191e280f}
+.site-head .wrap{display:flex;align-items:center;gap:26px;min-height:60px}
+.site-nav{display:flex;align-items:center;gap:4px;margin-left:auto}
+.site-nav a{padding:8px 11px;border-radius:7px;color:var(--ink-2);font:500 13px/1 var(--sans);text-decoration:none;transition:background-color 140ms ease,color 140ms ease}
+.site-nav a:hover{background:var(--rail);color:var(--ink)}
+.gh-link{display:inline-flex;align-items:center;gap:7px;margin-left:8px;padding:8px 13px;border:1px solid var(--hair-2);border-radius:8px;color:var(--ink);font:600 12.5px/1 var(--sans);transition:border-color 140ms ease,background-color 140ms ease}
+.gh-link:hover{background:var(--well);border-color:var(--faint);text-decoration:none}
+.gh-link svg{width:15px;height:15px;fill:currentColor}
+@media(max-width:760px){.site-nav a:not(.gh-link){display:none}}
+
+/* ---------- hero ---------- */
+.hero{position:relative;padding:76px 0 90px;border-bottom:1px solid var(--hair);overflow:hidden}
+.hero::before{content:"";position:absolute;inset:0 0 auto;height:520px;background:repeating-linear-gradient(to bottom,transparent 0 43px,var(--hair) 43px 44px);-webkit-mask-image:linear-gradient(to bottom,#000 0%,transparent 92%);mask-image:linear-gradient(to bottom,#000 0%,transparent 92%);opacity:.5;pointer-events:none}
+.hero .wrap{position:relative}
+.hero-mark{width:44px;height:49px;margin-bottom:26px}
+.hero-mark path{fill:none;stroke:var(--ink);stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:30;stroke-dashoffset:30;animation:draw 700ms ease forwards}
+.hero-mark path:nth-child(2){animation-delay:180ms}
+.hero-mark path:nth-child(3){stroke:var(--accent);animation-delay:360ms}
+@keyframes draw{to{stroke-dashoffset:0}}
+.hero h1{margin:0 0 22px;max-width:13.5em;font:600 clamp(38px,6.4vw,64px)/1.08 var(--serif);letter-spacing:-.02em;text-wrap:balance}
+.hero h1 em{font-style:italic;color:var(--accent)}
+.hero-lede{margin:0 0 30px;max-width:39em;font:400 17px/1.65 var(--sans);color:var(--ink-2)}
+.cta-row{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-bottom:18px}
+.btn{display:inline-flex;align-items:center;gap:9px;min-height:44px;padding:11px 20px;border:0;border-radius:9px;font:600 14px/1 var(--sans);cursor:pointer;text-decoration:none;transition:background-color 140ms ease,transform 140ms ease}
+.btn:hover{text-decoration:none;transform:translateY(-1px)}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover{background:#2049b4}
+.btn-ghost{background:transparent;color:var(--ink);border:1px solid var(--hair-2)}
+.btn-ghost:hover{background:var(--well)}
+.hero-chip{display:inline-flex;align-items:center;gap:12px;min-height:44px;padding:0 8px 0 16px;border:1px solid var(--hair-2);border-radius:9px;background:var(--well);font:500 13px/1 var(--mono);color:var(--ink-2)}
+.hero-chip .ps1{color:var(--faint);user-select:none}
+.soon{display:inline-flex;align-items:center;min-height:20px;padding:3px 8px;border:1px solid #d7e0f4;border-radius:999px;background:var(--wash);color:var(--accent);font:600 9.5px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;white-space:nowrap}
+.copy-btn{display:inline-grid;place-items:center;width:30px;height:30px;border:0;border-radius:7px;background:transparent;color:var(--ink-3);cursor:pointer;transition:background-color 140ms ease,color 140ms ease}
+.copy-btn:hover{background:#ecece9;color:var(--ink)}
+.copy-btn svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.hero-meta{display:flex;flex-wrap:wrap;gap:8px 22px;margin:0 0 54px;padding:0;list-style:none;font:500 12px/1.5 var(--sans);color:var(--ink-3)}
+.hero-meta li{display:inline-flex;align-items:center;gap:7px}
+.hero-meta li::before{content:"";width:5px;height:5px;border-radius:50%;background:var(--faint)}
+.hero-shot-caption{margin:16px 0 0;text-align:center;font:400 12px/1.6 var(--sans);color:var(--ink-3)}
+
+/* ---------- browser frame ---------- */
+.shot{border:1px solid var(--hair-2);border-radius:14px;background:var(--surface);box-shadow:var(--shadow);overflow:hidden}
+.shot-bar{display:flex;align-items:center;gap:14px;padding:10px 14px;border-bottom:1px solid var(--hair);background:var(--rail)}
+.shot-dots{display:flex;gap:6px}
+.shot-dots i{width:10px;height:10px;border-radius:50%;background:var(--hair-2)}
+.shot-url{flex:1;max-width:430px;margin:0 auto;padding:5px 12px;border:1px solid var(--hair);border-radius:7px;background:var(--surface);font:400 11px/1.4 var(--mono);color:var(--ink-3);text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ---------- app mock (faithful mini recreation of the artifact) ---------- */
+.am{display:grid;grid-template-columns:150px minmax(0,1fr) 148px;background:var(--surface);font-size:11px;text-align:left}
+.am-side{background:var(--rail);border-right:1px solid var(--hair);padding:13px 10px}
+.am-brand{display:flex;align-items:center;gap:6px;padding:2px 4px 14px}
+.am-brand svg{width:13px;height:15px}
+.am-brand svg path{fill:none;stroke:var(--ink);stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.am-brand svg .mark-deep{stroke:var(--accent)}
+.am-brand b{font:600 10.5px/1 var(--mono);letter-spacing:-.02em}
+.am-nav{display:grid;gap:2px}
+.am-nav span{position:relative;display:flex;align-items:center;gap:7px;padding:6px 7px;border-radius:6px;color:var(--ink-2);font:500 10px/1.2 var(--sans)}
+.am-nav svg{width:12px;height:12px;flex:none;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.am-nav .on{color:var(--accent)}
+.am-nav .on::before{content:"";position:absolute;left:-10px;top:6px;bottom:6px;width:2px;border-radius:2px;background:var(--accent)}
+.am-main{min-width:0;padding:16px 18px 18px}
+.am-masthead{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;border-bottom:1px solid var(--hair);padding-bottom:11px}
+.am-overline{margin:0 0 7px;font:600 7.5px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--ink-3)}
+.am-ref{margin:0 0 6px;font:600 13.5px/1.25 var(--mono);letter-spacing:-.02em;overflow-wrap:anywhere}
+.am-crumbs{display:flex;flex-wrap:wrap;gap:9px;font-size:8.5px;color:var(--ink-3)}
+.am-crumbs code{font:500 8px var(--mono);color:var(--ink-2);background:var(--well);border:1px solid var(--hair);border-radius:4px;padding:1px 4px}
+.am-summary{margin:12px 0 5px;font:400 12.5px/1.5 var(--sans);letter-spacing:-.01em}
+.am-coverage{margin:0 0 12px;font-size:8.5px;color:var(--ink-3);font-variant-numeric:tabular-nums}
+.am-insp{background:var(--rail);border-left:1px solid var(--hair);padding:13px 12px;font-size:9px}
+.am-insp h4{margin:0 0 9px;font:600 9px/1.2 var(--sans);color:var(--ink)}
+.am-insp h5{margin:0 0 6px;font:600 7px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3)}
+.am-insp section{padding:9px 0;border-bottom:1px solid var(--hair)}
+.am-insp section:last-child{border-bottom:0}
+.am-stat{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:2.5px 0;color:var(--ink-2);font-variant-numeric:tabular-nums}
+.am-stat b{font:600 8.5px var(--mono);color:var(--ink)}
+.am-stat .cat{display:inline-flex;align-items:center;gap:5px;text-transform:capitalize}
+.am-stat .cat svg{width:9px;height:9px;fill:none;stroke:var(--ink-3);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.am-action{display:flex;align-items:center;gap:6px;width:100%;margin-top:5px;padding:6px 8px;border:0;border-radius:6px;background:#ecece9;color:var(--ink);font:500 8.5px/1.2 var(--sans)}
+.am-action:first-of-type{margin-top:0}
+.am-action svg{width:10px;height:10px;flex:none;fill:none;stroke:var(--ink-3);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+@media(max-width:920px){.am{grid-template-columns:130px minmax(0,1fr)}.am-insp{display:none}}
+@media(max-width:560px){.am{grid-template-columns:minmax(0,1fr)}.am-side{display:none}}
+
+/* chapter rows (Story view) */
+.chl{border:1px solid var(--hair);border-radius:10px;overflow:hidden;background:var(--surface)}
+.ch{display:grid;grid-template-columns:34px minmax(0,1fr) 12px;gap:9px;padding:11px 12px 10px;border-bottom:1px solid var(--hair);align-items:start}
+.ch:last-child{border-bottom:0}
+.chn{position:relative;font:700 9.5px/1 var(--mono);letter-spacing:.08em;padding:4px 0 11px}
+.chn::after{content:"";position:absolute;left:1px;bottom:2px;width:13px;height:2.5px;border-radius:2px;background:var(--hair-2)}
+.lo{color:var(--low)}.lo::after{background:var(--low)}
+.co{color:var(--contained)}.co::after{background:var(--contained)}
+.el{color:var(--elevated)}.el::after{background:var(--elevated)}
+.hi{color:var(--high)}.hi::after{background:var(--high)}
+.cr{color:var(--critical)}.cr::after{background:var(--critical)}
+.ch-copy{display:grid;gap:3px;min-width:0}
+.ch-copy strong{font:600 11px/1.35 var(--sans)}
+.ch-copy small{font:400 9.5px/1.5 var(--sans);color:var(--ink-3)}
+.ch-tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px}
+.tagp{display:inline-flex;align-items:center;gap:4px;padding:2.5px 7px;border:1px solid var(--hair);border-radius:999px;background:var(--surface);font:600 6.5px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3)}
+.tagp svg{width:8px;height:8px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.ch-chev{margin-top:3px;color:var(--faint)}
+.ch-chev svg{width:9px;height:9px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+
+/* diff / evidence card */
+.ev{border:1px solid var(--hair);border-radius:9px;overflow:hidden;background:var(--surface)}
+.ev-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:6px 10px;border-bottom:1px solid var(--hair);background:var(--well);font:400 8.5px/1.4 var(--mono);color:var(--ink-3)}
+.ev-head b{font-weight:600;color:var(--ink-2)}
+.ev pre{margin:0;padding:6px 0;overflow-x:auto;font:9.5px/1.65 var(--mono)}
+.cl{display:grid;grid-template-columns:26px 26px 1fr;min-width:max-content;padding:0 10px}
+.cl>b{font-weight:400;font-size:8.5px;color:var(--faint);text-align:right;padding-right:7px;user-select:none;font-variant-numeric:tabular-nums}
+.cl>code{font:inherit;color:var(--tk);white-space:pre}
+.cl .pfx{display:inline-block;width:1.2ch;color:var(--faint)}
+.cl.add{background:var(--add-bg)}
+.cl.add .pfx{color:var(--add-ink)}
+.cl.del{background:var(--del-bg)}
+.cl.del .pfx{color:var(--del-ink)}
+.cl.om{display:block;min-width:0;padding:3px 10px}
+.cl.om .omd{display:flex;align-items:center;gap:7px;color:var(--faint)}
+.cl.om .omd i{height:0;flex:1;border-top:1px dashed var(--hair-2)}
+.cl.om .omd b{font:600 10px/1 var(--mono);letter-spacing:-2px}
+.ev-foot{margin:0;padding:5px 10px;border-top:1px solid var(--hair);background:var(--well);font-size:8px;color:var(--ink-3)}
+.tk-k{color:var(--tk-k)}.tk-s{color:var(--tk-s)}.tk-f{color:var(--tk-f)}.tk-c{color:var(--tk-c)}.tk-m{color:var(--tk-m)}
+.chip-add{color:var(--add-ink);font-weight:600}
+.chip-del{color:var(--del-ink);font-weight:600}
+
+/* ---------- reveal on scroll ---------- */
+.reveal{opacity:0;transform:translateY(14px);transition:opacity 520ms ease,transform 520ms cubic-bezier(.2,.8,.2,1);transition-delay:var(--d,0ms)}
+.reveal.in{opacity:1;transform:none}
+
+/* ---------- why section ---------- */
+.why{padding:88px 0;border-bottom:1px solid var(--hair);background:var(--rail)}
+.why-grid{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:44px;align-items:start;margin-top:40px}
+.why-copy p{margin:0 0 16px;max-width:34em;color:var(--ink-2)}
+.why-copy p strong{color:var(--ink)}
+.panels{display:grid;grid-template-columns:1fr 1fr;gap:14px;position:relative}
+.panel{border:1px solid var(--hair);border-radius:12px;background:var(--surface);overflow:hidden}
+.panel h3{margin:0;padding:9px 12px;border-bottom:1px solid var(--hair);background:var(--well);font:600 8px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3)}
+.filelist{margin:0;padding:6px 0;list-style:none;font:9.5px/1.5 var(--mono);color:var(--ink-3)}
+.filelist li{display:flex;justify-content:space-between;gap:10px;padding:3.5px 12px}
+.filelist li span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.filelist li small{flex:none;font-size:8.5px;font-variant-numeric:tabular-nums}
+.filelist .lock{background:var(--well)}
+.storylist{margin:0;padding:4px 0;list-style:none}
+.storylist li{display:grid;grid-template-columns:26px minmax(0,1fr);gap:7px;padding:7px 12px;align-items:start}
+.storylist li+li{border-top:1px solid var(--hair)}
+.storylist .chn{padding:2px 0 9px}
+.storylist b{display:block;font:600 10px/1.35 var(--sans);color:var(--ink)}
+.storylist small{font:400 8.5px/1.4 var(--sans);color:var(--ink-3)}
+.panel-arrow{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:2;display:grid;place-items:center;width:34px;height:34px;border:1px solid var(--hair-2);border-radius:50%;background:var(--surface);box-shadow:0 6px 18px #191e2814;color:var(--accent)}
+.panel-arrow svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+@media(max-width:920px){.why-grid{grid-template-columns:1fr}}
+@media(max-width:560px){.panels{grid-template-columns:1fr}.panel-arrow{transform:translate(-50%,-50%) rotate(90deg)}}
+
+/* ---------- zoom scrollytelling ---------- */
+.zoomstory{padding:88px 0 40px;border-bottom:1px solid var(--hair)}
+.zs-body{display:grid;grid-template-columns:minmax(0,7fr) minmax(0,5fr);gap:54px;margin-top:26px}
+.zs-sticky{position:sticky;top:76px;align-self:start;padding-bottom:24px}
+.zs-dialrow{display:flex;justify-content:center;margin-bottom:30px}
+.dial{position:relative;display:flex;align-items:flex-end;justify-content:space-between;width:250px;height:34px;padding:0 6px}
+.dial::before{content:"";position:absolute;left:10px;right:10px;bottom:3px;height:1px;background:var(--hair-2)}
+.dial button{position:relative;z-index:1;width:34px;height:34px;padding:0;border:0;background:transparent;cursor:pointer}
+.dial button::before{content:"";position:absolute;left:50%;bottom:3px;width:2px;height:10px;border-radius:1px 1px 0 0;background:var(--hair-2);transform:translateX(-50%);transition:background-color 160ms ease,height 200ms cubic-bezier(.3,1.3,.4,1)}
+.dial button:hover::before{background:var(--ink-3);height:14px}
+.dial button.active::before{background:var(--accent);height:19px;width:2.5px}
+.dial button::after{content:"";position:absolute;left:50%;bottom:25px;width:5px;height:5px;border-radius:50%;background:var(--accent);transform:translateX(-50%) scale(0);opacity:0;transition:transform 200ms cubic-bezier(.3,1.3,.4,1),opacity 160ms ease}
+.dial button.active::after{opacity:1;transform:translateX(-50%) scale(1)}
+.dial-callout{position:absolute;left:50%;top:calc(100% + 6px);transform:translateX(-50%);white-space:nowrap;text-align:center}
+.dial-callout output{font:700 11px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
+.dial-callout span{margin-left:9px;font:400 12px/1 var(--sans);color:var(--ink-3)}
+.zs-stage{position:relative;height:clamp(340px,46vh,470px);border:1px solid var(--hair);border-radius:14px;background:var(--well);overflow:hidden;margin-top:26px}
+.zs-view{position:absolute;inset:0;padding:18px;opacity:0;transform:translateY(12px) scale(.985);transition:opacity 340ms ease,transform 340ms cubic-bezier(.2,.8,.2,1);pointer-events:none;overflow:hidden}
+.zs-view[data-view="2"],.zs-view[data-view="3"],.zs-view[data-view="4"]{display:flex;flex-direction:column;justify-content:center}
+.zs-stage[data-level="0"] .zs-view[data-view="0"],.zs-stage[data-level="1"] .zs-view[data-view="1"],.zs-stage[data-level="2"] .zs-view[data-view="2"],.zs-stage[data-level="3"] .zs-view[data-view="3"],.zs-stage[data-level="4"] .zs-view[data-view="4"]{opacity:1;transform:none;pointer-events:auto}
+.zs-steps{padding-bottom:10vh}
+.zs-step{position:relative;min-height:62vh;display:flex;flex-direction:column;justify-content:center;padding:30px 0 30px 26px;border-left:1px solid var(--hair)}
+.zs-step::before{content:"";position:absolute;left:-1px;top:50%;height:0;width:2px;background:var(--accent);transition:height 300ms ease,top 300ms ease}
+.zs-step.active::before{top:calc(50% - 34px);height:68px}
+.zs-kicker{display:block;margin-bottom:12px;font:700 10.5px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--ink-3);transition:color 200ms ease}
+.zs-step.active .zs-kicker{color:var(--accent)}
+.zs-step h3{margin:0 0 12px;font:600 24px/1.2 var(--serif);letter-spacing:-.01em}
+.zs-step p{margin:0;max-width:30em;color:var(--ink-2)}
+/* map view bits */
+.mapline{display:flex;flex-wrap:wrap;gap:7px 15px;margin:0 0 13px;font:500 9px/1 var(--sans);color:var(--ink-2)}
+.mapline em{font-style:normal;text-transform:capitalize;display:inline-flex;align-items:center;gap:5px}
+.mapline .dot{width:6px;height:6px;border-radius:50%;background:var(--low)}
+.mapline .dot.d-co{background:var(--contained)}.mapline .dot.d-el{background:var(--elevated)}.mapline .dot.d-hi{background:var(--high)}
+.mapline b{font-variant-numeric:tabular-nums}
+.mapgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.mapcard{display:flex;flex-direction:column;gap:5px;min-height:86px;border:1px solid var(--hair);border-radius:10px;background:var(--surface);padding:10px}
+.mapcard b{font:600 10px/1.3 var(--sans)}
+.mapcard .meta{margin-top:auto;font:400 7.5px/1.4 var(--mono);color:var(--ink-3)}
+.mapcard .meta .chip-add,.mapcard .meta .chip-del{font-size:8px}
+.churn{display:flex;width:100%;height:3px;overflow:hidden;border-radius:999px;background:var(--hair)}
+.churn i{display:block}
+.churn .a{background:#79bd93;width:calc(var(--a)*1%)}
+.churn .d{background:#dd9d92;width:calc(var(--dd)*1%)}
+@media(max-width:560px){.mapgrid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+/* explanation view bits */
+.exp-card{border:1px solid var(--hair);border-radius:12px;background:var(--surface);padding:14px}
+.exp-head{display:grid;grid-template-columns:30px minmax(0,1fr);gap:9px;margin-bottom:6px;align-items:start}
+.semantic{display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:11px 0 4px;margin-top:8px;border-top:1px solid var(--hair)}
+.semantic>div+div{border-left:1px solid var(--hair);padding-left:16px}
+.semantic h5{margin:0 0 6px;font:600 7.5px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3)}
+.semantic p{margin:0;font:400 10px/1.6 var(--sans);color:var(--ink-2)}
+@media(max-width:560px){.semantic{grid-template-columns:1fr}.semantic>div+div{border-left:0;border-top:1px solid var(--hair);padding-left:0;padding-top:10px}}
+@media(max-width:920px){
+  .zs-body{display:block}
+  .zs-sticky{position:sticky;top:60px;z-index:5;background:var(--surface);padding:14px 0 18px;box-shadow:0 14px 18px -14px #191e2826}
+  .zs-stage{height:clamp(300px,66vw,420px);margin-top:20px}
+  .zs-step{min-height:56vh;padding-left:20px}
+  .zs-step h3{font-size:21px}
+}
+
+/* ---------- features ---------- */
+.features{padding:88px 0;border-bottom:1px solid var(--hair);background:var(--rail)}
+.fgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-top:40px}
+.fcard{display:flex;flex-direction:column;border:1px solid var(--hair);border-radius:14px;background:var(--surface);padding:22px 22px 20px;transition:transform 200ms cubic-bezier(.2,.8,.2,1),box-shadow 200ms ease,border-color 200ms ease}
+.fcard:hover{transform:translateY(-3px);box-shadow:0 14px 34px #191e2817;border-color:var(--hair-2)}
+.fico{display:grid;place-items:center;width:36px;height:36px;margin-bottom:14px;border:1px solid var(--hair);border-radius:9px;background:var(--well);color:var(--accent)}
+.fico svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.fico.glyph{font:600 15px/1 var(--mono);color:var(--accent)}
+.fcard h3{margin:0 0 8px;font:600 16px/1.3 var(--sans);letter-spacing:-.01em}
+.fcard p{margin:0;font:400 13.5px/1.6 var(--sans);color:var(--ink-2)}
+.fviz{margin-top:16px;padding-top:14px;border-top:1px solid var(--hair)}
+.dots-row{display:flex;flex-wrap:wrap;gap:6px 12px}
+.dots-row span{display:inline-flex;align-items:center;gap:6px;font:600 8px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3)}
+.dots-row i{width:7px;height:7px;border-radius:50%}
+.tl-mini{display:grid;gap:0;position:relative}
+.tl-mini::before{content:"";position:absolute;left:4px;top:8px;bottom:8px;width:1px;background:var(--hair)}
+.tl-mini span{position:relative;display:flex;align-items:baseline;gap:10px;padding:4px 0 4px 16px;font:500 10px/1.4 var(--sans);color:var(--ink-2)}
+.tl-mini span::before{content:"";position:absolute;left:1px;top:9px;width:7px;height:7px;border-radius:50%;box-shadow:0 0 0 2.5px var(--surface);background:var(--low)}
+.tl-mini .t-el::before{background:var(--elevated)}
+.tl-mini .t-hi::before{background:var(--high)}
+.tl-mini small{margin-left:auto;font:600 8.5px var(--mono);color:var(--ink-3);font-variant-numeric:tabular-nums}
+.selmenu{display:inline-flex;gap:2px;padding:3px;border:1px solid var(--hair);border-radius:9px;background:var(--surface);box-shadow:0 8px 22px #191e2814}
+.selmenu span{padding:6px 9px;border-radius:6px;color:var(--ink-2);font:500 9.5px/1 var(--sans);white-space:nowrap}
+.selmenu span:first-child{background:var(--wash);color:var(--accent)}
+@media(max-width:920px){.fgrid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:600px){.fgrid{grid-template-columns:1fr}}
+
+/* ---------- codex ---------- */
+.codex{padding:88px 0;border-bottom:1px solid var(--hair)}
+.cx-grid{display:grid;grid-template-columns:minmax(0,6fr) minmax(0,6fr);gap:48px;align-items:center;margin-top:8px}
+.cx-points{margin:26px 0 0;padding:0;list-style:none;display:grid;gap:18px}
+.cx-points li{display:grid;grid-template-columns:26px minmax(0,1fr);gap:12px}
+.cx-points .n{display:grid;place-items:center;width:26px;height:26px;border:1px solid var(--hair-2);border-radius:8px;font:700 11px/1 var(--mono);color:var(--accent);background:var(--well)}
+.cx-points b{display:block;margin-bottom:2px;font:600 14px/1.4 var(--sans)}
+.cx-points p{margin:0;font:400 13.5px/1.6 var(--sans);color:var(--ink-2)}
+.cx-points code{font:500 12px var(--mono);color:var(--ink-2);background:var(--well);border:1px solid var(--hair);border-radius:5px;padding:1px 5px}
+.term{border-radius:13px;background:#22262b;box-shadow:var(--shadow);overflow:hidden}
+.term-bar{display:flex;align-items:center;gap:6px;padding:11px 14px;border-bottom:1px solid #ffffff14}
+.term-bar i{width:9px;height:9px;border-radius:50%;background:#ffffff2e}
+.term-bar em{margin-left:8px;font:500 10.5px/1 var(--mono);font-style:normal;color:#f5f5f37a}
+.term pre{margin:0;padding:18px 18px 20px;overflow-x:auto;font:12px/1.75 var(--mono);color:#e8eaed}
+.term .ps1{color:#7d858c;user-select:none}
+.term .cmd{color:#fff;font-weight:600}
+.term .out{color:#9aa3ab}
+.term .hl{color:#8ab0ff}
+@media(max-width:920px){.cx-grid{grid-template-columns:1fr}}
+
+/* ---------- install ---------- */
+.install{padding:88px 0;border-bottom:1px solid var(--hair);background:var(--rail)}
+.inst-head{display:flex;flex-wrap:wrap;align-items:center;gap:14px}
+.steps{display:grid;gap:14px;margin-top:38px}
+.step{display:grid;grid-template-columns:44px minmax(0,1fr);gap:18px;border:1px solid var(--hair);border-radius:14px;background:var(--surface);padding:22px}
+.step-n{font:700 13px/1 var(--mono);color:var(--ink-3);padding-top:4px}
+.step-n::after{content:"";display:block;width:16px;height:3px;margin-top:8px;border-radius:2px;background:var(--accent)}
+.step h3{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:0 0 6px;font:600 16px/1.3 var(--sans)}
+.step p{margin:0 0 12px;max-width:44em;font:400 13.5px/1.6 var(--sans);color:var(--ink-2)}
+.codeblock{position:relative;display:flex;align-items:center;gap:10px;border:1px solid var(--hair);border-radius:10px;background:var(--well);padding:4px 6px 4px 14px}
+.codeblock+.codeblock{margin-top:8px}
+.codeblock pre{flex:1;margin:0;padding:9px 0;overflow-x:auto;font:12.5px/1.7 var(--mono);color:var(--ink)}
+.codeblock .ps1{color:var(--faint);user-select:none}
+.step small.alt{display:block;margin-top:10px;font:400 12px/1.6 var(--sans);color:var(--ink-3)}
+.step small.alt code{font:500 11.5px var(--mono);background:var(--well);border:1px solid var(--hair);border-radius:5px;padding:1px 5px}
+.inst-foot{margin:22px 0 0;font:400 12.5px/1.7 var(--sans);color:var(--ink-3);max-width:56em}
+
+/* ---------- scope ---------- */
+.scope{padding:100px 0;text-align:center;border-bottom:1px solid var(--hair)}
+.scope h2{margin:0 auto 18px;max-width:14em;font:600 clamp(28px,4.6vw,44px)/1.15 var(--serif);letter-spacing:-.015em}
+.scope h2 em{color:var(--accent);font-style:italic}
+.scope p{margin:0 auto;max-width:42em;color:var(--ink-2);font-size:16px}
+.scope .mono-note{display:block;margin:26px auto 0}
+
+/* ---------- footer ---------- */
+.colophon{padding:30px 0 44px}
+.colophon .wrap{display:flex;flex-wrap:wrap;align-items:center;gap:12px 26px}
+.colo-brand{display:inline-flex;align-items:center;gap:9px;font:600 10px/1.6 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3)}
+.colo-brand svg{width:12px;height:13px;flex:none;color:var(--faint)}
+.colo-brand svg path{fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.colo-brand svg .mark-deep{stroke:var(--accent)}
+.colo-links{display:flex;flex-wrap:wrap;gap:2px 18px;margin-left:auto;font:500 12px/1.6 var(--sans)}
+.colo-links a{color:var(--ink-3)}
+.colo-links a:hover{color:var(--accent)}
+
+/* ---------- toast ---------- */
+.toast{position:fixed;right:20px;bottom:20px;z-index:60;max-width:calc(100vw - 32px);background:#22262b;color:#f5f5f3;border-radius:9px;padding:11px 14px;font:500 12.5px/1.4 var(--sans);box-shadow:var(--shadow);animation:rise 200ms ease}
+@keyframes rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+@media(prefers-reduced-motion:reduce){
+  html{scroll-behavior:auto}
+  *,*::before,*::after{transition:none!important;animation:none!important}
+  .reveal{opacity:1;transform:none}
+}
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="site-head" id="top">
+  <div class="wrap">
+    <a class="brand" href="#top" aria-label="ndrstnd home">
+      <svg viewBox="0 0 20 22" aria-hidden="true"><path d="M4.4 3.4 10 7.6l5.6-4.2"/><path d="M4.4 8.9 10 13.1l5.6-4.2"/><path class="mark-deep" d="M4.4 14.4 10 18.6l5.6-4.2"/></svg>
+      <b>ndrstnd</b>
+    </a>
+    <nav class="site-nav" aria-label="Sections">
+      <a href="#why">Why</a>
+      <a href="#zoom">Zoom</a>
+      <a href="#features">Features</a>
+      <a href="#codex">Codex</a>
+      <a href="#install">Install</a>
+      <a class="gh-link" href="https://github.com/truizlop/ndrstnd" rel="noopener">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+        GitHub
+      </a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+<!-- ======================== HERO ======================== -->
+<section class="hero">
+  <div class="wrap">
+    <svg class="hero-mark" viewBox="0 0 20 22" aria-hidden="true"><path d="M4.4 3.4 10 7.6l5.6-4.2"/><path d="M4.4 8.9 10 13.1l5.6-4.2"/><path d="M4.4 14.4 10 18.6l5.6-4.2"/></svg>
+    <p class="overline reveal">A local comprehension workspace for agent-produced changes</p>
+    <h1 class="reveal" style="--d:60ms">Your agent shipped 3,000 lines overnight. <em>Read them like a story.</em></h1>
+    <p class="hero-lede reveal" style="--d:120ms">ndrstnd turns a branch diff into an evidence-linked narrative — semantic chapters, color-coded impact, a reading-order timeline, a test plan, and the full diff — so you understand a change before you judge it.</p>
+    <div class="cta-row reveal" style="--d:180ms">
+      <a class="btn btn-primary" href="#install">Install ndrstnd</a>
+      <a class="btn btn-ghost" href="https://github.com/truizlop/ndrstnd" rel="noopener">View on GitHub</a>
+      <span class="hero-chip"><span class="ps1">$</span>brew install ndrstnd<span class="soon">Soon</span><button class="copy-btn" data-copy="brew install ndrstnd" aria-label="Copy Homebrew command"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5.4" y="5.4" width="7.8" height="8.6" rx="1.6"/><path d="M2.8 10.6V4.2a1.4 1.4 0 0 1 1.4-1.4h5.4"/></svg></button></span>
+    </div>
+    <ul class="hero-meta reveal" style="--d:240ms">
+      <li>Runs entirely on your machine</li>
+      <li>Open source · Apache-2.0</li>
+      <li>Artifacts live in your repo and expire after seven days</li>
+    </ul>
+
+    <!-- Hero product shot: faithful recreation of the Story view -->
+    <div class="reveal" style="--d:300ms">
+    <div class="shot" role="img" aria-label="The ndrstnd Story view: a review summary, five semantic chapters with color-coded attention levels, and an at-a-glance inspector.">
+      <div class="shot-bar" aria-hidden="true"><span class="shot-dots"><i></i><i></i><i></i></span><span class="shot-url">.ndrstnd/codex-checkout-retry-hardening.html</span><span style="width:46px"></span></div>
+      <div class="am" aria-hidden="true">
+        <aside class="am-side">
+          <div class="am-brand"><svg viewBox="0 0 20 22"><path d="M4.4 3.4 10 7.6l5.6-4.2"/><path d="M4.4 8.9 10 13.1l5.6-4.2"/><path class="mark-deep" d="M4.4 14.4 10 18.6l5.6-4.2"/></svg><b>ndrstnd</b></div>
+          <nav class="am-nav">
+            <span class="on"><svg viewBox="0 0 18 18"><circle cx="5" cy="4" r="1.5"/><circle cx="5" cy="12" r="1.5"/><path d="M5 5.5v5M9 4h4M9 12h4"/></svg>Story</span>
+            <span><svg viewBox="0 0 18 18"><circle cx="9" cy="9" r="5.5"/><path d="M9 5.5v3.8l2.5 1.5"/></svg>Timeline</span>
+            <span><svg viewBox="0 0 18 18"><path d="M6.5 5L3 9l3.5 4M11.5 5L15 9l-3.5 4"/></svg>Full diff</span>
+            <span><svg viewBox="0 0 18 18"><path d="M3.5 9.5l3.2 3.2 6.8-7"/></svg>Test plan</span>
+          </nav>
+        </aside>
+        <div class="am-main">
+          <div class="am-masthead">
+            <div>
+              <p class="am-overline">Change review</p>
+              <p class="am-ref">codex/checkout-retry-hardening</p>
+              <div class="am-crumbs"><span>against <strong>main</strong></span><span>merge base <code>f3a91c02</code></span></div>
+            </div>
+            <div class="dial" style="width:150px;height:24px;flex:none" aria-hidden="true">
+              <button style="width:20px;height:24px;cursor:default"></button><button style="width:20px;height:24px;cursor:default" class="active"></button><button style="width:20px;height:24px;cursor:default"></button><button style="width:20px;height:24px;cursor:default"></button><button style="width:20px;height:24px;cursor:default"></button>
+            </div>
+          </div>
+          <p class="am-summary">Payment captures now retry transient gateway failures with jittered exponential backoff, and idempotency keys guarantee a retry can never double-charge.</p>
+          <p class="am-coverage">12 files · 31 evidence hunks · 5 story steps</p>
+          <div class="chl">
+            <article class="ch"><span class="chn el">01</span><span class="ch-copy"><strong>Retry transient capture failures</strong><small>captureCharge retries gateway timeouts with exponential backoff and jitter.</small><span class="ch-tags"><span class="tagp"><svg viewBox="0 0 18 18"><path d="M3 8h12M10 4l4 4-4 4"/></svg>behavior</span><span class="tagp"><svg viewBox="0 0 18 18"><path d="M10 2L4 10h4l-1 6 6-8H9l1-6z"/></svg>performance</span></span></span><span class="ch-chev"><svg viewBox="0 0 12 12"><path d="M2.5 4.25L6 7.75l3.5-3.5"/></svg></span></article>
+            <article class="ch"><span class="chn hi">02</span><span class="ch-copy"><strong>Idempotency keys guard every retry</strong><small>A stable key per payment intent makes retries safe from double-charging.</small><span class="ch-tags"><span class="tagp"><svg viewBox="0 0 18 18"><path d="M9 2l5 2v4c0 3.2-2 5.7-5 6.8C6 13.7 4 11.2 4 8V4l5-2z"/><path d="M7 8l1.3 1.3L11 6.6"/></svg>security</span><span class="tagp"><svg viewBox="0 0 18 18"><path d="M3 8h12M10 4l4 4-4 4"/></svg>behavior</span></span></span><span class="ch-chev"><svg viewBox="0 0 12 12"><path d="M2.5 4.25L6 7.75l3.5-3.5"/></svg></span></article>
+            <article class="ch"><span class="chn co">03</span><span class="ch-copy"><strong>Retry policy is configurable</strong><small>Attempts, base delay, and jitter validate through the config schema.</small><span class="ch-tags"><span class="tagp"><svg viewBox="0 0 18 18"><path d="M3 8h12M10 4l4 4-4 4"/></svg>behavior</span></span></span><span class="ch-chev"><svg viewBox="0 0 12 12"><path d="M2.5 4.25L6 7.75l3.5-3.5"/></svg></span></article>
+            <article class="ch"><span class="chn lo">04</span><span class="ch-copy"><strong>Extract a pure backoff module</strong><small>Delay math moves to src/payments/backoff.ts with no behavior change.</small><span class="ch-tags"><span class="tagp"><svg viewBox="0 0 18 18"><path d="M5 3v10M5 3l-2 2M5 3l2 2M13 13V3M13 13l-2-2M13 13l2-2"/></svg>refactor</span></span></span><span class="ch-chev"><svg viewBox="0 0 12 12"><path d="M2.5 4.25L6 7.75l3.5-3.5"/></svg></span></article>
+            <article class="ch"><span class="chn lo">05</span><span class="ch-copy"><strong>Cover exhaustion, jitter bounds, and key reuse</strong><small>New tests pin retry exhaustion, delay bounds, and idempotency reuse.</small></span><span class="ch-chev"><svg viewBox="0 0 12 12"><path d="M2.5 4.25L6 7.75l3.5-3.5"/></svg></span></article>
+          </div>
+        </div>
+        <aside class="am-insp">
+          <h4>At a glance</h4>
+          <section>
+            <h5>This change</h5>
+            <div class="am-stat"><span>Story steps</span><b>5</b></div>
+            <div class="am-stat"><span>Changed files</span><b>12</b></div>
+            <div class="am-stat"><span>Evidence hunks</span><b>31</b></div>
+          </section>
+          <section>
+            <h5>Focus areas</h5>
+            <div class="am-stat"><span class="cat"><svg viewBox="0 0 18 18"><path d="M3 8h12M10 4l4 4-4 4"/></svg>behavior</span><b>3</b></div>
+            <div class="am-stat"><span class="cat"><svg viewBox="0 0 18 18"><path d="M9 2l5 2v4c0 3.2-2 5.7-5 6.8C6 13.7 4 11.2 4 8V4l5-2z"/><path d="M7 8l1.3 1.3L11 6.6"/></svg>security</span><b>1</b></div>
+            <div class="am-stat"><span class="cat"><svg viewBox="0 0 18 18"><path d="M10 2L4 10h4l-1 6 6-8H9l1-6z"/></svg>performance</span><b>1</b></div>
+            <div class="am-stat"><span class="cat"><svg viewBox="0 0 18 18"><path d="M5 3v10M5 3l-2 2M5 3l2 2M13 13V3M13 13l-2-2M13 13l2-2"/></svg>refactor</span><b>1</b></div>
+          </section>
+          <section>
+            <h5>Actions</h5>
+            <div class="am-action"><svg viewBox="0 0 16 16"><path d="M8 9.8V2.6M5.2 5.2L8 2.4l2.8 2.8"/><path d="M2.8 9.6v2.6a1.2 1.2 0 0 0 1.2 1.2h8a1.2 1.2 0 0 0 1.2-1.2V9.6"/></svg>Export review…</div>
+            <div class="am-action"><svg viewBox="0 0 16 16"><rect x="5.4" y="5.4" width="7.8" height="8.6" rx="1.6"/><path d="M2.8 10.6V4.2a1.4 1.4 0 0 1 1.4-1.4h5.4"/></svg>Copy Codex prompt</div>
+          </section>
+        </aside>
+      </div>
+    </div>
+    <p class="hero-shot-caption">The Story view of an ndrstnd artifact — one self-contained HTML file, no server required.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ======================== WHY ======================== -->
+<section class="why" id="why">
+  <div class="wrap">
+    <p class="overline reveal">The problem</p>
+    <h2 class="display reveal" style="--d:60ms">Alphabetical order is not an explanation.</h2>
+    <div class="why-grid">
+      <div class="why-copy reveal" style="--d:120ms">
+        <p>Coding agents produce more change per hour than anyone can absorb in file-path order. The diff is <strong>complete</strong>, but completeness isn't comprehension — a lockfile and a payment-critical retry loop get equal billing.</p>
+        <p>ndrstnd reads the branch the way you'd want a colleague to walk you through it: <strong>claims first, meaning second, evidence on demand.</strong> Every sentence in the story links to the hunks that prove it.</p>
+        <p class="mono-note">It compares the branch to its merge-base, asks Codex for the narrative, and falls back to a complete evidence view when it can't.</p>
+      </div>
+      <div class="panels reveal" style="--d:180ms" role="img" aria-label="Side by side: a flat alphabetical file list versus five semantic story chapters.">
+        <div class="panel" aria-hidden="true">
+          <h3>What your forge shows</h3>
+          <ul class="filelist">
+            <li><span>.github/workflows/ci.yml</span><small>+6 −1</small></li>
+            <li><span>config/payment.schema.json</span><small>+18 −2</small></li>
+            <li class="lock"><span>package-lock.json</span><small>+1,204 −87</small></li>
+            <li><span>src/payments/backoff.ts</span><small>+47 −0</small></li>
+            <li><span>src/payments/capture.ts</span><small>+52 −17</small></li>
+            <li><span>src/payments/gateway.ts</span><small>+9 −4</small></li>
+            <li><span>src/payments/idempotency.ts</span><small>+31 −0</small></li>
+            <li><span>test/payments/backoff.test.ts</span><small>+44 −0</small></li>
+            <li><span>test/payments/capture.test.ts</span><small>+59 −0</small></li>
+            <li><span>… 3 more files</span><small></small></li>
+          </ul>
+        </div>
+        <div class="panel-arrow" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M2.5 8h11M9.5 4l4 4-4 4"/></svg></div>
+        <div class="panel" aria-hidden="true">
+          <h3>What ndrstnd shows</h3>
+          <ul class="storylist">
+            <li><span class="chn el">01</span><span><b>Retry transient capture failures</b><small>behavior · performance</small></span></li>
+            <li><span class="chn hi">02</span><span><b>Idempotency keys guard every retry</b><small>security · behavior</small></span></li>
+            <li><span class="chn co">03</span><span><b>Retry policy is configurable</b><small>behavior</small></span></li>
+            <li><span class="chn lo">04</span><span><b>Extract a pure backoff module</b><small>refactor</small></span></li>
+            <li><span class="chn lo">05</span><span><b>Cover exhaustion and key reuse</b><small>tests</small></span></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================== ZOOM SCROLLYTELLING ======================== -->
+<section class="zoomstory" id="zoom">
+  <div class="wrap">
+    <p class="overline reveal">Zoom controls</p>
+    <h2 class="display reveal" style="--d:60ms">One dial, five altitudes.</h2>
+    <p class="lede reveal" style="--d:120ms">The zoom dial moves the whole workspace between meaning and mechanism. Keep scrolling — the workspace below follows the dial.</p>
+    <div class="zs-body">
+      <div class="zs-sticky">
+        <div class="zs-dialrow">
+          <div class="dial" role="group" aria-label="Story detail level">
+            <div class="dial-callout" aria-live="polite"><output id="dial-label">Map</output><span id="dial-desc">Themes and risk distribution</span></div>
+            <button data-dial="0" aria-label="Map" class="active"></button>
+            <button data-dial="1" aria-label="Summary"></button>
+            <button data-dial="2" aria-label="Explanation"></button>
+            <button data-dial="3" aria-label="Evidence"></button>
+            <button data-dial="4" aria-label="Raw"></button>
+          </div>
+        </div>
+        <div class="zs-stage" id="stage" data-level="0">
+
+          <div class="zs-view" data-view="0" aria-hidden="true">
+            <div class="mapline"><em><i class="dot"></i>low <b>2</b></em><em><i class="dot d-co"></i>contained <b>1</b></em><em><i class="dot d-el"></i>elevated <b>1</b></em><em><i class="dot d-hi"></i>high <b>1</b></em></div>
+            <div class="mapgrid">
+              <div class="mapcard"><span class="chn el">01</span><b>Retry transient capture failures</b><span class="meta"><span class="chip-add">+64</span> <span class="chip-del">−12</span> · 3 files · 6 hunks</span><span class="churn"><i class="a" style="--a:72"></i><i class="d" style="--dd:14"></i></span></div>
+              <div class="mapcard"><span class="chn hi">02</span><b>Idempotency keys guard every retry</b><span class="meta"><span class="chip-add">+38</span> <span class="chip-del">−5</span> · 2 files · 4 hunks</span><span class="churn"><i class="a" style="--a:64"></i><i class="d" style="--dd:9"></i></span></div>
+              <div class="mapcard"><span class="chn co">03</span><b>Retry policy is configurable</b><span class="meta"><span class="chip-add">+22</span> <span class="chip-del">−3</span> · 2 files · 3 hunks</span><span class="churn"><i class="a" style="--a:56"></i><i class="d" style="--dd:8"></i></span></div>
+              <div class="mapcard"><span class="chn lo">04</span><b>Extract a pure backoff module</b><span class="meta"><span class="chip-add">+41</span> <span class="chip-del">−29</span> · 2 files · 5 hunks</span><span class="churn"><i class="a" style="--a:42"></i><i class="d" style="--dd:30"></i></span></div>
+              <div class="mapcard"><span class="chn lo">05</span><b>Cover exhaustion and key reuse</b><span class="meta"><span class="chip-add">+103</span> <span class="chip-del">−0</span> · 3 files · 8 hunks</span><span class="churn"><i class="a" style="--a:88"></i><i class="d" style="--dd:0"></i></span></div>
+            </div>
+          </div>
+
+          <div class="zs-view" data-view="1" aria-hidden="true">
+            <div class="chl">
+              <article class="ch"><span class="chn el">01</span><span class="ch-copy"><strong>Retry transient capture failures</strong><small>captureCharge retries gateway timeouts with exponential backoff and jitter.</small></span></article>
+              <article class="ch"><span class="chn hi">02</span><span class="ch-copy"><strong>Idempotency keys guard every retry</strong><small>A stable key per payment intent makes retries safe from double-charging.</small></span></article>
+              <article class="ch"><span class="chn co">03</span><span class="ch-copy"><strong>Retry policy is configurable</strong><small>Attempts, base delay, and jitter validate through the config schema.</small></span></article>
+              <article class="ch"><span class="chn lo">04</span><span class="ch-copy"><strong>Extract a pure backoff module</strong><small>Delay math moves to src/payments/backoff.ts with no behavior change.</small></span></article>
+              <article class="ch"><span class="chn lo">05</span><span class="ch-copy"><strong>Cover exhaustion, jitter bounds, and key reuse</strong><small>New tests pin retry exhaustion, delay bounds, and idempotency reuse.</small></span></article>
+            </div>
+          </div>
+
+          <div class="zs-view" data-view="2" aria-hidden="true">
+            <div class="exp-card">
+              <div class="exp-head"><span class="chn hi">02</span><span class="ch-copy"><strong style="font:600 12px/1.35 var(--sans)">Idempotency keys guard every retry</strong><small style="font:400 10px/1.5 var(--sans);color:var(--ink-3)">A stable key per payment intent makes retries safe from double-charging.</small><span class="ch-tags"><span class="tagp"><svg viewBox="0 0 18 18"><path d="M9 2l5 2v4c0 3.2-2 5.7-5 6.8C6 13.7 4 11.2 4 8V4l5-2z"/><path d="M7 8l1.3 1.3L11 6.6"/></svg>security</span><span class="tagp"><svg viewBox="0 0 18 18"><path d="M3 8h12M10 4l4 4-4 4"/></svg>behavior</span></span></span></div>
+              <div class="semantic">
+                <div><h5>Before</h5><p>A single capture attempt per intent. Any gateway timeout surfaced to the caller as a failed payment, and manual retries risked charging the customer twice.</p></div>
+                <div><h5>After</h5><p>Transient failures retry up to maxAttempts with jittered exponential backoff, and every attempt reuses the same idempotency key — a retry can never double-charge.</p></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="zs-view" data-view="3" aria-hidden="true">
+            <div class="ev">
+              <div class="ev-head"><b>src/payments/capture.ts</b><span>Focused excerpt · @@ −18 +18 @@</span></div>
+              <pre><span class="cl"><b>18</b><b>18</b><code><i class="pfx"> </i><span class="tk-k">export async function</span> <span class="tk-f">captureCharge</span>(intent: PaymentIntent) {</code></span><span class="cl del"><b>19</b><b></b><code><i class="pfx">-</i>  <span class="tk-k">return</span> gateway.<span class="tk-f">capture</span>(intent);</code></span><span class="cl add"><b></b><b>19</b><code><i class="pfx">+</i>  <span class="tk-k">const</span> <span class="tk-c">key</span> = <span class="tk-f">idempotencyKey</span>(intent);</code></span><span class="cl add"><b></b><b>20</b><code><i class="pfx">+</i>  <span class="tk-k">for</span> (<span class="tk-k">let</span> attempt = <span class="tk-c">0</span>; ; attempt += <span class="tk-c">1</span>) {</code></span><span class="cl add"><b></b><b>22</b><code><i class="pfx">+</i>      <span class="tk-k">return await</span> gateway.<span class="tk-f">capture</span>(intent, { idempotencyKey: key });</code></span><span class="cl om"><span class="omd"><i></i><b>⌁</b><i></i></span></span><span class="cl add"><b></b><b>24</b><code><i class="pfx">+</i>      <span class="tk-k">if</span> (!<span class="tk-f">isTransient</span>(error) || attempt === policy.maxAttempts) <span class="tk-k">throw</span> error;</code></span><span class="cl add"><b></b><b>25</b><code><i class="pfx">+</i>      <span class="tk-k">await</span> <span class="tk-f">sleep</span>(<span class="tk-f">backoffDelay</span>(policy, attempt));</code></span></pre>
+              <p class="ev-foot">4 routine lines omitted</p>
+            </div>
+          </div>
+
+          <div class="zs-view" data-view="4" aria-hidden="true">
+            <div class="ev">
+              <div class="ev-head"><b>src/payments/capture.ts</b><span>Complete excerpt · @@ −18 +18 @@</span></div>
+              <pre><span class="cl"><b>18</b><b>18</b><code><i class="pfx"> </i><span class="tk-k">export async function</span> <span class="tk-f">captureCharge</span>(intent: PaymentIntent) {</code></span><span class="cl del"><b>19</b><b></b><code><i class="pfx">-</i>  <span class="tk-k">return</span> gateway.<span class="tk-f">capture</span>(intent);</code></span><span class="cl add"><b></b><b>19</b><code><i class="pfx">+</i>  <span class="tk-k">const</span> <span class="tk-c">key</span> = <span class="tk-f">idempotencyKey</span>(intent);</code></span><span class="cl add"><b></b><b>20</b><code><i class="pfx">+</i>  <span class="tk-k">for</span> (<span class="tk-k">let</span> attempt = <span class="tk-c">0</span>; ; attempt += <span class="tk-c">1</span>) {</code></span><span class="cl add"><b></b><b>21</b><code><i class="pfx">+</i>    <span class="tk-k">try</span> {</code></span><span class="cl add"><b></b><b>22</b><code><i class="pfx">+</i>      <span class="tk-k">return await</span> gateway.<span class="tk-f">capture</span>(intent, { idempotencyKey: key });</code></span><span class="cl add"><b></b><b>23</b><code><i class="pfx">+</i>    } <span class="tk-k">catch</span> (error) {</code></span><span class="cl add"><b></b><b>24</b><code><i class="pfx">+</i>      <span class="tk-k">if</span> (!<span class="tk-f">isTransient</span>(error) || attempt === policy.maxAttempts) <span class="tk-k">throw</span> error;</code></span><span class="cl add"><b></b><b>25</b><code><i class="pfx">+</i>      <span class="tk-k">await</span> <span class="tk-f">sleep</span>(<span class="tk-f">backoffDelay</span>(policy, attempt));</code></span><span class="cl add"><b></b><b>26</b><code><i class="pfx">+</i>    }</code></span><span class="cl add"><b></b><b>27</b><code><i class="pfx">+</i>  }</code></span><span class="cl"><b>20</b><b>28</b><code><i class="pfx"> </i>}</code></span></pre>
+            </div>
+          </div>
+
+        </div>
+      </div>
+      <div class="zs-steps">
+        <article class="zs-step" data-level="0">
+          <span class="zs-kicker">Level 0 · Map</span>
+          <h3>The whole change at a glance</h3>
+          <p>Chapter cards show where the churn went and where the risk lives — five attention colors from low to critical. Know in ten seconds where to spend your next ten minutes.</p>
+        </article>
+        <article class="zs-step" data-level="1">
+          <span class="zs-kicker">Level 1 · Summary</span>
+          <h3>Every chapter is a claim</h3>
+          <p>The story states what the change does in plain sentences, ordered by meaning instead of file path. Skim it like a table of contents.</p>
+        </article>
+        <article class="zs-step" data-level="2">
+          <span class="zs-kicker">Level 2 · Explanation</span>
+          <h3>Before and after, in words</h3>
+          <p>One notch down, each claim explains the system it replaced: what used to happen, what happens now, and why the difference matters.</p>
+        </article>
+        <article class="zs-step" data-level="3">
+          <span class="zs-kicker">Level 3 · Evidence</span>
+          <h3>Proof, minus the noise</h3>
+          <p>Every claim links to the exact lines that back it. Routine lines fold behind a counted ⌁ divider — omitted, never hidden.</p>
+        </article>
+        <article class="zs-step" data-level="4">
+          <span class="zs-kicker">Level 4 · Raw</span>
+          <h3>Nothing between you and the patch</h3>
+          <p>At the bottom of the dial the workspace shows complete hunks, exactly as Git sees them. Trust the story, then verify it — without leaving the page.</p>
+        </article>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================== FEATURES ======================== -->
+<section class="features" id="features">
+  <div class="wrap">
+    <p class="overline reveal">What's inside</p>
+    <h2 class="display reveal" style="--d:60ms">Every claim travels with its evidence.</h2>
+    <p class="lede reveal" style="--d:120ms">ndrstnd never asks you to trust a summary. Each view is a different altitude over the same linked facts.</p>
+    <div class="fgrid">
+      <article class="fcard reveal">
+        <span class="fico"><svg viewBox="0 0 18 18"><circle cx="5" cy="4" r="1.5"/><circle cx="5" cy="12" r="1.5"/><path d="M5 5.5v5M9 4h4M9 12h4"/></svg></span>
+        <h3>Semantic grouping</h3>
+        <p>Hunks are grouped by what they mean, not where they live. A claim, its synopsis, its risk tags, and its evidence travel together as one chapter.</p>
+      </article>
+      <article class="fcard reveal" style="--d:60ms">
+        <span class="fico"><svg viewBox="0 0 18 18"><path d="M9 2l5 2v4c0 3.2-2 5.7-5 6.8C6 13.7 4 11.2 4 8V4l5-2z"/><path d="M7 8l1.3 1.3L11 6.6"/></svg></span>
+        <h3>Color-coded impact</h3>
+        <p>Five attention levels mark every chapter number, map card, and timeline dot, so risk is visible from any altitude.</p>
+        <div class="fviz"><div class="dots-row"><span><i style="background:var(--low)"></i>low</span><span><i style="background:var(--contained)"></i>contained</span><span><i style="background:var(--elevated)"></i>elevated</span><span><i style="background:var(--high)"></i>high</span><span><i style="background:var(--critical)"></i>critical</span></div></div>
+      </article>
+      <article class="fcard reveal" style="--d:120ms">
+        <span class="fico"><svg viewBox="0 0 18 18"><circle cx="9" cy="9" r="5.5"/><path d="M9 5.5v3.8l2.5 1.5"/></svg></span>
+        <h3>Timeline</h3>
+        <p>A suggested reading order that replays the implementation step by step, with the files and churn each step touched.</p>
+        <div class="fviz"><div class="tl-mini"><span class="t-el">01 · Retry transient failures<small>+64 −12</small></span><span class="t-hi">02 · Guard with idempotency keys<small>+38 −5</small></span><span>03 · Make the policy configurable<small>+22 −3</small></span></div></div>
+      </article>
+      <article class="fcard reveal">
+        <span class="fico"><svg viewBox="0 0 18 18"><path d="M3.5 9.5l3.2 3.2 6.8-7"/></svg></span>
+        <h3>Test plan view</h3>
+        <p>Tested behaviors grouped into themes and linked back to story claims — zoomable from summary cards down to raw test artifacts.</p>
+      </article>
+      <article class="fcard reveal" style="--d:60ms">
+        <span class="fico"><svg viewBox="0 0 18 18"><path d="M6.5 5L3 9l3.5 4M11.5 5L15 9l-3.5 4"/></svg></span>
+        <h3>Full diff, always</h3>
+        <p>Every patch hunk, syntax-highlighted, with low-signal files collapsed but one click away. The story never replaces the diff.</p>
+      </article>
+      <article class="fcard reveal" style="--d:120ms">
+        <span class="fico glyph" aria-hidden="true">⌁</span>
+        <h3>Focused excerpts</h3>
+        <p>Evidence shows the lines that matter and folds the routine ones behind a counted divider. You always know exactly what was omitted.</p>
+      </article>
+      <article class="fcard reveal">
+        <span class="fico"><svg viewBox="0 0 18 18"><path d="M9 3v7M9 10l-3-3M9 10l3-3"/><rect x="3" y="12.5" width="12" height="2.5" rx="1.2"/></svg></span>
+        <h3>Ask the change</h3>
+        <p>In a live workspace, select any lines and ask. Answers come back grounded in the evidence you selected — not in vibes.</p>
+        <div class="fviz"><div class="selmenu" aria-hidden="true"><span>Explain selection</span><span>Trace effects</span><span>Why included?</span></div></div>
+      </article>
+      <article class="fcard reveal" style="--d:60ms">
+        <span class="fico"><svg viewBox="0 0 18 18"><circle cx="9" cy="9" r="5.8"/><circle cx="9" cy="9" r="2.2"/></svg></span>
+        <h3>Review lenses</h3>
+        <p>Swap the lens and re-run the analysis: grouping, emphasis, and risk signals reshape around how you need to read the change.</p>
+      </article>
+      <article class="fcard reveal" style="--d:120ms">
+        <span class="fico"><svg viewBox="0 0 18 18"><rect x="3" y="2.5" width="12" height="13" rx="2"/><path d="M6.5 6h5M6.5 9h5M6.5 12h3"/></svg></span>
+        <h3>Private, portable artifacts</h3>
+        <p>Each review is one self-contained HTML file in your repo's Git-ignored <code style="font:500 12px var(--mono)">.ndrstnd</code> — readable on any device, expiring after seven days.</p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ======================== CODEX ======================== -->
+<section class="codex" id="codex">
+  <div class="wrap">
+    <p class="overline reveal">Codex integration</p>
+    <h2 class="display reveal" style="--d:60ms">Your agent hands you the review.</h2>
+    <div class="cx-grid">
+      <div class="reveal" style="--d:120ms">
+        <p class="lede">ndrstnd ships as a Codex skill and a CLI. Install the skill once, and Codex can end its coding tasks by preparing an ndrstnd workspace for the human — instead of a wall of diff.</p>
+        <ul class="cx-points">
+          <li><span class="n">1</span><div><b>Skill-aware</b><p>After finishing a task, Codex runs ndrstnd on the branch and links the artifact in its reply, ready to read on desktop or mobile.</p></div></li>
+          <li><span class="n">2</span><div><b>Conversation-informed</b><p>Pass <code>--conversation</code> and the implementation dialogue becomes part of the story — the decisions, not just the diff.</p></div></li>
+          <li><span class="n">3</span><div><b>Zero token custody</b><p>ndrstnd rides Codex's existing authenticated session. It never stores a credential of its own.</p></div></li>
+        </ul>
+      </div>
+      <div class="term reveal" style="--d:180ms" role="img" aria-label="Terminal session: installing the ndrstnd Codex skill and reviewing a branch.">
+        <div class="term-bar" aria-hidden="true"><i></i><i></i><i></i><em>zsh — ~/work/checkout</em></div>
+        <pre aria-hidden="true"><span class="ps1">$</span> <span class="cmd">ndrstnd skill install</span>
+<span class="out">Installed the ndrstnd Codex skill at ~/.codex/skills/ndrstnd.</span>
+
+<span class="ps1">$</span> <span class="cmd">ndrstnd review codex/checkout-retry-hardening --repo .</span>
+<span class="out">Drafting the review narrative with Codex…</span>
+<span class="out">merge-base=f3a91c02b7d4 files=12 meaningful-files=7</span>
+<span class="out">hunks=31 conversation=42</span>
+<span class="out">ndrstnd artifact: <span class="hl">.ndrstnd/codex-checkout-retry-hardening.html</span></span>
+<span class="out">This self-contained file is in the Git-ignored .ndrstnd</span>
+<span class="out">directory and expires after seven days.</span></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================== INSTALL ======================== -->
+<section class="install" id="install">
+  <div class="wrap">
+    <div class="inst-head reveal">
+      <p class="overline" style="margin:0">Get started</p>
+      <span class="soon">Homebrew · shipping soon</span>
+    </div>
+    <h2 class="display reveal" style="--d:60ms">Four commands to your first story.</h2>
+    <p class="lede reveal" style="--d:120ms">ndrstnd is being prepared for Homebrew. The tap and formula already live in the repository — the moment the first release is tagged, this is the whole setup:</p>
+    <div class="steps">
+      <div class="step reveal">
+        <span class="step-n">1</span>
+        <div>
+          <h3>Install the CLI <span class="soon">Soon</span></h3>
+          <p>The repository doubles as a Homebrew tap.</p>
+          <div class="codeblock"><pre><span class="ps1">$ </span>brew tap truizlop/ndrstnd https://github.com/truizlop/ndrstnd
+<span class="ps1">$ </span>brew install ndrstnd</pre><button class="copy-btn" data-copy="brew tap truizlop/ndrstnd https://github.com/truizlop/ndrstnd&#10;brew install ndrstnd" aria-label="Copy Homebrew install commands"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5.4" y="5.4" width="7.8" height="8.6" rx="1.6"/><path d="M2.8 10.6V4.2a1.4 1.4 0 0 1 1.4-1.4h5.4"/></svg></button></div>
+          <small class="alt">Prefer npm? <code>npm install -g ndrstnd</code> (requires Node 22+).</small>
+        </div>
+      </div>
+      <div class="step reveal" style="--d:60ms">
+        <span class="step-n">2</span>
+        <div>
+          <h3>Connect Codex</h3>
+          <p>ndrstnd reuses your existing Codex session — it never stores a token itself.</p>
+          <div class="codeblock"><pre><span class="ps1">$ </span>ndrstnd auth login</pre><button class="copy-btn" data-copy="ndrstnd auth login" aria-label="Copy auth command"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5.4" y="5.4" width="7.8" height="8.6" rx="1.6"/><path d="M2.8 10.6V4.2a1.4 1.4 0 0 1 1.4-1.4h5.4"/></svg></button></div>
+        </div>
+      </div>
+      <div class="step reveal" style="--d:120ms">
+        <span class="step-n">3</span>
+        <div>
+          <h3>Teach your agent</h3>
+          <p>Install the Codex skill so finished tasks arrive as ndrstnd workspaces.</p>
+          <div class="codeblock"><pre><span class="ps1">$ </span>ndrstnd skill install</pre><button class="copy-btn" data-copy="ndrstnd skill install" aria-label="Copy skill install command"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5.4" y="5.4" width="7.8" height="8.6" rx="1.6"/><path d="M2.8 10.6V4.2a1.4 1.4 0 0 1 1.4-1.4h5.4"/></svg></button></div>
+        </div>
+      </div>
+      <div class="step reveal" style="--d:180ms">
+        <span class="step-n">4</span>
+        <div>
+          <h3>Understand a branch</h3>
+          <p>Compare any branch to its merge-base and open the story. Use <code style="font:500 12px var(--mono)">--base main</code> to review the checked-out worktree, staged and unstaged changes included.</p>
+          <div class="codeblock"><pre><span class="ps1">$ </span>ndrstnd review feature/my-change --repo /path/to/repository</pre><button class="copy-btn" data-copy="ndrstnd review feature/my-change --repo /path/to/repository" aria-label="Copy review command"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5.4" y="5.4" width="7.8" height="8.6" rx="1.6"/><path d="M2.8 10.6V4.2a1.4 1.4 0 0 1 1.4-1.4h5.4"/></svg></button></div>
+        </div>
+      </div>
+    </div>
+    <p class="inst-foot reveal">Artifacts are written to the reviewed repository's Git-ignored <code style="font:500 11.5px var(--mono)">.ndrstnd/</code> directory, stay private to your working copy, and expire after seven days.</p>
+  </div>
+</section>
+
+<!-- ======================== SCOPE ======================== -->
+<section class="scope">
+  <div class="wrap">
+    <p class="overline reveal" style="display:inline-flex">The point</p>
+    <h2 class="reveal" style="--d:60ms">Comprehension, <em>not critique.</em></h2>
+    <p class="reveal" style="--d:120ms">ndrstnd deliberately doesn't leave review comments, doesn't score your agent, and never edits the branch. It explains the implementation story, the evidence, the risk signals — and then gets out of the way. The judgment stays yours.</p>
+    <span class="mono-note reveal" style="--d:180ms">For critique, keep your review workflow. ndrstnd makes sure you understand what you're judging.</span>
+  </div>
+</section>
+
+</main>
+
+<footer class="colophon">
+  <div class="wrap">
+    <span class="colo-brand"><svg viewBox="0 0 20 22" aria-hidden="true"><path d="M4.4 3.4 10 7.6l5.6-4.2"/><path d="M4.4 8.9 10 13.1l5.6-4.2"/><path class="mark-deep" d="M4.4 14.4 10 18.6l5.6-4.2"/></svg>ndrstnd · created by Tomás Ruiz-López</span>
+    <nav class="colo-links" aria-label="Footer">
+      <a href="https://github.com/truizlop/ndrstnd" rel="noopener">GitHub</a>
+      <a href="https://github.com/truizlop/ndrstnd/blob/main/LICENSE" rel="noopener">Apache-2.0</a>
+      <a href="https://github.com/truizlop/ndrstnd/issues" rel="noopener">Report an issue</a>
+    </nav>
+  </div>
+</footer>
+
+<div id="toast" class="toast" hidden></div>
+
+<script>
+(() => {
+  const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  /* Sticky header hairline */
+  const head = document.querySelector('.site-head');
+  const onScroll = () => head.classList.toggle('stuck', window.scrollY > 8);
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+
+  /* Reveal on scroll */
+  const revealer = new IntersectionObserver((entries) => {
+    for (const entry of entries) {
+      if (!entry.isIntersecting) continue;
+      entry.target.classList.add('in');
+      revealer.unobserve(entry.target);
+    }
+  }, { threshold: 0.12, rootMargin: '0px 0px -8% 0px' });
+  document.querySelectorAll('.reveal').forEach((node) => revealer.observe(node));
+
+  /* Zoom scrollytelling */
+  const levels = [
+    { name: 'Map', description: 'Themes and risk distribution' },
+    { name: 'Summary', description: 'Story claims and summaries' },
+    { name: 'Explanation', description: 'Before and after meaning' },
+    { name: 'Evidence', description: 'Focused code excerpts' },
+    { name: 'Raw', description: 'Complete change evidence' },
+  ];
+  const stage = document.getElementById('stage');
+  const label = document.getElementById('dial-label');
+  const desc = document.getElementById('dial-desc');
+  const ticks = [...document.querySelectorAll('[data-dial]')];
+  const steps = [...document.querySelectorAll('.zs-step')];
+  const setLevel = (level) => {
+    stage.dataset.level = String(level);
+    label.textContent = levels[level].name;
+    desc.textContent = levels[level].description;
+    ticks.forEach((tick, index) => tick.classList.toggle('active', index === level));
+    steps.forEach((step) => step.classList.toggle('active', Number(step.dataset.level) === level));
+    stage.querySelectorAll('.zs-view').forEach((view) => view.setAttribute('aria-hidden', String(view.dataset.view !== String(level))));
+  };
+  const stepWatcher = new IntersectionObserver((entries) => {
+    for (const entry of entries) {
+      if (entry.isIntersecting) setLevel(Number(entry.target.dataset.level));
+    }
+  }, { rootMargin: '-45% 0px -45% 0px' });
+  steps.forEach((step) => stepWatcher.observe(step));
+  ticks.forEach((tick, index) => tick.addEventListener('click', () => {
+    setLevel(index);
+    steps[index].scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'center' });
+  }));
+  setLevel(0);
+
+  /* Copy buttons */
+  const toast = (message) => {
+    const node = document.getElementById('toast');
+    node.textContent = message;
+    node.hidden = false;
+    window.clearTimeout(toast.timer);
+    toast.timer = window.setTimeout(() => { node.hidden = true; }, 3200);
+  };
+  document.querySelectorAll('[data-copy]').forEach((button) => {
+    button.addEventListener('click', async () => {
+      const text = button.getAttribute('data-copy');
+      try {
+        await navigator.clipboard.writeText(text);
+        toast('Copied — see you in the terminal.');
+      } catch {
+        window.prompt('Copy this command:', text);
+      }
+    });
+  });
+})();
+</script>
+</body>
+</html>
