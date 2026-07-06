@@ -3,106 +3,7 @@ import { AnalysisDocumentSchema } from "../shared/analysis-schema.js";
 import { z } from "zod";
 import type { CollectedReviewInput } from "./git.js";
 import type { ConversationContext } from "./conversation.js";
-
-export function buildFallbackAnalysis(input: CollectedReviewInput): AnalysisDocument {
-  const filesById = new Map(input.files.map((file) => [file.id, file]));
-  const meaningful = input.hunks.filter((hunk) => filesById.get(hunk.fileId)?.signal === "meaningful");
-  const lowSignal = input.hunks.filter((hunk) => filesById.get(hunk.fileId)?.signal === "low-signal");
-  const groups = new Map<string, ReturnType<typeof fallbackGroupForHunk> & { evidenceIds: string[] }>();
-  for (const hunk of meaningful) {
-    const group = fallbackGroupForHunk(hunk, filesById.get(hunk.fileId)?.path);
-    const existing = groups.get(group.id);
-    if (existing === undefined) groups.set(group.id, { ...group, evidenceIds: [hunk.id] });
-    else existing.evidenceIds.push(hunk.id);
-  }
-  const chapters = [...groups.values()].map((group) => ({
-    id: group.id,
-    title: group.title,
-    kind: group.kind,
-    synopsis: group.synopsis,
-    confidence: "low" as const,
-    attention: group.attention,
-    riskCategories: group.riskCategories,
-    evidenceIds: group.evidenceIds,
-  }));
-  return {
-    summary: fallbackSummary(input.files.length, chapters.map((chapter) => chapter.title)),
-    chapters,
-    omittedGroups: lowSignal.length === 0 ? [] : [{ title: "Low-signal changes", reason: "Automatically classified as generated, binary, vendor, or lockfile content.", evidenceIds: lowSignal.map((hunk) => hunk.id) }],
-    unclassifiedEvidenceIds: [],
-  };
-}
-
-function fallbackGroupForHunk(hunk: CollectedReviewInput["hunks"][number], path: string | undefined) {
-  const normalizedPath = (path ?? "").toLowerCase();
-  const changedText = hunk.lines.filter((line) => line.kind !== "context").map((line) => line.content).join("\n").toLowerCase();
-
-  if (/(^|\/)(?:test|tests|__snapshots__)\//.test(normalizedPath) || /\.(?:test|spec)\.[cm]?[jt]sx?$/.test(normalizedPath) || /\b(?:expect|it|test|describe)\s*\(/.test(changedText)) {
-    return {
-      id: "test-coverage",
-      title: "Test coverage",
-      kind: "test" as const,
-      synopsis: "Tests and snapshots describe the intended behavior changes.",
-      attention: "low" as const,
-      riskCategories: ["behavior" as const],
-    };
-  }
-
-  if (/src\/web|artifact|page|story|zoom|chapter|timeline|diff/.test(normalizedPath) || /\b(?:story|zoom|chapter|artifact|render|snapshot)\b/.test(changedText)) {
-    return {
-      id: "review-presentation",
-      title: "Review presentation",
-      kind: "behavior" as const,
-      synopsis: "The static review artifact changes how the story, evidence, and actions are presented.",
-      attention: "contained" as const,
-      riskCategories: ["behavior" as const],
-    };
-  }
-
-  if (/src\/server\/git|gitreader|worktree|merge-base|mergebase|diff/.test(normalizedPath) || /\b(?:worktree|mergebase|merge-base|baseRef|targetRef|git diff|untracked|staged)\b/i.test(changedText)) {
-    return {
-      id: "review-input-collection",
-      title: "Review input collection",
-      kind: "behavior" as const,
-      synopsis: "Review input collection changes how Git ranges and working-tree evidence are gathered.",
-      attention: "contained" as const,
-      riskCategories: ["behavior" as const],
-    };
-  }
-
-  if (/src\/server\/(?:analyze|codex|conversation)|prompt|analysis/.test(normalizedPath) || /\b(?:prompt|analysis|codex|conversation|evidenceIds)\b/.test(changedText)) {
-    return {
-      id: "analysis-grouping",
-      title: "Analysis grouping",
-      kind: "behavior" as const,
-      synopsis: "Analysis and prompt handling change how evidence becomes a readable review story.",
-      attention: "contained" as const,
-      riskCategories: ["behavior" as const],
-    };
-  }
-
-  return {
-    id: "implementation-support",
-    title: "Implementation support",
-    kind: "other" as const,
-    synopsis: "Supporting source changes contribute to the reviewed behavior.",
-    attention: "contained" as const,
-    riskCategories: ["refactor" as const],
-  };
-}
-
-function fallbackSummary(fileCount: number, titles: string[]): string {
-  if (titles.length === 0) return `${fileCount} changed files are ready for review.`;
-  const visible = titles.slice(0, 3);
-  const tail = titles.length > visible.length ? `, and ${titles.length - visible.length} more area${titles.length - visible.length === 1 ? "" : "s"}` : "";
-  return `The branch changes ${formatList(visible.map((title) => title.toLowerCase()))}${tail} across ${fileCount} file${fileCount === 1 ? "" : "s"}.`;
-}
-
-function formatList(values: string[]): string {
-  if (values.length <= 1) return values[0] ?? "";
-  if (values.length === 2) return `${values[0]} and ${values[1]}`;
-  return `${values.slice(0, -1).join(", ")}, and ${values.at(-1)}`;
-}
+import { deriveEvidenceOrder } from "./evidence-ordering.js";
 
 export function parseAnalysisDocument(value: unknown, input: CollectedReviewInput): AnalysisDocument {
   const document = parseWireAnalysisDocument(value);
@@ -111,18 +12,102 @@ export function parseAnalysisDocument(value: unknown, input: CollectedReviewInpu
   for (const chapter of document.chapters) for (const id of chapter.evidenceIds) referenced.add(id);
   for (const group of document.omittedGroups) for (const id of group.evidenceIds) referenced.add(id);
   for (const id of document.unclassifiedEvidenceIds) referenced.add(id);
-  for (const id of referenced) if (!knownEvidence.has(id)) throw new Error(`Analysis referenced unknown evidence: ${id}`);
+  for (const id of referenced) if (!knownEvidence.has(id)) throw new Error(`Analysis referenced unknown evidence: ${id}. Use only hunk IDs listed in the review input manifest.`);
   const meaningfulEvidence = input.hunks
     .filter((hunk) => input.files.find((file) => file.id === hunk.fileId)?.signal === "meaningful")
     .map((hunk) => hunk.id);
   const missing = meaningfulEvidence.filter((id) => !referenced.has(id));
-  if (missing.length > 0) throw new Error(`Analysis did not account for meaningful evidence: ${missing.join(", ")}`);
+  if (missing.length > 0) throw new Error(`Analysis did not account for meaningful evidence: ${missing.join(", ")}. Add each missing ID to a chapter (c), an omitted group (o), or unclassified (u).`);
+  validateStepPlan(document, input, meaningfulEvidence);
+  validateProseDepth(document);
   return document;
+}
+
+export const PROSE_WORD_RANGES = {
+  summary: { min: 35, max: 75 },
+  synopsis: { min: 20, max: 55 },
+  beforeAfter: { min: 8, max: 40 },
+  goal: { min: 12, max: 40 },
+  youNowHave: { min: 12, max: 40 },
+} as const;
+
+function wordCount(text: string): number {
+  const trimmed = text.trim();
+  return trimmed === "" ? 0 : trimmed.split(/\s+/).length;
+}
+
+function proseIssue(label: string, text: string, range: { min: number; max: number }): string | undefined {
+  const words = wordCount(text);
+  if (words < range.min) return `${label} is ${words} words but must be ${range.min}-${range.max}: expand it with the concrete mechanisms, symbols, and consequences involved, not filler.`;
+  if (words > range.max) return `${label} is ${words} words but must be ${range.min}-${range.max}: cut it down to the load-bearing facts.`;
+  return undefined;
+}
+
+function validateProseDepth(document: AnalysisDocument): void {
+  const issues: Array<string | undefined> = [proseIssue("The summary", document.summary, PROSE_WORD_RANGES.summary)];
+  for (const chapter of document.chapters) {
+    issues.push(proseIssue(`Chapter ${chapter.id} synopsis`, chapter.synopsis, PROSE_WORD_RANGES.synopsis));
+    if (chapter.before !== undefined) issues.push(proseIssue(`Chapter ${chapter.id} before`, chapter.before, PROSE_WORD_RANGES.beforeAfter));
+    if (chapter.after !== undefined) issues.push(proseIssue(`Chapter ${chapter.id} after`, chapter.after, PROSE_WORD_RANGES.beforeAfter));
+  }
+  for (const step of document.steps) {
+    issues.push(proseIssue(`Step ${step.id} goal`, step.goal, PROSE_WORD_RANGES.goal));
+    issues.push(proseIssue(`Step ${step.id} youNowHave`, step.youNowHave, PROSE_WORD_RANGES.youNowHave));
+  }
+  const found = issues.filter((issue): issue is string => issue !== undefined);
+  if (found.length > 0) throw new Error(`Analysis prose depth is out of range; fix every field listed and keep all other fields unchanged. ${found.join(" ")}`);
+}
+
+function validateStepPlan(document: AnalysisDocument, input: CollectedReviewInput, meaningfulEvidence: string[]) {
+  const knownChapters = new Set(document.chapters.map((chapter) => chapter.id));
+  const knownSteps = new Set(document.steps.map((step) => step.id));
+  for (const step of document.steps) {
+    for (const chapterId of step.advancesChapterIds) {
+      if (!knownChapters.has(chapterId)) throw new Error(`Analysis step ${step.id} advances unknown chapter: ${chapterId}. Every advancesChapterIds entry must match a chapter id declared in c.`);
+    }
+    for (const dependency of step.dependsOn) {
+      if (!knownSteps.has(dependency)) throw new Error(`Analysis step ${step.id} depends on unknown step: ${dependency}. dependsOn may only reference ids of other steps in t.`);
+    }
+    for (const targetStep of Object.values(step.forwardRefs)) {
+      if (!knownSteps.has(targetStep)) throw new Error(`Analysis step ${step.id} forward references unknown step: ${targetStep}. Each forwardRefs value must be the id of the step that introduces the symbol.`);
+    }
+  }
+
+  const stepEvidence = new Map<string, string>();
+  for (const step of document.steps) {
+    for (const evidenceId of step.evidenceIds) {
+      if (stepEvidence.has(evidenceId)) throw new Error(`Analysis step evidence was duplicated: ${evidenceId}. Each evidence ID must appear in exactly one step; keep it in the step where the change is introduced.`);
+      stepEvidence.set(evidenceId, step.id);
+    }
+  }
+  const missing = meaningfulEvidence.filter((id) => !stepEvidence.has(id));
+  if (missing.length > 0) throw new Error(`Analysis steps did not account for meaningful evidence: ${missing.join(", ")}. Assign each missing ID to exactly one step in t.`);
+  const extra = [...stepEvidence.keys()].filter((id) => !meaningfulEvidence.includes(id));
+  if (extra.length > 0) throw new Error(`Analysis steps referenced non-meaningful evidence: ${extra.join(", ")}. Steps may only contain meaningful evidence IDs; low-signal evidence belongs in omitted groups.`);
+
+  const stepIndex = new Map(document.steps.map((step, index) => [step.id, index]));
+  const stepByEvidence = new Map([...stepEvidence.entries()].map(([evidenceId, stepId]) => [evidenceId, document.steps.find((step) => step.id === stepId)!]));
+  // Only define-before-use is a hard invariant; layer and test constraints stay
+  // suggestions because a good step plan may interleave tests with their subject.
+  for (const constraint of deriveEvidenceOrder(input.hunks, input.files).constraints) {
+    if (constraint.reason !== "symbol" || constraint.symbol === undefined) continue;
+    const before = stepByEvidence.get(constraint.beforeEvidenceId);
+    const after = stepByEvidence.get(constraint.afterEvidenceId);
+    if (before === undefined || after === undefined || before.id === after.id) continue;
+    if ((stepIndex.get(before.id) ?? 0) < (stepIndex.get(after.id) ?? 0)) continue;
+    if (after.forwardRefs[constraint.symbol] !== before.id) {
+      throw new Error(`Analysis step order violates symbol ${constraint.symbol}: ${before.id} must come before ${after.id}. Reorder the steps, or declare forwardRefs {"${constraint.symbol}":"${before.id}"} on ${after.id} if the forward use is intentional.`);
+    }
+  }
 }
 
 export function analysisPrompt(input: CollectedReviewInput, conversation?: ConversationContext, lensInstructions?: string): string {
   const reviewInput = buildPromptReviewInput(input, conversation);
-  return `You are ndrstnd, a comprehension assistant. Explain a branch without critiquing it or proposing changes. ${lensInstructions ?? "Prioritize the implementation story and behavior changes."} Return compact minified JSON only with this shape: {s,c:[[id,title,kind,synopsis,before|null,after|null,confidence,attention,riskCategories,evidenceIds]],o:[[title,reason,evidenceIds]],u:[evidenceId]}. Keep summary under 45 words; title under 10 words; synopsis/before/after under 30 words each. Allowed kind values are exactly feature, decision, behavior, non_functional, risk, test, other. Confidence is high, medium, or low. Attention is low, contained, elevated, high, or critical. Risk categories are formatting, refactor, behavior, performance, security. Use only listed evidence IDs. Every meaningful evidence ID must appear exactly once in c, o, or u.
+  return `You are ndrstnd, a comprehension assistant. Explain a branch without critiquing it or proposing changes. ${lensInstructions ?? "Prioritize the implementation story and behavior changes."} Return compact minified JSON only with this shape: {s,c:[[id,title,kind,synopsis,before|null,after|null,confidence,attention,riskCategories,evidenceIds]],t:[[id,title,goal,youNowHave,[[concern,resolvedByStepId|null]],dependsOn,forwardRefs,advancesChapterIds,evidenceIds]],o:[[title,reason,evidenceIds]],u:[evidenceId]}. Allowed kind values are exactly feature, decision, behavior, non_functional, risk, test, other. Confidence is high, medium, or low. Attention is low, contained, elevated, high, or critical. Risk categories are formatting, refactor, behavior, performance, security. Use only listed evidence IDs. Every meaningful evidence ID must appear exactly once in c, o, or u, and exactly once in t.
+
+Prose depth is validated and out-of-range fields are rejected, so hit these word counts: summary 35-75 words; each synopsis 20-55 words across two or three sentences explaining what changed, how it works, and why it matters; before and after 10-40 words each describing concrete observable behavior; each step goal 12-40 words stating the intent and mechanism; each youNowHave 12-40 words stating the capability that now exists. Titles stay under 10 words. Name the actual functions, types, and files involved. Never answer with a single vague sentence, and never pad - every sentence must add information a reviewer can act on.
+
+Timeline steps are a rational reconstruction of how to build this branch. They are not commit chronology, file order, or the Story chapters repeated. Each step must be one capability increment; explain its intent in goal, its postcondition in youNowHave, intentionally postponed concerns in deferred, earlier step ids in dependsOn, unavoidable forward symbol uses in forwardRefs as {"Symbol":"later-step-id"}, the Story chapters it advances, and its evidence IDs. The manifest's construction.defineBeforeUse entries are hard ordering rules: each symbol must be defined in the same or an earlier step than its use, or the using step must declare it in forwardRefs. construction.suggestedEvidenceOrder is one valid linearization you may regroup into steps.
 
 You are running in the reviewed repository with a read-only sandbox. The review input below is a compact manifest, not the full patch. Use its file paths, hunk IDs, line anchors, and suggested git commands to inspect only the code you need for a high-quality comprehension story. Prefer grouping related evidence IDs by behavior or decision instead of mirroring path order.
 
@@ -140,6 +125,7 @@ export function buildPromptReviewInput(input: CollectedReviewInput, conversation
     list.push(compact);
     hunksByFile.set(hunk.fileId, list);
   }
+  const evidenceOrder = deriveEvidenceOrder(input.hunks, input.files);
 
   return {
     target: input.targetRef,
@@ -162,6 +148,12 @@ export function buildPromptReviewInput(input: CollectedReviewInput, conversation
       signalReason: file.signalReason,
       hunks: hunksByFile.get(file.id) ?? [],
     })),
+    construction: {
+      suggestedEvidenceOrder: evidenceOrder.orderedEvidenceIds,
+      defineBeforeUse: evidenceOrder.constraints
+        .filter((constraint) => constraint.reason === "symbol")
+        .map((constraint) => ({ symbol: constraint.symbol, definedIn: constraint.beforeEvidenceId, usedIn: constraint.afterEvidenceId })),
+    },
     conversation: compactConversation(conversation),
   };
 }
@@ -173,18 +165,30 @@ const CompactChapterSchema = z.tuple([
   z.string().min(1).max(80),
   z.string().min(1).max(120),
   KindSchema,
-  z.string().min(1).max(260),
-  z.string().max(260).nullable(),
-  z.string().max(260).nullable(),
+  z.string().min(1).max(420),
+  z.string().max(300).nullable(),
+  z.string().max(300).nullable(),
   ConfidenceSchema,
   z.enum(["low", "contained", "elevated", "high", "critical"]),
   z.array(CompactRiskCategorySchema),
   z.array(z.string().min(1)).min(1),
 ]);
+const CompactStepSchema = z.tuple([
+  z.string().min(1).max(80),
+  z.string().min(1).max(120),
+  z.string().min(1).max(320),
+  z.string().min(1).max(320),
+  z.array(z.tuple([z.string().min(1).max(220), z.string().min(1).max(80).nullable()])),
+  z.array(z.string().min(1).max(80)),
+  z.record(z.string().min(1), z.string().min(1).max(80)),
+  z.array(z.string().min(1).max(80)).min(1),
+  z.array(z.string().min(1)).min(1),
+]);
 
 const CompactAnalysisDocumentSchema = z.object({
-  s: z.string().min(1).max(320),
+  s: z.string().min(1).max(560),
   c: z.array(CompactChapterSchema),
+  t: z.array(CompactStepSchema),
   o: z.array(z.tuple([z.string().min(1).max(120), z.string().min(1).max(220), z.array(z.string().min(1)).min(1)])),
   u: z.array(z.string().min(1)),
 });
@@ -207,6 +211,17 @@ function parseWireAnalysisDocument(value: unknown): AnalysisDocument {
       attention: chapter[7],
       riskCategories: chapter[8],
       evidenceIds: chapter[9],
+    })),
+    steps: compact.t.map((step) => ({
+      id: step[0],
+      title: step[1],
+      goal: step[2],
+      youNowHave: step[3],
+      deferred: step[4].map((item) => ({ concern: item[0], resolvedByStepId: item[1] ?? undefined })),
+      dependsOn: step[5],
+      forwardRefs: step[6],
+      advancesChapterIds: step[7],
+      evidenceIds: step[8],
     })),
     omittedGroups: compact.o.map((group) => ({ title: group[0], reason: group[1], evidenceIds: group[2] })),
     unclassifiedEvidenceIds: compact.u,
@@ -265,6 +280,12 @@ function diffRange(input: CollectedReviewInput): string {
 }
 
 export function extractJson(text: string): string {
-  const fenced = /^\s*```(?:json)?\s*([\s\S]*?)\s*```\s*$/.exec(text);
-  return (fenced?.[1] ?? text).trim();
+  // Codex sometimes narrates around the document; accept a fenced block anywhere,
+  // then fall back to the outermost braces before giving up on the raw text.
+  const fenced = /```(?:json)?\s*([\s\S]*?)```/.exec(text);
+  const candidate = (fenced?.[1] ?? text).trim();
+  if (candidate.startsWith("{")) return candidate;
+  const start = candidate.indexOf("{");
+  const end = candidate.lastIndexOf("}");
+  return start !== -1 && end > start ? candidate.slice(start, end + 1).trim() : candidate;
 }
