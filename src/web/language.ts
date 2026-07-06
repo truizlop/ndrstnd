@@ -10,7 +10,7 @@ export function resolveLanguage(path: string): BundledLanguage {
 }
 
 export async function syntaxHighlighter(files: ChangedFile[]): Promise<Highlighter> {
-  const highlighter = await getSingletonHighlighter({ themes: ["github-light"], langs: [] });
+  const highlighter = await getSingletonHighlighter({ themes: ["github-light", "github-dark"], langs: [] });
   await Promise.all([...new Set(files.map((file) => resolveLanguage(file.path)))].map((language) => highlighter.loadLanguage(language)));
   return highlighter;
 }

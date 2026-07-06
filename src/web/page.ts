@@ -215,7 +215,7 @@ function renderFullDiff(file: ChangedFile, hunks: DiffHunk[], highlighter: Highl
 }
 
 function renderDiffBlock(block: DiffBlock, language: BundledLanguage, highlighter: Highlighter): string {
-  const tokenLines = highlighter.codeToTokens(block.lines.map((line) => line.content.slice(1)).join("\n"), { lang: language, theme: "github-light" }).tokens;
+  const tokenLines = highlighter.codeToTokens(block.lines.map((line) => line.content.slice(1)).join("\n"), { lang: language, themes: syntaxThemes }).tokens;
   return `<div class="diff-block"><div class="diff-hunk-header">${escapeHtml(block.header)}</div><pre>${block.lines.map((line, index) => renderDiffLine(line, tokenLines[index] ?? [])).join("")}</pre></div>`;
 }
 
@@ -224,12 +224,20 @@ function renderDiffLine(line: ParsedDiffLine, tokens: Array<{ content: string; c
   return `<span class="line ${kind}"><b>${line.oldNumber ?? ""}</b><b>${line.newNumber ?? ""}</b><code><span class="diff-prefix">${escapeHtml(line.content.slice(0, 1))}</span>${renderTokens(tokens)}</code></span>`;
 }
 
+/** Both themes are emitted per token; dark mode flips to the --shiki-dark variable. */
+const syntaxThemes = { light: "github-light", dark: "github-dark" } as const;
+
 function highlightCode(source: string, language: BundledLanguage, highlighter: Highlighter): string {
-  return renderTokens(highlighter.codeToTokens(source, { lang: language, theme: "github-light" }).tokens[0] ?? []);
+  return renderTokens(highlighter.codeToTokens(source, { lang: language, themes: syntaxThemes }).tokens[0] ?? []);
 }
 
-function renderTokens(tokens: Array<{ content: string; color?: string; fontStyle?: number }>): string {
-  return tokens.map((token) => `<span${token.color === undefined ? "" : ` style="color:${token.color}"`}${token.fontStyle === 1 ? ' class="token-italic"' : ""}>${escapeHtml(token.content)}</span>`).join("");
+function renderTokens(tokens: Array<{ content: string; color?: string; fontStyle?: number; htmlStyle?: Record<string, string> }>): string {
+  return tokens.map((token) => {
+    const style = token.htmlStyle === undefined
+      ? (token.color === undefined ? "" : `color:${token.color}`)
+      : Object.entries(token.htmlStyle).map(([property, value]) => `${property}:${value}`).join(";");
+    return `<span${style === "" ? "" : ` style="${style}"`}${token.fontStyle === 1 ? ' class="token-italic"' : ""}>${escapeHtml(token.content)}</span>`;
+  }).join("");
 }
 
 function renderOmitted(document: AnalysisDocument, hunks: DiffHunk[]): string {
@@ -303,7 +311,7 @@ function escapeHtml(value: string): string { return value.replace(/[&<>"']/g, (c
  * Light paper surfaces, hairline rules, a single cobalt accent, no gradients.
  */
 export const styles = `
-:root{--sans:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",system-ui,sans-serif;--mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;--surface:#fff;--rail:#f6f6f4;--well:#fafaf8;--ink:#1c2126;--ink-2:#4a5258;--ink-3:#7d858c;--faint:#b4bac0;--hair:#e8e7e3;--hair-2:#d7d6d1;--accent:#2757cf;--wash:#eef2fb;--low:#2e8f53;--contained:#4d94c9;--elevated:#a97c15;--high:#b85f2e;--critical:#bf4840;--add-ink:#1c7a41;--add-bg:#eefaf1;--del-ink:#b04a3d;--del-bg:#fdf1ee;--shadow:0 18px 44px #191e2821}
+:root{color-scheme:light dark;--sans:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",system-ui,sans-serif;--mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;--surface:#fff;--rail:#f6f6f4;--well:#fafaf8;--ink:#1c2126;--ink-2:#4a5258;--ink-3:#7d858c;--faint:#b4bac0;--hair:#e8e7e3;--hair-2:#d7d6d1;--accent:#2757cf;--wash:#eef2fb;--low:#2e8f53;--contained:#4d94c9;--elevated:#a97c15;--high:#b85f2e;--critical:#bf4840;--add-ink:#1c7a41;--add-bg:#eefaf1;--del-ink:#b04a3d;--del-bg:#fdf1ee;--shadow:0 18px 44px #191e2821}
 *{box-sizing:border-box}html{overflow-x:hidden}body{margin:0;min-width:320px;background:var(--surface);color:var(--ink);font:13px/1.5 var(--sans);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
 [hidden]{display:none!important}
 ::selection{background:#d9e3f8}
@@ -739,6 +747,22 @@ body.story-level-0 #collapse-all,body.story-level-1 #collapse-all{display:none}
 .toast{left:16px;right:16px;bottom:calc(98px + env(safe-area-inset-bottom));text-align:center}
 }
 @media(max-width:380px){.main{padding-left:12px;padding-right:12px}.breadcrumbs code{font-size:10.5px}.nav-item,.sidebar.collapsed .nav-item{font-size:10px}}
+@media(prefers-color-scheme:dark){
+:root{--surface:#15181c;--rail:#1b1f24;--well:#191d22;--ink:#e7eaed;--ink-2:#b4bbc2;--ink-3:#868f97;--faint:#565e66;--hair:#272c33;--hair-2:#3a414a;--accent:#7b9ce8;--wash:#1c2536;--low:#46a86c;--contained:#6cb6e6;--elevated:#cfa145;--high:#dd8a5b;--critical:#e07268;--add-ink:#5cb883;--add-bg:#152b1d;--del-ink:#e08a7a;--del-bg:#2f1b17;--shadow:0 18px 44px #00000059}
+::selection{background:#2c3e66}
+.panel-toggle:hover{background:#262c33}
+.nav-item:hover{background:#232930}
+.notice{border-color:#2f3d5e;color:#b9c4dc}
+.notice button{color:#10131a}
+.line code{color:#c9d1d9}
+.line code span[style]{color:var(--shiki-dark,currentColor)!important}
+.chapter-churn-bar .additions{background:#3f7f57}
+.chapter-churn-bar .deletions{background:#96584e}
+.inspector-action{background:#232930}
+.inspector-action:hover{background:#2b323a}
+.toast{border:1px solid #3a414a}
+.app-shell.mobile-inspector-open::before{background:rgba(0,0,0,.5)}
+}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;animation:none!important}}
 `;
 
