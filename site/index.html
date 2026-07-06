@@ -272,6 +272,28 @@ h2.display{margin:0 0 14px;font:600 clamp(28px,4.4vw,42px)/1.15 var(--serif);let
   .zs-step h3{font-size:21px}
 }
 
+/* ---------- timeline / parnas interlude ---------- */
+.parnas{padding:96px 0;background:#1c2126;color:#e8eaed}
+.parnas .overline{color:#9aa3ab}
+.parnas .overline::before{background:#8ab0ff}
+.parnas figure{margin:0}
+.parnas blockquote{margin:0;max-width:22em;font:600 clamp(26px,4.6vw,44px)/1.28 var(--serif);letter-spacing:-.015em;color:#f5f5f3;text-wrap:balance}
+.parnas blockquote em{font-style:italic;color:#8ab0ff}
+.parnas cite{display:block;margin-top:20px;font:500 11.5px/1.7 var(--mono);font-style:normal;color:#8b949c}
+.parnas-body{display:grid;grid-template-columns:1fr 1fr;gap:28px;margin-top:46px;padding-top:36px;border-top:1px solid #ffffff1c}
+.parnas-body p{margin:0;font:400 14.5px/1.75 var(--sans);color:#b6bdc4}
+.parnas-body p strong{color:#f0f1f2;font-weight:600}
+.order-motif{display:flex;flex-wrap:wrap;align-items:flex-end;gap:18px 24px;margin-top:44px}
+.order-group{display:grid;gap:9px}
+.order-group small{font:600 9px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;color:#7d858c}
+.order-set{display:flex;flex-wrap:wrap;gap:6px}
+.order-set span{display:grid;place-items:center;min-width:32px;height:28px;padding:0 9px;border-radius:7px;font:700 10.5px var(--mono);letter-spacing:.06em}
+.order-built span{border:1px solid #ffffff26;color:#9aa3ab;font-weight:500}
+.order-read span{background:#fff}
+.order-arrow{display:grid;place-items:center;width:30px;height:28px;color:#8ab0ff}
+.order-arrow svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+@media(max-width:760px){.parnas-body{grid-template-columns:1fr}}
+
 /* ---------- features ---------- */
 .features{padding:88px 0;border-bottom:1px solid var(--hair);background:var(--rail)}
 .fgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-top:40px}
@@ -377,6 +399,7 @@ h2.display{margin:0 0 14px;font:600 clamp(28px,4.4vw,42px)/1.15 var(--serif);let
     <nav class="site-nav" aria-label="Sections">
       <a href="#why">Why</a>
       <a href="#zoom">Zoom</a>
+      <a href="#timeline">Timeline</a>
       <a href="#features">Features</a>
       <a href="#codex">Codex</a>
       <a href="#install">Install</a>
@@ -609,6 +632,26 @@ h2.display{margin:0 0 14px;font:600 clamp(28px,4.4vw,42px)/1.15 var(--serif);let
           <p>At the bottom of the dial the workspace shows complete hunks, exactly as Git sees them. Trust the story, then verify it, without leaving the page.</p>
         </article>
       </div>
+    </div>
+  </div>
+</section>
+
+<!-- ======================== TIMELINE / PARNAS ======================== -->
+<section class="parnas" id="timeline">
+  <div class="wrap">
+    <p class="overline reveal">The timeline view</p>
+    <figure class="reveal" style="--d:60ms">
+      <blockquote>&ldquo;We cannot follow the ideal design process. But we can <em>fake it</em> in the documentation.&rdquo;</blockquote>
+      <cite>after David L. Parnas and Paul C. Clements, &ldquo;A Rational Design Process: How and Why to Fake It&rdquo; (1986)</cite>
+    </figure>
+    <div class="parnas-body">
+      <p class="reveal" style="--d:120ms">No branch is built in the order it's best understood. Agents scaffold, backtrack, revert, and patch their way to a result, and the commit log faithfully records all of that wandering. Replaying it teaches you the journey, not the design.</p>
+      <p class="reveal" style="--d:180ms">The Timeline view takes Parnas seriously: it presents the change as the sequence of steps a rational designer would have taken, each step linked to the files, churn, and evidence behind it. <strong>The history stays honest. The reading order becomes rational.</strong></p>
+    </div>
+    <div class="order-motif reveal" style="--d:240ms" role="img" aria-label="A messy sequence of work-in-progress commits reordered into five rational reading steps.">
+      <div class="order-group"><small>The order it was built</small><div class="order-set order-built"><span>wip</span><span>retry loop</span><span>fix test</span><span>revert</span><span>backoff, again</span><span>fmt</span></div></div>
+      <div class="order-arrow" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M2.5 8h11M9.5 4l4 4-4 4"/></svg></div>
+      <div class="order-group"><small>The order you read it</small><div class="order-set order-read"><span class="el">01</span><span class="hi">02</span><span class="co">03</span><span class="lo">04</span><span class="lo">05</span></div></div>
     </div>
   </div>
 </section>
