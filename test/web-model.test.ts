@@ -27,6 +27,7 @@ describe("web evidence model", () => {
         { id: "runner", title: "Runner", kind: "behavior", synopsis: "Runs jobs.", confidence: "high", attention: "contained", riskCategories: ["behavior"], evidenceIds: ["one", "two", "two"] },
         { id: "security", title: "Security", kind: "risk", synopsis: "Checks auth.", confidence: "medium", attention: "elevated", riskCategories: ["security"], evidenceIds: ["missing"] },
       ],
+      steps: [{ id: "step-01", title: "Build runner", goal: "Introduce runner evidence.", youNowHave: "Runner evidence exists.", deferred: [], dependsOn: [], forwardRefs: {}, advancesChapterIds: ["runner"], evidenceIds: ["one"] }],
       omittedGroups: [],
       unclassifiedEvidenceIds: [],
     };
@@ -88,6 +89,7 @@ describe("web test plan model", () => {
         { id: "security", title: "Secret handling", kind: "risk", synopsis: "Secrets stay hidden.", confidence: "medium", attention: "elevated", riskCategories: ["security"], evidenceIds: ["security"] },
         { id: "tests", title: "Exercise worktree handling", kind: "test", synopsis: "Tests cover staged and unstaged files.", confidence: "high", attention: "low", riskCategories: ["behavior"], evidenceIds: ["test"] },
       ],
+      steps: [{ id: "step-01", title: "Build worktree", goal: "Introduce worktree evidence.", youNowHave: "Worktree evidence exists.", deferred: [], dependsOn: [], forwardRefs: {}, advancesChapterIds: ["worktree"], evidenceIds: ["source"] }],
       omittedGroups: [],
       unclassifiedEvidenceIds: [],
     };

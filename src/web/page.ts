@@ -44,46 +44,89 @@ async function renderPage(data: ReviewPresentationData, launchToken: string, art
   <aside class="sidebar"><div class="brand"><svg class="brand-mark" viewBox="0 0 20 22" aria-hidden="true"><path d="M4.4 3.4 10 7.6l5.6-4.2"/><path d="M4.4 8.9 10 13.1l5.6-4.2"/><path class="mark-deep" d="M4.4 14.4 10 18.6l5.6-4.2"/></svg><span class="brand-name">ndrstnd</span><button class="collapse-sidebar panel-toggle" aria-label="Collapse navigation" aria-expanded="true">${panelIcon("collapse-left")}</button><button class="mobile-inspector-toggle panel-toggle" aria-label="Show review details" aria-expanded="false">${panelIcon("details")}</button></div><nav aria-label="Review views"><button class="nav-item active" data-view="trailer">${navIcon("story")}Story</button><button class="nav-item" data-view="timeline">${navIcon("timeline")}Timeline</button><button class="nav-item" data-view="diff">${navIcon("diff")}Full diff</button>${data.document.chapters.some((chapter) => chapter.kind === "test") ? `<button class="nav-item" data-view="tests">${navIcon("tests")}Test plan</button>` : ""}</nav></aside>
   <main class="main"><header class="page-header"><div class="masthead"><p class="masthead-overline">Change review</p><h1>${escapeHtml(data.targetRef)}</h1><div class="breadcrumbs"><span>against <strong>${escapeHtml(data.baseRef)}</strong></span><span>merge base <code>${escapeHtml(data.mergeBase.slice(0, 8))}</code></span></div></div></header><div class="view-bar"><span class="view-bar-ref">${escapeHtml(data.targetRef)}</span>${artifact ? "" : `<label class="lens-label">Lens <select id="lens-select" aria-label="Review lens"><option>Loading…</option></select></label>`}<div class="story-zoom-controls"><button data-zoom-step="-1" aria-label="Decrease detail">−</button><div class="zoom" id="zoom-control" role="group" aria-label="Story detail level"><div class="zoom-callout" id="zoom-callout" aria-live="polite"><output id="zoom-label">Summary</output><span id="zoom-description">Story claims and summaries</span></div><button data-zoom="0" aria-label="Map" title="Map"></button><button data-zoom="1" aria-label="Summary" title="Summary" class="active"></button><button data-zoom="2" aria-label="Explanation" title="Explanation"></button><button data-zoom="3" aria-label="Evidence" title="Evidence"></button><button data-zoom="4" aria-label="Raw" title="Raw"></button></div><button data-zoom-step="1" aria-label="Increase detail">+</button></div></div>
   ${artifact ? "" : `<div id="lens-notice" class="notice" hidden><span>Review lens changed. Grouping and risk signals will change.</span><button id="rerun">Re-run analysis</button></div>`}
-  <section id="trailer" class="view active"><p class="review-summary">${escapeHtml(data.document.summary)}</p><p class="coverage">${data.files.length} files · ${data.hunks.length} evidence hunks · ${data.document.chapters.length} story steps</p><div class="story-toolbar"><div id="map" class="map" hidden>${Object.entries(counts).map(([key, value]) => `<div><span class="dot ${key}"></span>${escapeHtml(key)} <strong>${value}</strong></div>`).join("")}</div><button id="collapse-all">Collapse all</button></div><div class="chapter-list">${renderChapters(data.document, data.hunks, filePaths, data.files, highlighter)}</div>${renderOtherFilesChanged(data.files, data.hunks)}${renderOmitted(data.document, data.hunks)}</section>
-  <section id="timeline" class="view"><p class="section-title">Suggested implementation story</p><p class="view-subtitle">Each step in suggested reading order, with the files it touched.</p><div class="timeline">${renderTimeline(data.document, data.hunks, filePaths)}</div></section>
+  <section id="trailer" class="view active"><p class="review-summary">${escapeHtml(data.document.summary)}</p><p class="coverage">${data.files.length} files · ${data.hunks.length} evidence hunks · ${data.document.chapters.length} story chapters · ${data.document.steps.length} build steps</p><div class="story-toolbar"><div id="map" class="map" hidden>${Object.entries(counts).map(([key, value]) => `<div><span class="dot ${key}"></span>${escapeHtml(key)} <strong>${value}</strong></div>`).join("")}</div><button id="collapse-all">Collapse all</button></div><div class="chapter-list">${renderChapters(data.document, data.hunks, filePaths, data.files, highlighter)}</div>${renderOtherFilesChanged(data.files, data.hunks)}${renderOmitted(data.document, data.hunks)}</section>
+  <section id="timeline" class="view"><p class="section-title">Build path</p><p class="view-subtitle">A constructive reconstruction of how you would assemble this change so each step builds on what came before.</p>${renderTimeline(data.document, data.hunks, filePaths, data.files, highlighter)}</section>
   <section id="diff" class="view"><p class="section-title">Every patch hunk</p>${data.files.map((file) => renderFullDiff(file, data.hunks.filter((hunk) => hunk.fileId === file.id), highlighter)).join("")}</section>
   <section id="tests" class="view"><p class="section-title">Test plan</p><p class="test-plan-subtitle">See how the changed behavior was exercised, from high-level themes to raw test evidence.</p>${renderTestPlan(data.document, data.hunks, filePaths, data.files, highlighter)}</section>
   <footer class="colophon"><svg viewBox="0 0 20 22" aria-hidden="true"><path d="M4.4 3.4 10 7.6l5.6-4.2"/><path d="M4.4 8.9 10 13.1l5.6-4.2"/><path class="mark-deep" d="M4.4 14.4 10 18.6l5.6-4.2"/></svg><span>ndrstnd · created by Tomás Ruiz-López</span></footer>
   </main>
-  <aside class="inspector" aria-label="Review details"><header class="inspector-header"><h2>At a glance</h2><button class="collapse-inspector panel-toggle" aria-label="Collapse review details" aria-expanded="true">${panelIcon("collapse-right")}</button></header><div class="inspector-content"><section><h3>This change</h3><div class="stat-row"><span>Story steps</span><strong>${data.document.chapters.length}</strong></div><div class="stat-row"><span>Changed files</span><strong>${data.files.length}</strong></div><div class="stat-row"><span>Evidence hunks</span><strong>${data.hunks.length}</strong></div></section><section><h3>Focus areas</h3>${Object.entries(categoryCounts(data.document)).map(([category, count]) => `<div class="stat-row stat-category"><span>${categoryIcon(category)}${escapeHtml(category)}</span><strong>${count}</strong></div>`).join("")}</section><section><h3>Actions</h3><button class="inspector-action" data-action="export">${actionIcon("export")}Export review…</button><button class="inspector-action" data-action="copy-summary" title="Copy a concise prompt for asking Codex about this review">${actionIcon("copy")}Copy Codex prompt</button></section></div></aside>
+  <aside class="inspector" aria-label="Review details"><header class="inspector-header"><h2>At a glance</h2><button class="collapse-inspector panel-toggle" aria-label="Collapse review details" aria-expanded="true">${panelIcon("collapse-right")}</button></header><div class="inspector-content"><section><h3>This change</h3><div class="stat-row"><span>Story chapters</span><strong>${data.document.chapters.length}</strong></div><div class="stat-row"><span>Build steps</span><strong>${data.document.steps.length}</strong></div><div class="stat-row"><span>Changed files</span><strong>${data.files.length}</strong></div><div class="stat-row"><span>Evidence hunks</span><strong>${data.hunks.length}</strong></div></section><section><h3>Focus areas</h3>${Object.entries(categoryCounts(data.document)).map(([category, count]) => `<div class="stat-row stat-category"><span>${categoryIcon(category)}${escapeHtml(category)}</span><strong>${count}</strong></div>`).join("")}</section><section><h3>Actions</h3><button class="inspector-action" data-action="export">${actionIcon("export")}Export review…</button><button class="inspector-action" data-action="copy-summary" title="Copy a concise prompt for asking Codex about this review">${actionIcon("copy")}Copy Codex prompt</button></section></div></aside>
 </div><div id="selection-menu" class="selection-menu" hidden><button data-question="Explain the selected lines.">Explain selection</button><button data-question="Trace the callers, effects, and dependencies of the selected lines.">Trace effects</button><button data-question="Why is this included in the change?">Why included?</button><button data-action="ask">Ask a question…</button></div><div id="toast" class="toast" hidden></div><script>${artifact ? artifactClientScript : `const ndrstnd=${state};${clientScript}`}${portableEnhancements}</script></body></html>`;
 }
 
 function renderChapters(document: AnalysisDocument, hunks: DiffHunk[], filePaths: Map<string, string>, files: ChangedFile[], highlighter: Highlighter): string {
   const filesById = new Map(files.map((file) => [file.id, file]));
+  const stepsByChapter = new Map<string, Array<{ id: string; index: number }>>();
+  const stepIndexByEvidence = new Map<string, number>();
+  for (const [index, step] of document.steps.entries()) {
+    for (const chapterId of step.advancesChapterIds) {
+      const list = stepsByChapter.get(chapterId) ?? [];
+      list.push({ id: step.id, index });
+      stepsByChapter.set(chapterId, list);
+    }
+    for (const evidenceId of step.evidenceIds) stepIndexByEvidence.set(evidenceId, index);
+  }
   return document.chapters.map((chapter, index) => {
     const metrics = chapterMetrics(chapter, hunks);
+    const stepChips = (stepsByChapter.get(chapter.id) ?? []).map((step) => `<span class="step-chip" role="button" tabindex="0" data-story-step="${escapeHtml(step.id)}">step ${String(step.index + 1).padStart(2, "0")}</span>`).join("");
     const focusedEvidence = chapter.evidenceIds
       .map((id) => requireHunk(hunks, id))
       .filter((hunk) => !isSupportingFile(filesById.get(hunk.fileId)))
-      .map((hunk) => renderEvidence(hunk, filePaths.get(hunk.fileId) ?? hunk.fileId, highlighter))
+      .map((hunk) => renderEvidence(hunk, filePaths.get(hunk.fileId) ?? hunk.fileId, highlighter, stepIndexByEvidence.get(hunk.id)))
       .filter(Boolean)
       .join("");
-    return `<article class="chapter" data-chapter="${escapeHtml(chapter.id)}"><button class="chapter-toggle" aria-expanded="false"><span class="chapter-number attention-${escapeHtml(chapter.attention)}">${String(index + 1).padStart(2, "0")}</span><span class="chapter-copy"><strong>${escapeHtml(chapter.title)}</strong><small>${escapeHtml(chapter.synopsis)}</small><span class="chapter-tags">${chapter.riskCategories.map((risk) => `<span class="chapter-tag">${categoryIcon(risk)}${escapeHtml(risk)}</span>`).join("")}</span>${renderChapterMapMetrics(metrics)}</span><span class="chevron" aria-hidden="true"><svg viewBox="0 0 12 12"><path d="M2.5 4.25L6 7.75l3.5-3.5"/></svg></span></button><div class="chapter-detail" hidden>${renderSemantic(chapter.before, chapter.after)}${focusedEvidence ? `<div class="evidence-stack">${focusedEvidence}</div>` : ""}</div></article>`;
+    return `<article class="chapter" data-chapter="${escapeHtml(chapter.id)}"><button class="chapter-toggle" aria-expanded="false"><span class="chapter-number attention-${escapeHtml(chapter.attention)}">${String(index + 1).padStart(2, "0")}</span><span class="chapter-copy"><strong>${escapeHtml(chapter.title)}</strong><small>${escapeHtml(chapter.synopsis)}</small>${stepChips ? `<span class="chapter-steps">${stepChips}</span>` : ""}<span class="chapter-tags">${chapter.riskCategories.map((risk) => `<span class="chapter-tag">${categoryIcon(risk)}${escapeHtml(risk)}</span>`).join("")}</span>${renderChapterMapMetrics(metrics)}</span><span class="chevron" aria-hidden="true"><svg viewBox="0 0 12 12"><path d="M2.5 4.25L6 7.75l3.5-3.5"/></svg></span></button><div class="chapter-detail" hidden>${renderSemantic(chapter.before, chapter.after)}${focusedEvidence ? `<div class="evidence-stack">${focusedEvidence}</div>` : ""}</div></article>`;
   }).join("");
 }
 
-function renderTimeline(document: AnalysisDocument, hunks: DiffHunk[], filePaths: Map<string, string>): string {
-  return document.chapters.map((chapter, index) => {
-    const churnByFile = new Map<string, { additions: number; deletions: number }>();
-    for (const id of chapter.evidenceIds) {
-      const hunk = hunks.find((candidate) => candidate.id === id);
-      if (hunk === undefined) continue;
-      const churn = churnByFile.get(hunk.fileId) ?? { additions: 0, deletions: 0 };
-      for (const line of hunk.lines) {
-        if (line.kind === "addition") churn.additions += 1;
-        if (line.kind === "deletion") churn.deletions += 1;
-      }
-      churnByFile.set(hunk.fileId, churn);
-    }
-    const files = [...churnByFile.entries()].map(([fileId, churn]) => `<span class="timeline-file"><span>${escapeHtml(filePaths.get(fileId) ?? fileId)}</span><small><b class="additions">+${churn.additions}</b><b class="deletions">−${churn.deletions}</b></small></span>`).join("");
-    return `<button data-timeline-chapter="${escapeHtml(chapter.id)}" class="timeline-step attention-${escapeHtml(chapter.attention)}"><span>${String(index + 1).padStart(2, "0")}</span><div><h2>${escapeHtml(chapter.title)}</h2><p>${escapeHtml(chapter.synopsis)}</p>${files ? `<div class="timeline-files">${files}</div>` : ""}</div></button>`;
+const ATTENTION_RANK = { low: 0, contained: 1, elevated: 2, high: 3, critical: 4 } as const;
+
+function renderTimeline(document: AnalysisDocument, hunks: DiffHunk[], filePaths: Map<string, string>, files: ChangedFile[], highlighter: Highlighter): string {
+  const chaptersById = new Map(document.chapters.map((chapter) => [chapter.id, chapter]));
+  if (document.steps.length === 0) return `<p class="empty-note">This change has no meaningful evidence to reconstruct as a build path.</p>`;
+  const ordinal = (index: number) => String(index + 1).padStart(2, "0");
+  const attentionFor = (step: AnalysisDocument["steps"][number]) => step.advancesChapterIds
+    .map((chapterId) => chaptersById.get(chapterId)?.attention ?? "low")
+    .reduce((highest, attention) => (ATTENTION_RANK[attention] > ATTENTION_RANK[highest] ? attention : highest), "low" as keyof typeof ATTENTION_RANK);
+  const stepIndexByEvidence = new Map<string, number>();
+  for (const [index, step] of document.steps.entries()) for (const evidenceId of step.evidenceIds) stepIndexByEvidence.set(evidenceId, index);
+
+  const ticks = document.steps.map((step, index) => `<button class="rail-tick attention-${escapeHtml(attentionFor(step))}${index === 0 ? " active" : ""}" role="tab" aria-selected="${index === 0 ? "true" : "false"}" data-timeline-select="${escapeHtml(step.id)}" data-step-title="${escapeHtml(step.title)}" title="${ordinal(index)} · ${escapeHtml(step.title)}"></button>`).join("");
+  const rail = `<div class="timeline-rail"><button class="rail-nav" data-timeline-move="-1" aria-label="Previous step" disabled>${railIcon("previous")}</button><div class="rail-ticks" role="tablist" aria-label="Build steps">${ticks}</div><button class="rail-nav" data-timeline-move="1" aria-label="Next step"${document.steps.length === 1 ? " disabled" : ""}>${railIcon("next")}</button><p class="rail-readout"><output id="rail-step" aria-live="polite">01 / ${String(document.steps.length).padStart(2, "0")}</output><span id="rail-title">${escapeHtml(document.steps[0].title)}</span></p></div>`;
+  const plan = `<div class="timeline-plan">${document.steps.map((step, index) => `<button class="timeline-plan-step attention-${escapeHtml(attentionFor(step))}" data-timeline-select="${escapeHtml(step.id)}"><span>${ordinal(index)}</span><div><strong>${escapeHtml(step.title)}</strong><p>${escapeHtml(step.goal)}</p></div></button>`).join("")}</div>`;
+
+  const states = document.steps.map((step, index) => {
+    const currentEvidence = new Set(step.evidenceIds);
+    const cumulativeHunks = document.steps.slice(0, index + 1).flatMap((candidate) => candidate.evidenceIds.map((id) => requireHunk(hunks, id)));
+    const churn = churnFor(step.evidenceIds.map((id) => requireHunk(hunks, id)));
+    const filesTouched = [...churn.entries()].map(([fileId, counts]) => `<span class="timeline-file"><span>${escapeHtml(filePaths.get(fileId) ?? fileId)}</span><small><b class="additions">+${counts.additions}</b><b class="deletions">−${counts.deletions}</b></small></span>`).join("");
+    const chapters = step.advancesChapterIds.map((chapterId) => chaptersById.get(chapterId)).filter((chapter): chapter is NonNullable<typeof chapter> => chapter !== undefined);
+    const chapterLinks = chapters.map((chapter) => `<button data-step-chapter="${escapeHtml(chapter.id)}">Story · ${escapeHtml(chapter.title)}</button>`).join("");
+    const deferred = step.deferred.length === 0 ? `<p class="empty-note">Nothing was postponed at this step.</p>` : `<ul>${step.deferred.map((item) => `<li>${escapeHtml(item.concern)}${item.resolvedByStepId ? ` <button data-timeline-select="${escapeHtml(item.resolvedByStepId)}">${escapeHtml(item.resolvedByStepId)}</button>` : ""}</li>`).join("")}</ul>`;
+    const forwardRefs = Object.entries(step.forwardRefs);
+    const refs = forwardRefs.length === 0 ? `<p class="empty-note">Every symbol used here already exists.</p>` : `<ul>${forwardRefs.map(([symbol, targetStepId]) => `<li><code>${escapeHtml(symbol)}</code> is introduced at <button data-timeline-select="${escapeHtml(targetStepId)}">${escapeHtml(targetStepId)}</button></li>`).join("")}</ul>`;
+    const renderItem = (hunk: DiffHunk) => `<div class="timeline-evidence-item${currentEvidence.has(hunk.id) ? " current" : ""}" data-evidence-id="${escapeHtml(hunk.id)}">${renderEvidence(hunk, filePaths.get(hunk.fileId) ?? hunk.fileId, highlighter, stepIndexByEvidence.get(hunk.id) ?? index)}</div>`;
+    const currentItems = cumulativeHunks.filter((hunk) => currentEvidence.has(hunk.id)).map(renderItem).join("");
+    const priorHunks = cumulativeHunks.filter((hunk) => !currentEvidence.has(hunk.id));
+    const priorItems = priorHunks.length === 0 ? "" : `<p class="timeline-evidence-divider">Already in place from earlier steps</p>${priorHunks.map(renderItem).join("")}`;
+    const cumulativeFiles = files.filter((file) => cumulativeHunks.some((hunk) => hunk.fileId === file.id));
+    const raw = cumulativeFiles.map((file) => renderFullDiff(file, cumulativeHunks.filter((hunk) => hunk.fileId === file.id), highlighter)).join("");
+    return `<article class="timeline-state${index === 0 ? " active" : ""}" data-timeline-state="${escapeHtml(step.id)}" data-step-index="${index + 1}"${index === 0 ? "" : " hidden"}><header class="timeline-card"><span class="timeline-index attention-${escapeHtml(attentionFor(step))}">${ordinal(index)}</span><div><h2>${escapeHtml(step.title)}</h2><p class="timeline-goal">${escapeHtml(step.goal)}</p>${filesTouched ? `<div class="timeline-files">${filesTouched}</div>` : ""}${chapterLinks ? `<div class="timeline-chapter-links">${chapterLinks}</div>` : ""}</div></header><div class="timeline-summary"><strong>You now have</strong><p>${escapeHtml(step.youNowHave)}</p></div><div class="timeline-explanation"><section><h3>Deferred for later steps</h3>${deferred}</section><section><h3>Forward references</h3>${refs}</section></div><div class="timeline-evidence">${currentItems}${priorItems}</div><div class="timeline-raw">${raw}</div></article>`;
   }).join("");
+  return `<div class="timeline">${rail}${plan}<div class="timeline-states">${states}</div></div>`;
+}
+
+function churnFor(hunks: DiffHunk[]): Map<string, { additions: number; deletions: number }> {
+  const churnByFile = new Map<string, { additions: number; deletions: number }>();
+  for (const hunk of hunks) {
+    const churn = churnByFile.get(hunk.fileId) ?? { additions: 0, deletions: 0 };
+    for (const line of hunk.lines) {
+      if (line.kind === "addition") churn.additions += 1;
+      if (line.kind === "deletion") churn.deletions += 1;
+    }
+    churnByFile.set(hunk.fileId, churn);
+  }
+  return churnByFile;
 }
 
 function renderChapterMapMetrics(metrics: ReturnType<typeof chapterMetrics>): string {
@@ -105,6 +148,14 @@ function categoryIcon(category: string): string {
   return `<svg class="tag-icon" viewBox="0 0 18 18" aria-hidden="true">${paths[category] ?? '<circle cx="9" cy="9" r="3"/>'}</svg>`;
 }
 
+function railIcon(direction: "previous" | "next"): string {
+  const paths: Record<typeof direction, string> = {
+    previous: '<path d="M9.8 3.8L5.6 8l4.2 4.2"/>',
+    next: '<path d="M6.2 3.8L10.4 8l-4.2 4.2"/>',
+  };
+  return `<svg viewBox="0 0 16 16" aria-hidden="true">${paths[direction]}</svg>`;
+}
+
 function navIcon(view: "story" | "timeline" | "diff" | "tests"): string {
   const paths: Record<typeof view, string> = {
     story: '<circle cx="5" cy="4" r="1.5"/><circle cx="5" cy="12" r="1.5"/><path d="M5 5.5v5M9 4h4M9 12h4"/>',
@@ -120,7 +171,7 @@ function renderSemantic(before: string | undefined, after: string | undefined): 
   return `<div class="semantic"><div><strong>Before</strong><p>${escapeHtml(before ?? "Not inferred from this patch.")}</p></div><div><strong>After</strong><p>${escapeHtml(after ?? "Not inferred from this patch.")}</p></div></div>`;
 }
 
-function renderEvidence(hunk: DiffHunk, path: string, highlighter: Highlighter): string {
+function renderEvidence(hunk: DiffHunk, path: string, highlighter: Highlighter, stepIndex?: number): string {
   const focused = focusedEvidenceLines(hunk.lines);
   if (focused.length === 0) return "";
   const language = resolveLanguage(path);
@@ -132,7 +183,8 @@ function renderEvidence(hunk: DiffHunk, path: string, highlighter: Highlighter):
   }).join("");
   const raw = hunk.lines.map((line) => renderEvidenceLine(line, language, highlighter)).join("");
   const omittedCount = hunk.lines.length - focused.length;
-  return `<article class="evidence focused-evidence"><header><span class="evidence-path">${escapeHtml(path)}</span><span class="focused-label">Focused excerpt · @@ −${hunk.oldStart} +${hunk.newStart} @@</span><span class="raw-label">Complete excerpt · @@ −${hunk.oldStart} +${hunk.newStart} @@</span></header><pre class="focused-code">${excerpt}</pre><pre class="raw-code">${raw}</pre>${omittedCount > 0 ? `<p class="evidence-context">${omittedCount} routine line${omittedCount === 1 ? "" : "s"} omitted</p>` : ""}</article>`;
+  const tag = stepIndex === undefined ? "" : `<button class="evidence-step-tag" data-story-step-index="${stepIndex + 1}">step ${String(stepIndex + 1).padStart(2, "0")}</button>`;
+  return `<article class="evidence focused-evidence" data-evidence-id="${escapeHtml(hunk.id)}"><header><span class="evidence-path">${escapeHtml(path)}</span><span class="focused-label">Focused excerpt · @@ −${hunk.oldStart} +${hunk.newStart} @@</span><span class="raw-label">Complete excerpt · @@ −${hunk.oldStart} +${hunk.newStart} @@</span>${tag}</header><pre class="focused-code">${excerpt}</pre><pre class="raw-code">${raw}</pre>${omittedCount > 0 ? `<p class="evidence-context">${omittedCount} routine line${omittedCount === 1 ? "" : "s"} omitted</p>` : ""}</article>`;
 }
 
 function renderEvidenceLine(line: DiffLine, language: BundledLanguage, highlighter: Highlighter): string {
@@ -361,8 +413,10 @@ body.story-level-0 #collapse-all,body.story-level-1 #collapse-all{display:none}
 .chapter-copy{display:grid;gap:4px;min-width:0}
 .chapter-copy strong{font:600 14.5px/1.4 var(--sans);color:var(--ink)}
 .chapter-copy small{font:400 12.5px/1.5 var(--sans);color:var(--ink-3)}
-.chapter-tags{display:flex;flex-wrap:wrap;gap:5px 6px;margin-top:8px}
+.chapter-tags,.chapter-steps{display:flex;flex-wrap:wrap;gap:5px 6px;margin-top:8px}
 .chapter-tag{display:inline-flex;align-items:center;gap:5px;padding:4px 9px;border:1px solid var(--hair);border-radius:999px;background:var(--surface);font:600 9.5px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3)}
+.step-chip,.evidence-step-tag{display:inline-flex;align-items:center;min-height:22px;padding:3px 8px;border:0;border-radius:7px;background:var(--well);font:700 9.5px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--accent);cursor:pointer}
+.step-chip:hover,.evidence-step-tag:hover{background:var(--wash)}
 .tag-icon{width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
 .chevron{display:grid;place-items:center;width:18px;height:18px;margin-top:3px;color:var(--faint);transition:transform 200ms ease,color 140ms ease}
 .chevron svg{width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
@@ -445,23 +499,78 @@ body.story-level-0 #collapse-all,body.story-level-1 #collapse-all{display:none}
 
 .section-title{margin:30px 0 6px;font:600 10px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--ink-3)}
 .timeline{position:relative;margin-top:16px}
-.timeline::before{content:"";position:absolute;left:9px;top:28px;bottom:28px;width:1px;background:var(--hair)}
-.timeline-step{position:relative;display:grid;grid-template-columns:40px minmax(0,1fr);gap:12px;width:100%;padding:18px 2px 18px 30px;border:0;border-bottom:1px solid var(--hair);background:transparent;text-align:left;cursor:pointer}
-.timeline-step:last-child{border-bottom:0}
-.timeline-step::before{content:"";position:absolute;left:5.5px;top:24px;width:8px;height:8px;border-radius:50%;background:var(--low);box-shadow:0 0 0 3px var(--surface)}
-.timeline-step.attention-contained::before{background:var(--contained)}
-.timeline-step.attention-elevated::before{background:var(--elevated)}
-.timeline-step.attention-high::before{background:var(--high)}
-.timeline-step.attention-critical::before{background:var(--critical)}
-.timeline-step.attention-low>span{color:var(--low)}
-.timeline-step.attention-contained>span{color:var(--contained)}
-.timeline-step.attention-elevated>span{color:var(--elevated)}
-.timeline-step.attention-high>span{color:var(--high)}
-.timeline-step.attention-critical>span{color:var(--critical)}
-.timeline-step>span{font:600 12.5px/1 var(--mono);letter-spacing:.08em;color:var(--ink-3);padding-top:4px}
-.timeline h2{margin:0 0 5px;font:600 14.5px/1.4 var(--sans);color:var(--ink);transition:color 140ms ease}
+.timeline-rail{position:sticky;top:70px;z-index:10;display:grid;grid-template-columns:30px minmax(0,1fr) 30px;align-items:center;column-gap:8px;margin:0 0 16px;padding:9px 12px 7px;border:1px solid var(--hair);border-radius:12px;background:var(--surface)}
+.rail-nav{display:grid;place-items:center;width:30px;height:30px;border:0;border-radius:8px;background:transparent;color:var(--ink-3);cursor:pointer;transition:background-color 140ms ease,color 140ms ease}
+.rail-nav:hover{background:var(--well);color:var(--ink)}
+.rail-nav[disabled]{opacity:.35;cursor:default}
+.rail-nav[disabled]:hover{background:transparent;color:var(--ink-3)}
+.rail-nav svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.rail-ticks{position:relative;display:flex;align-items:flex-end;height:28px;min-width:0}
+.rail-ticks::before{content:"";position:absolute;left:2px;right:2px;bottom:4px;height:1px;background:var(--hair-2)}
+.rail-tick{position:relative;flex:1;min-width:4px;height:28px;padding:0;border:0;background:transparent;cursor:pointer}
+.rail-tick::before{content:"";position:absolute;left:50%;bottom:4px;width:2px;height:9px;border-radius:1px 1px 0 0;background:var(--hair-2);transform:translateX(-50%);transition:background-color 160ms ease,height 200ms cubic-bezier(.3,1.3,.4,1),width 160ms ease}
+.rail-tick.attention-low::before{background:var(--low)}
+.rail-tick.attention-contained::before{background:var(--contained)}
+.rail-tick.attention-elevated::before{background:var(--elevated)}
+.rail-tick.attention-high::before{background:var(--high)}
+.rail-tick.attention-critical::before{background:var(--critical)}
+.rail-tick:hover::before{height:13px}
+.rail-tick.active::before{background:var(--accent);height:17px;width:2.5px}
+.rail-readout{grid-column:1/-1;display:flex;align-items:baseline;gap:10px;margin:4px 2px 0!important;max-width:none!important;min-width:0}
+.rail-readout output{flex:none;font:700 10px/1 var(--mono);letter-spacing:.14em;color:var(--accent);font-variant-numeric:tabular-nums}
+.rail-readout span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:500 11.5px/1.3 var(--sans);color:var(--ink-2)}
+.timeline-plan{position:relative;display:none}
+.timeline-plan::before{content:"";position:absolute;left:9px;top:26px;bottom:26px;width:1px;background:var(--hair)}
+.timeline-plan-step{position:relative;display:grid;grid-template-columns:40px minmax(0,1fr);gap:12px;width:100%;padding:15px 2px 15px 30px;border:0;border-bottom:1px solid var(--hair);background:transparent;text-align:left;cursor:pointer}
+.timeline-plan-step:last-child{border-bottom:0}
+.timeline-plan-step::before{content:"";position:absolute;left:5.5px;top:21px;width:8px;height:8px;border-radius:50%;background:var(--low);box-shadow:0 0 0 3px var(--surface)}
+.timeline-plan-step.attention-contained::before{background:var(--contained)}
+.timeline-plan-step.attention-elevated::before{background:var(--elevated)}
+.timeline-plan-step.attention-high::before{background:var(--high)}
+.timeline-plan-step.attention-critical::before{background:var(--critical)}
+.timeline-plan-step>span{padding-top:2px;font:700 12.5px/1 var(--mono);letter-spacing:.08em;color:var(--low)}
+.timeline-plan-step.attention-contained>span{color:var(--contained)}
+.timeline-plan-step.attention-elevated>span{color:var(--elevated)}
+.timeline-plan-step.attention-high>span{color:var(--high)}
+.timeline-plan-step.attention-critical>span{color:var(--critical)}
+.timeline-plan-step strong{display:block;font:600 14.5px/1.4 var(--sans);color:var(--ink);transition:color 140ms ease}
+.timeline-plan-step p{margin:3px 0 0}
+.timeline-plan-step:hover strong{color:var(--accent)}
+.timeline-state{display:none}
+.timeline-state.active{display:block}
+.timeline-card{display:grid;grid-template-columns:44px minmax(0,1fr);gap:12px;padding:16px 0;border-top:1px solid var(--hair);border-bottom:1px solid var(--hair)}
+.timeline-card h2{margin:0 0 6px;font:600 16px/1.35 var(--sans);color:var(--ink)}
+.timeline-index{font:700 12.5px/1 var(--mono);letter-spacing:.08em;color:var(--ink-3);padding-top:5px}
+.timeline-index.attention-low{color:var(--low)}
+.timeline-index.attention-contained{color:var(--contained)}
+.timeline-index.attention-elevated{color:var(--elevated)}
+.timeline-index.attention-high{color:var(--high)}
+.timeline-index.attention-critical{color:var(--critical)}
 .timeline p{margin:0;max-width:60em;font:400 12.5px/1.55 var(--sans);color:var(--ink-3)}
-.timeline-step:hover h2{color:var(--accent)}
+.timeline-summary,.timeline-explanation{border:1px solid var(--hair);border-radius:10px;background:var(--surface);padding:14px;margin-top:14px}
+.timeline-summary strong,.timeline-explanation h3{display:block;margin:0 0 7px;font:700 10px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3)}
+.timeline-summary p{color:var(--ink-2)}
+.timeline-explanation{grid-template-columns:1fr 1fr;gap:18px}
+.timeline-explanation section+section{border-left:1px solid var(--hair);padding-left:18px}
+.timeline-explanation ul{margin:0;padding-left:18px;color:var(--ink-2)}
+.timeline-explanation li{margin:4px 0;font-size:12.5px}
+.timeline-explanation button,.timeline-chapter-links button{border:0;border-radius:7px;background:var(--well);min-height:24px;padding:4px 8px;color:var(--accent);font:600 11px/1 var(--sans);cursor:pointer}
+.timeline-chapter-links{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.timeline-evidence,.timeline-raw{margin-top:14px}
+.timeline-evidence-divider{margin:20px 0 2px!important;font:600 10px/1 var(--mono)!important;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3)!important}
+.timeline-evidence-item{opacity:.62}
+.timeline-evidence-item.current{opacity:1}
+.timeline-evidence-item.current .evidence{border-color:#c9d5f5;box-shadow:0 0 0 1px #d9e3f8}
+.timeline-summary,.timeline-explanation,.timeline-evidence,.timeline-raw{display:none}
+.story-level-0 #timeline .timeline-rail{display:none}
+.story-level-0 #timeline .timeline-plan{display:block}
+.story-level-0 #timeline .timeline-states{display:none}
+.story-level-1 #timeline .timeline-summary{display:block}
+.story-level-2 #timeline .timeline-summary{display:block}
+.story-level-2 #timeline .timeline-explanation{display:grid}
+.story-level-3 #timeline .timeline-explanation{display:grid}
+.story-level-3 #timeline .timeline-evidence{display:block}
+.story-level-4 #timeline .timeline-raw{display:block}
 .timeline-files{display:flex;flex-direction:column;gap:4px;margin-top:10px}
 .timeline-file{display:flex;align-items:center;gap:12px;font:11px/1.4 var(--mono);color:var(--ink-2)}
 .timeline-file small{display:flex;gap:7px;font:600 10.5px/1 var(--mono)}
@@ -611,7 +720,12 @@ body.story-level-0 #collapse-all,body.story-level-1 #collapse-all{display:none}
 .story-level-0 .chapter-copy{min-height:0}
 .test-theme-grid{grid-template-columns:1fr}
 .test-evidence-card summary{flex-direction:column;align-items:flex-start}
-.timeline-step{grid-template-columns:34px minmax(0,1fr)}
+.timeline-rail{top:8px;grid-template-columns:34px minmax(0,1fr) 34px;padding:8px 8px 6px}
+.rail-nav{width:34px;height:34px}
+.timeline-explanation{grid-template-columns:1fr}
+.story-level-2 #timeline .timeline-explanation,.story-level-3 #timeline .timeline-explanation{grid-template-columns:1fr}
+.timeline-explanation section+section{border-left:0;border-top:1px solid var(--hair);padding-left:0;padding-top:14px}
+.timeline-card{grid-template-columns:36px minmax(0,1fr)}
 .inspector{display:none}
 .app-shell.mobile-inspector-open::before{content:"";position:fixed;inset:0;z-index:35;background:rgba(17,21,28,.32);animation:fade-in 220ms ease both}
 .app-shell.mobile-inspector-open .inspector{display:block;position:fixed;z-index:40;inset:auto 10px calc(10px + env(safe-area-inset-bottom)) 10px;height:auto;max-height:min(76vh,600px);overflow:auto;border:1px solid var(--hair);border-radius:14px;padding:18px;background:var(--surface);box-shadow:var(--shadow);animation:sheet-in 300ms cubic-bezier(.2,.9,.25,1) both}
@@ -637,7 +751,7 @@ export const clientScript = `
   let selectedText = '';
   let selectedLens = 'default';
   const currentStoryLevel = () => Number(document.body.dataset.storyLevel ?? 1);
-  const setActiveView = (view, viewButton) => { document.querySelectorAll('[data-view]').forEach((node) => node.classList.toggle('active', node === viewButton)); document.querySelectorAll('.view').forEach((node) => node.classList.toggle('active', node.id === view)); const zoomControls = document.querySelector('.story-zoom-controls'); if (zoomControls) zoomControls.hidden = view !== 'trailer'; };
+  const setActiveView = (view, viewButton) => { document.querySelectorAll('[data-view]').forEach((node) => node.classList.toggle('active', node === viewButton)); document.querySelectorAll('.view').forEach((node) => node.classList.toggle('active', node.id === view)); const zoomControls = document.querySelector('.story-zoom-controls'); if (zoomControls) zoomControls.hidden = view !== 'trailer' && view !== 'timeline' && view !== 'tests'; };
 
   document.addEventListener('click', async (event) => {
     const target = event.target instanceof Element ? event.target : null;
@@ -681,7 +795,7 @@ export const artifactClientScript = `
   const toast = (message) => { const node = byId('toast'); node.textContent = message; node.hidden = false; window.setTimeout(() => { node.hidden = true; }, 3600); };
   let selectedText = '';
   const currentStoryLevel = () => Number(document.body.dataset.storyLevel ?? 1);
-  const setActiveView = (view, viewButton) => { document.querySelectorAll('[data-view]').forEach((node) => node.classList.toggle('active', node === viewButton)); document.querySelectorAll('.view').forEach((node) => node.classList.toggle('active', node.id === view)); const zoomControls = document.querySelector('.story-zoom-controls'); if (zoomControls) zoomControls.hidden = view !== 'trailer'; };
+  const setActiveView = (view, viewButton) => { document.querySelectorAll('[data-view]').forEach((node) => node.classList.toggle('active', node === viewButton)); document.querySelectorAll('.view').forEach((node) => node.classList.toggle('active', node.id === view)); const zoomControls = document.querySelector('.story-zoom-controls'); if (zoomControls) zoomControls.hidden = view !== 'trailer' && view !== 'timeline' && view !== 'tests'; };
   document.addEventListener('click', (event) => {
     const target = event.target instanceof Element ? event.target : null;
     if (!target) return;
@@ -708,9 +822,10 @@ export const portableEnhancements = `
 (() => {
   const byId = (id) => document.getElementById(id);
   const storyLevels = [{ name: 'Map', description: 'Themes and risk distribution' }, { name: 'Summary', description: 'Story claims and summaries' }, { name: 'Explanation', description: 'Before and after meaning' }, { name: 'Evidence', description: 'Focused code excerpts' }, { name: 'Raw', description: 'Complete change evidence' }];
+  const timelineLevels = [{ name: 'Map', description: 'Complete build path' }, { name: 'Summary', description: 'Goals and postconditions' }, { name: 'Explanation', description: 'Deferred concerns and forward references' }, { name: 'Evidence', description: 'Cumulative evidence by step' }, { name: 'Raw', description: 'Cumulative patch through this step' }];
   const testLevels = [{ name: 'Map', description: 'Change themes and test activity' }, { name: 'Summary', description: 'Tested behaviors' }, { name: 'Explanation', description: 'Behavior meaning' }, { name: 'Evidence', description: 'Test cases and excerpts' }, { name: 'Raw', description: 'Complete test artifacts' }];
   const activeView = () => document.querySelector('[data-view].active')?.getAttribute('data-view') || 'trailer';
-  const levelsForView = () => activeView() === 'tests' ? testLevels : storyLevels;
+  const levelsForView = () => activeView() === 'tests' ? testLevels : activeView() === 'timeline' ? timelineLevels : storyLevels;
   const updateZoomLabel = (level) => {
     const levels = levelsForView();
     const label = document.getElementById('zoom-label');
@@ -721,9 +836,12 @@ export const portableEnhancements = `
   const setChapterDetail = (chapter, expanded, animate) => { const detail = chapter.querySelector('.chapter-detail'); if (!detail) return; window.clearTimeout(Number(detail.dataset.zoomCollapseTimer)); if (expanded) { detail.hidden = false; if (animate) void detail.offsetHeight; chapter.classList.add('open'); detail.classList.toggle('zoom-revealed', animate); return; } chapter.classList.remove('open'); detail.classList.remove('zoom-revealed'); if (!animate) { detail.hidden = true; return; } detail.dataset.zoomCollapseTimer = String(window.setTimeout(() => { if (!chapter.classList.contains('open')) detail.hidden = true; }, 260)); };
   const setZoom = (level) => { level = Math.max(0, Math.min(4, level)); const current = Number(document.body.dataset.storyLevel ?? 1); const changed = current !== level; const zoom = document.getElementById('zoom-control'); zoom?.classList.toggle('is-changing', changed); document.body.dataset.storyLevel = String(level); document.body.className = document.body.className.replace(/story-level-\\d/g, '') + ' story-level-' + level; document.querySelectorAll('[data-zoom]').forEach((button) => { const active = Number(button.dataset.zoom) === level; button.classList.toggle('active', active); button.setAttribute('aria-pressed', String(active)); }); updateZoomLabel(level); const callout = document.getElementById('zoom-callout'); if (callout) { callout.style.setProperty('--zoom-position', String(level / 4)); callout.dataset.edge = level === 0 ? 'start' : level === 4 ? 'end' : ''; } const map = document.getElementById('map'); if (map) map.hidden = level !== 0; document.querySelectorAll('.chapter').forEach((chapter) => setChapterDetail(chapter, level >= 2, changed)); if (changed) window.setTimeout(() => zoom?.classList.remove('is-changing'), 260); };
   setZoom(1);
-  const setZoomControlsVisible = (view) => { const hidden = view !== 'trailer' && view !== 'tests'; const controls = document.querySelector('.story-zoom-controls'); if (controls) controls.hidden = hidden; document.querySelector('.view-bar')?.classList.toggle('view-bar-empty', hidden); updateZoomLabel(Number(document.body.dataset.storyLevel ?? 1)); };
+  const setZoomControlsVisible = (view) => { const hidden = view !== 'trailer' && view !== 'timeline' && view !== 'tests'; const controls = document.querySelector('.story-zoom-controls'); if (controls) controls.hidden = hidden; document.querySelector('.view-bar')?.classList.toggle('view-bar-empty', hidden); updateZoomLabel(Number(document.body.dataset.storyLevel ?? 1)); };
   setZoomControlsVisible(document.querySelector('[data-view].active')?.getAttribute('data-view') || 'trailer');
-  document.addEventListener('click', (event) => { const target = event.target instanceof Element ? event.target : null; if (!target) return; if (!target.closest('.selection-menu') && !target.closest('.evidence')) byId('selection-menu').hidden = true; const more = target.closest('.evidence-more'); if (more) { more.closest('.evidence')?.classList.toggle('expanded'); return; } const collapse = target.closest('.collapse-sidebar'); if (collapse) { document.querySelector('.sidebar')?.classList.toggle('collapsed'); return; } const all = target.closest('#collapse-all'); if (all) { document.querySelectorAll('.chapter').forEach((chapter) => { chapter.classList.remove('open'); chapter.querySelector('.chapter-detail').hidden = true; }); return; } const testJump = target.closest('[data-test-jump]'); if (testJump) { const id = testJump.getAttribute('data-test-jump'); setZoom(3); window.setTimeout(() => { const card = document.querySelector('.test-plan-evidence [data-test-case="' + id + '"]'); if (card) { card.open = true; card.scrollIntoView({ behavior: 'smooth', block: 'center' }); } }, 0); return; } const timeline = target.closest('[data-timeline-chapter]'); if (timeline) { const id = timeline.getAttribute('data-timeline-chapter'); document.querySelector('[data-view="trailer"]')?.click(); const chapter = document.querySelector('.chapter[data-chapter="' + id + '"]'); if (chapter) { chapter.classList.add('open'); chapter.querySelector('.chapter-detail').hidden = false; chapter.scrollIntoView({ behavior: 'smooth', block: 'center' }); } return; } const view = target.closest('[data-view]')?.getAttribute('data-view'); if (view) setZoomControlsVisible(view); const step = target.closest('[data-zoom-step]'); if (step) { const active = Number(document.querySelector('[data-zoom].active')?.getAttribute('data-zoom') ?? 1); setZoom(active + Number(step.getAttribute('data-zoom-step'))); return; } if (target.closest('.zoom-info')) { document.getElementById('zoom-dialog').showModal(); return; } if (target.closest('[data-close-dialog]')) { document.getElementById('zoom-dialog').close(); return; } const zoom = target.closest('[data-zoom]'); if (zoom) setZoom(Number(zoom.getAttribute('data-zoom'))); });
+  const selectTimelineStep = (stepId) => { document.querySelectorAll('[data-timeline-state]').forEach((state) => { const active = state.getAttribute('data-timeline-state') === stepId; state.classList.toggle('active', active); state.hidden = !active; }); document.querySelectorAll('[data-timeline-select]').forEach((button) => { const active = button.getAttribute('data-timeline-select') === stepId; button.classList.toggle('active', active); if (button.getAttribute('role') === 'tab') button.setAttribute('aria-selected', String(active)); }); const ticks = [...document.querySelectorAll('.rail-tick')]; const index = ticks.findIndex((tick) => tick.getAttribute('data-timeline-select') === stepId); if (index < 0) return; const pad = (value) => String(value).padStart(2, '0'); const stepOutput = byId('rail-step'); if (stepOutput) stepOutput.textContent = pad(index + 1) + ' / ' + pad(ticks.length); const titleOutput = byId('rail-title'); if (titleOutput) titleOutput.textContent = ticks[index].getAttribute('data-step-title') || ''; document.querySelectorAll('[data-timeline-move]').forEach((nav) => { const next = index + Number(nav.getAttribute('data-timeline-move')); nav.toggleAttribute('disabled', next < 0 || next >= ticks.length); }); };
+  const moveTimelineStep = (delta) => { const ticks = [...document.querySelectorAll('.rail-tick')]; const index = ticks.findIndex((tick) => tick.classList.contains('active')); const next = ticks[index + delta]; if (next) selectTimelineStep(next.getAttribute('data-timeline-select')); };
+  const openStoryChapter = (id) => { document.querySelector('[data-view="trailer"]')?.click(); const chapter = document.querySelector('.chapter[data-chapter="' + id + '"]'); if (chapter) { setZoom(Math.max(2, Number(document.body.dataset.storyLevel ?? 1))); chapter.classList.add('open'); chapter.querySelector('.chapter-detail').hidden = false; chapter.scrollIntoView({ behavior: 'smooth', block: 'center' }); } };
+  document.addEventListener('click', (event) => { const target = event.target instanceof Element ? event.target : null; if (!target) return; if (!target.closest('.selection-menu') && !target.closest('.evidence')) byId('selection-menu').hidden = true; const more = target.closest('.evidence-more'); if (more) { more.closest('.evidence')?.classList.toggle('expanded'); return; } const timelineMove = target.closest('[data-timeline-move]'); if (timelineMove) { moveTimelineStep(Number(timelineMove.getAttribute('data-timeline-move'))); return; } const timelineSelect = target.closest('[data-timeline-select]'); if (timelineSelect) { selectTimelineStep(timelineSelect.getAttribute('data-timeline-select')); if (Number(document.body.dataset.storyLevel ?? 1) === 0) setZoom(1); return; } const storyStep = target.closest('[data-story-step]'); if (storyStep) { document.querySelector('[data-view="timeline"]')?.click(); selectTimelineStep(storyStep.getAttribute('data-story-step')); setZoom(Math.max(1, Number(document.body.dataset.storyLevel ?? 1))); document.querySelector('.timeline-rail')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); return; } const storyStepIndex = target.closest('[data-story-step-index]'); if (storyStepIndex) { const index = Number(storyStepIndex.getAttribute('data-story-step-index')); const state = document.querySelector('.timeline-state[data-step-index="' + index + '"]'); document.querySelector('[data-view="timeline"]')?.click(); if (state) selectTimelineStep(state.getAttribute('data-timeline-state')); setZoom(3); document.querySelector('.timeline-rail')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); return; } const collapse = target.closest('.collapse-sidebar'); if (collapse) { document.querySelector('.sidebar')?.classList.toggle('collapsed'); return; } const all = target.closest('#collapse-all'); if (all) { document.querySelectorAll('.chapter').forEach((chapter) => { chapter.classList.remove('open'); chapter.querySelector('.chapter-detail').hidden = true; }); return; } const testJump = target.closest('[data-test-jump]'); if (testJump) { const id = testJump.getAttribute('data-test-jump'); setZoom(3); window.setTimeout(() => { const card = document.querySelector('.test-plan-evidence [data-test-case="' + id + '"]'); if (card) { card.open = true; card.scrollIntoView({ behavior: 'smooth', block: 'center' }); } }, 0); return; } const chapterJump = target.closest('[data-step-chapter]'); if (chapterJump) { openStoryChapter(chapterJump.getAttribute('data-step-chapter')); return; } const view = target.closest('[data-view]')?.getAttribute('data-view'); if (view) setZoomControlsVisible(view); const step = target.closest('[data-zoom-step]'); if (step) { const active = Number(document.querySelector('[data-zoom].active')?.getAttribute('data-zoom') ?? 1); setZoom(active + Number(step.getAttribute('data-zoom-step'))); return; } if (target.closest('.zoom-info')) { document.getElementById('zoom-dialog').showModal(); return; } if (target.closest('[data-close-dialog]')) { document.getElementById('zoom-dialog').close(); return; } const zoom = target.closest('[data-zoom]'); if (zoom) setZoom(Number(zoom.getAttribute('data-zoom'))); });
 })();
 (() => {
   const shell = document.querySelector('.app-shell');

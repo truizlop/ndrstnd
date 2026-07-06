@@ -85,7 +85,7 @@ it("changes the portable Story surface at every zoom level with staged expansion
     {
       "diff": true,
       "tests": false,
-      "timeline": true,
+      "timeline": false,
       "trailer": false,
     }
   `);
@@ -129,6 +129,50 @@ it("restores non-Story views with the zoom controls hidden", () => {
       "zoomHidden": true,
     }
   `);
+});
+
+it("uses the shared zoom rail on Timeline and changes its semantic level labels", () => {
+  const window = new Window();
+  const document = window.document;
+  document.body.innerHTML = `<button data-view="trailer" class="nav-item active"></button><button data-view="timeline" class="nav-item"></button><section id="trailer" class="view active"></section><section id="timeline" class="view"><div class="timeline-map"></div><div class="timeline-summary"></div><div class="timeline-explanation"></div><div class="timeline-evidence"></div><div class="timeline-raw"></div></section><div id="map" hidden></div><div class="story-zoom-controls"><div id="zoom-control"><div id="zoom-callout"><output id="zoom-label"></output><span id="zoom-description"></span></div><button data-zoom="0"></button><button data-zoom="1"></button><button data-zoom="2"></button><button data-zoom="3"></button><button data-zoom="4"></button></div></div><div id="selection-menu" hidden></div>`;
+  window.eval(`${artifactClientScript}${portableEnhancements}`);
+
+  document.querySelector<HTMLElement>('[data-view="timeline"]')?.click();
+  expect(document.querySelector<HTMLElement>(".story-zoom-controls")?.hidden).toBe(false);
+  const labels = [0, 1, 2, 3, 4].map((level) => {
+    document.querySelector<HTMLElement>(`[data-zoom="${level}"]`)?.click();
+    return {
+      level,
+      bodyClass: [...document.body.classList].find((name) => name.startsWith("story-level-")),
+      label: document.querySelector("#zoom-label")?.textContent,
+      description: document.querySelector("#zoom-description")?.textContent,
+    };
+  });
+
+  expect(labels).toEqual([
+    { level: 0, bodyClass: "story-level-0", label: "Map", description: "Complete build path" },
+    { level: 1, bodyClass: "story-level-1", label: "Summary", description: "Goals and postconditions" },
+    { level: 2, bodyClass: "story-level-2", label: "Explanation", description: "Deferred concerns and forward references" },
+    { level: 3, bodyClass: "story-level-3", label: "Evidence", description: "Cumulative evidence by step" },
+    { level: 4, bodyClass: "story-level-4", label: "Raw", description: "Cumulative patch through this step" },
+  ]);
+});
+
+it("jumps between Timeline steps and Story chapters in the portable artifact", () => {
+  const window = new Window();
+  const document = window.document;
+  document.body.innerHTML = `<button data-view="trailer" class="nav-item active"></button><button data-view="timeline" class="nav-item"></button><section id="trailer" class="view active"><article class="chapter" data-chapter="chapter-1"><button class="chapter-toggle"><span data-story-step="step-02"></span></button><div class="chapter-detail" hidden></div></article></section><section id="timeline" class="view"><button data-timeline-select="step-01" role="tab"></button><button data-timeline-select="step-02" role="tab"></button><article class="timeline-state active" data-timeline-state="step-01" data-step-index="1"></article><article class="timeline-state" data-timeline-state="step-02" data-step-index="2" hidden><button data-step-chapter="chapter-1"></button></article></section><div id="map" hidden></div><div class="story-zoom-controls"><div id="zoom-control"><div id="zoom-callout"><output id="zoom-label"></output><span id="zoom-description"></span></div><button data-zoom="0"></button><button data-zoom="1"></button><button data-zoom="2"></button><button data-zoom="3"></button><button data-zoom="4"></button></div></div><div id="selection-menu" hidden></div>`;
+  window.eval(`${artifactClientScript}${portableEnhancements}`);
+
+  document.querySelector<HTMLElement>('[data-story-step="step-02"]')?.click();
+  expect(document.querySelector("#timeline")?.classList.contains("active")).toBe(true);
+  expect(document.querySelector<HTMLElement>('[data-timeline-state="step-02"]')?.hidden).toBe(false);
+  expect(document.querySelector('[data-timeline-select="step-02"]')?.classList.contains("active")).toBe(true);
+
+  document.querySelector<HTMLElement>('[data-step-chapter="chapter-1"]')?.click();
+  expect(document.querySelector("#trailer")?.classList.contains("active")).toBe(true);
+  expect(document.querySelector(".chapter")?.classList.contains("open")).toBe(true);
+  expect(document.querySelector<HTMLElement>(".chapter-detail")?.hidden).toBe(false);
 });
 
 it("restores the Test plan with zoom controls visible", () => {
@@ -276,7 +320,7 @@ it("restores and saves portable UI preferences when local storage is available",
   expect(document.querySelector(".app-shell")?.classList.contains("inspector-collapsed")).toBe(true);
   expect(document.body.dataset.storyLevel).toBe("3");
   expect(document.querySelector("#timeline")?.classList.contains("active")).toBe(true);
-  expect(document.querySelector<HTMLElement>(".story-zoom-controls")?.hidden).toBe(true);
+  expect(document.querySelector<HTMLElement>(".story-zoom-controls")?.hidden).toBe(false);
 
   document.querySelector<HTMLElement>('[data-view="trailer"]')?.click();
   document.querySelector<HTMLElement>('[data-zoom="2"]')?.click();

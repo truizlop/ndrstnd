@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { renderArtifact, renderWorkspace, styles } from "../src/web/page.js";
 import { createReviewPresentationData } from "../src/server/review-presentation.js";
-import { buildFallbackAnalysis } from "../src/server/analyze.js";
+import { buildTestAnalysis } from "./fixtures/analysis-fixture.js";
 import type { StoredReviewSession } from "../src/server/store.js";
 import { frozenReviewData } from "../src/web/frozen-review-data.js";
 
@@ -11,7 +11,7 @@ describe("renderWorkspace", () => {
       id: "session", repoPath: "/repo", targetRef: "agent-change", baseRef: "main", mergeBase: "abcdef123456", inputHash: "hash", createdAt: "now",
       input: { repoPath: "/repo", targetRef: "agent-change", baseRef: "main", mergeBase: "abcdef123456", files: [{ id: "file", path: "app.ts", status: "modified", binary: false, signal: "meaningful" }], hunks: [{ id: "hunk", fileId: "file", oldStart: 1, newStart: 1, lines: [{ kind: "addition", content: "trailer = true;", newLine: 1 }] }] },
     };
-    const page = await renderWorkspace(createReviewPresentationData(session, { id: "revision", sessionId: "session", source: "fallback", status: "partial", document: buildFallbackAnalysis(session.input), createdAt: "now" }), "token");
+    const page = await renderWorkspace(createReviewPresentationData(session, { id: "revision", sessionId: "session", source: "codex", status: "complete", document: buildTestAnalysis(session.input), createdAt: "now" }), "token");
     expect(page).toContain("Story");
     expect(page).toContain("Timeline");
     expect(page).toContain("Full diff");
@@ -32,7 +32,7 @@ describe("renderWorkspace", () => {
       id: "session", repoPath: "/repo", targetRef: "agent-change", baseRef: "main", mergeBase: "abcdef123456", inputHash: "hash", createdAt: "now",
       input: { repoPath: "/repo", targetRef: "agent-change", baseRef: "main", mergeBase: "abcdef123456", files: [], hunks: [] },
     };
-    const page = await renderArtifact(createReviewPresentationData(session, { id: "revision", sessionId: "session", source: "fallback", status: "partial", document: buildFallbackAnalysis(session.input), createdAt: "now" }));
+    const page = await renderArtifact(createReviewPresentationData(session, { id: "revision", sessionId: "session", source: "codex", status: "complete", document: buildTestAnalysis(session.input), createdAt: "now" }));
     expect(page).toContain('class="collapse-sidebar panel-toggle"');
     expect(page).toContain('class="collapse-inspector panel-toggle"');
     expect(page).toContain('class="mobile-inspector-toggle panel-toggle"');
@@ -46,7 +46,7 @@ describe("renderWorkspace", () => {
       id: "session", repoPath: "/repo", targetRef: "agent-change", baseRef: "main", mergeBase: "abcdef123456", inputHash: "hash", createdAt: "now",
       input: { repoPath: "/repo", targetRef: "agent-change", baseRef: "main", mergeBase: "abcdef123456", files: [], hunks: [] },
     };
-    const page = await renderArtifact(createReviewPresentationData(session, { id: "revision", sessionId: "session", source: "fallback", status: "partial", document: buildFallbackAnalysis(session.input), createdAt: "now" }));
+    const page = await renderArtifact(createReviewPresentationData(session, { id: "revision", sessionId: "session", source: "codex", status: "complete", document: buildTestAnalysis(session.input), createdAt: "now" }));
     expect(page).not.toContain("linear-gradient");
     expect(page).not.toContain("--serif");
     expect(page).toContain("--mono:ui-monospace");
@@ -89,7 +89,7 @@ describe("renderWorkspace", () => {
       id: "session", repoPath: "/repo", targetRef: "agent-change", baseRef: "main", mergeBase: "abcdef123456", inputHash: "hash", createdAt: "now",
       input: { repoPath: "/repo", targetRef: "agent-change", baseRef: "main", mergeBase: "abcdef123456", files: [], hunks: [] },
     };
-    const page = await renderArtifact(createReviewPresentationData(session, { id: "revision", sessionId: "session", source: "fallback", status: "partial", document: buildFallbackAnalysis(session.input), createdAt: "now" }));
+    const page = await renderArtifact(createReviewPresentationData(session, { id: "revision", sessionId: "session", source: "codex", status: "complete", document: buildTestAnalysis(session.input), createdAt: "now" }));
     expect(page.match(/<div class="view-bar">[\s\S]*?aria-label="Increase detail">\+<\/button><\/div><\/div>/)?.[0]).toMatchSnapshot();
     expect(page).not.toContain('class="zoom-info"');
     expect(page).not.toContain('<dialog id="zoom-dialog"');
@@ -123,8 +123,8 @@ describe("renderWorkspace", () => {
         ],
       },
     };
-    const page = await renderArtifact(createReviewPresentationData(session, { id: "revision", sessionId: "session", source: "fallback", status: "partial", document: buildFallbackAnalysis(session.input), createdAt: "now" }));
-    const focusedExcerpt = page.match(/<article class="evidence focused-evidence">[\s\S]*?<\/article>/)?.[0] ?? "";
+    const page = await renderArtifact(createReviewPresentationData(session, { id: "revision", sessionId: "session", source: "codex", status: "complete", document: buildTestAnalysis(session.input), createdAt: "now" }));
+    const focusedExcerpt = page.match(/<article class="evidence focused-evidence"[\s\S]*?<\/article>/)?.[0] ?? "";
     expect(focusedExcerpt).toContain("Focused excerpt");
     expect(focusedExcerpt).toContain("Complete excerpt");
     expect(focusedExcerpt).toContain("execute");
@@ -137,7 +137,7 @@ describe("renderWorkspace", () => {
     expect(focusedExcerpt.match(/<pre class="raw-code">[\s\S]*?<\/pre>/)?.[0]).toContain("status");
     expect(focusedExcerpt.match(/<pre class="raw-code">[\s\S]*?<\/pre>/)?.[0]).toContain("this");
     expect(focusedExcerpt.match(/<pre class="raw-code">[\s\S]*?<\/pre>/)?.[0]).toContain(".ready");
-    expect(focusedExcerpt.match(/<article class="evidence focused-evidence">[\s\S]*?<\/article>/)?.[0]).toMatchSnapshot();
+    expect(focusedExcerpt.match(/<article class="evidence focused-evidence"[\s\S]*?<\/article>/)?.[0]).toMatchSnapshot();
     expect(page).toContain("Other files changed");
     expect(page).toContain(".gitignore");
     expect(page).toContain("+1");
@@ -180,6 +180,30 @@ describe("renderWorkspace", () => {
         riskCategories: ["behavior" as const],
         evidenceIds: ["runner-hunk", "test-hunk"],
       }],
+      steps: [
+        {
+          id: "step-01",
+          title: "Queue jobs",
+          goal: "Introduce queued job execution.",
+          youNowHave: "Jobs can be queued and recorded.",
+          deferred: [{ concern: "Test coverage follows after the behavior exists.", resolvedByStepId: "step-02" }],
+          dependsOn: [],
+          forwardRefs: {},
+          advancesChapterIds: ["runner-story"],
+          evidenceIds: ["runner-hunk"],
+        },
+        {
+          id: "step-02",
+          title: "Cover queueing",
+          goal: "Exercise queued job execution.",
+          youNowHave: "The queue behavior has test evidence.",
+          deferred: [],
+          dependsOn: ["step-01"],
+          forwardRefs: {},
+          advancesChapterIds: ["runner-story"],
+          evidenceIds: ["test-hunk"],
+        },
+      ],
       omittedGroups: [],
       unclassifiedEvidenceIds: [],
     };
@@ -190,12 +214,67 @@ describe("renderWorkspace", () => {
     expect(card).toContain("<span>2 files</span><span>2 hunks</span>");
     expect(card).toContain('class="chapter-churn-bar" aria-hidden="true" style="--add:75;--delete:25"');
     expect(card).toMatchSnapshot();
-    expect(page).toContain('class="timeline-step attention-contained"');
-    const timelineStep = page.match(/<button data-timeline-chapter="runner-story"[\s\S]*?<\/button>/)?.[0] ?? "";
-    expect(timelineStep).toContain('class="timeline-file"');
-    expect(timelineStep).toContain("src/runner.ts");
-    expect(timelineStep).toContain("test/runner.test.ts");
-    expect(timelineStep).toContain('<b class="additions">+2</b>');
+    expect(card).toContain('data-story-step="step-01"');
+    expect(card).toContain('data-story-step="step-02"');
+    expect(page).toContain('data-timeline-state="step-01"');
+    expect(page).toContain('data-timeline-state="step-02"');
+    expect(page).toContain("A constructive reconstruction of how you would assemble this change");
+    expect(page).toContain("Queue jobs");
+    expect(page).toContain("Cover queueing");
+    expect(page).toContain("src/runner.ts");
+    expect(page).toContain("test/runner.test.ts");
+    expect(page).toContain('<b class="additions">+2</b>');
+  });
+
+  it("precomputes Timeline states with cumulative evidence for consecutive steps", async () => {
+    const session: StoredReviewSession = {
+      id: "session", repoPath: "/repo", targetRef: "agent-change", baseRef: "main", mergeBase: "abcdef123456", inputHash: "hash", createdAt: "now",
+      input: {
+        repoPath: "/repo", targetRef: "agent-change", baseRef: "main", mergeBase: "abcdef123456",
+        files: [{ id: "source", path: "src/runner.ts", status: "modified", binary: false, signal: "meaningful" }],
+        hunks: [
+          { id: "hunk-1", fileId: "source", oldStart: 1, newStart: 1, lines: [{ kind: "addition", content: "export function first() { return true; }", newLine: 1 }] },
+          { id: "hunk-2", fileId: "source", oldStart: 5, newStart: 5, lines: [{ kind: "addition", content: "export function second() { return first(); }", newLine: 5 }] },
+          { id: "hunk-3", fileId: "source", oldStart: 9, newStart: 9, lines: [{ kind: "addition", content: "export function third() { return second(); }", newLine: 9 }] },
+        ],
+      },
+    };
+    const document = {
+      summary: "Three increments build the runner.",
+      chapters: [{ id: "runner", title: "Runner", kind: "behavior" as const, synopsis: "Runner behavior changes.", confidence: "high" as const, attention: "contained" as const, riskCategories: ["behavior" as const], evidenceIds: ["hunk-1", "hunk-2", "hunk-3"] }],
+      steps: [1, 2, 3].map((number) => ({
+        id: `step-0${number}`,
+        title: `Build part ${number}`,
+        goal: `Introduce part ${number}.`,
+        youNowHave: `Part ${number} exists.`,
+        deferred: [],
+        dependsOn: number === 1 ? [] : [`step-0${number - 1}`],
+        forwardRefs: {},
+        advancesChapterIds: ["runner"],
+        evidenceIds: [`hunk-${number}`],
+      })),
+      omittedGroups: [],
+      unclassifiedEvidenceIds: [],
+    };
+
+    const page = await renderArtifact(createReviewPresentationData(session, { id: "revision", sessionId: "session", source: "codex", status: "complete", document, createdAt: "now" }));
+    const state = (stepId: string) => {
+      const start = page.indexOf(`data-timeline-state="${stepId}"`);
+      if (start < 0) return "";
+      const articleStart = page.lastIndexOf("<article", start);
+      const next = page.indexOf('<article class="timeline-state', start + stepId.length);
+      return page.slice(articleStart, next < 0 ? page.indexOf("</div></div></section>", start) : next);
+    };
+
+    expect(state("step-01")).toContain('data-evidence-id="hunk-1"');
+    expect(state("step-01")).not.toContain('data-evidence-id="hunk-2"');
+    expect(state("step-02")).toContain('data-evidence-id="hunk-1"');
+    expect(state("step-02")).toContain('data-evidence-id="hunk-2"');
+    expect(state("step-02")).not.toContain('data-evidence-id="hunk-3"');
+    expect(state("step-03")).toContain('data-evidence-id="hunk-1"');
+    expect(state("step-03")).toContain('data-evidence-id="hunk-2"');
+    expect(state("step-03")).toContain('data-evidence-id="hunk-3"');
+    expect(state("step-03").match(/class="timeline-evidence-item current"/g)).toHaveLength(1);
   });
 
   it("renders Test plan zoom projections from one test information model", async () => {
@@ -247,6 +326,30 @@ describe("renderWorkspace", () => {
           evidenceIds: ["test-hunk"],
         },
       ],
+      steps: [
+        {
+          id: "step-01",
+          title: "Collect worktree",
+          goal: "Introduce worktree-aware input collection.",
+          youNowHave: "Review input includes local worktree changes.",
+          deferred: [{ concern: "Tests are introduced after the implementation path.", resolvedByStepId: "step-02" }],
+          dependsOn: [],
+          forwardRefs: {},
+          advancesChapterIds: ["worktree-theme"],
+          evidenceIds: ["source-hunk"],
+        },
+        {
+          id: "step-02",
+          title: "Exercise worktree",
+          goal: "Verify staged and unstaged changes.",
+          youNowHave: "Worktree-aware input has test evidence.",
+          deferred: [],
+          dependsOn: ["step-01"],
+          forwardRefs: {},
+          advancesChapterIds: ["worktree-tests"],
+          evidenceIds: ["test-hunk"],
+        },
+      ],
       omittedGroups: [],
       unclassifiedEvidenceIds: [],
     };
@@ -279,7 +382,7 @@ describe("renderWorkspace", () => {
       id: "session", repoPath: "/repo", targetRef: "agent-change", baseRef: "main", mergeBase: "abcdef123456", inputHash: "hash", createdAt: "now",
       input: { repoPath: "/repo", targetRef: "agent-change", baseRef: "main", mergeBase: "abcdef123456", files: [], hunks: [] },
     };
-    const page = await renderArtifact(createReviewPresentationData(session, { id: "revision", sessionId: "session", source: "fallback", status: "partial", document: buildFallbackAnalysis(session.input), createdAt: "now" }));
+    const page = await renderArtifact(createReviewPresentationData(session, { id: "revision", sessionId: "session", source: "codex", status: "complete", document: buildTestAnalysis(session.input), createdAt: "now" }));
     expect(page).not.toContain("Test plan</button>");
     expect(page).toContain("No test activity was captured for this change.");
     expect(page).not.toContain("No dedicated test change was identified.");
