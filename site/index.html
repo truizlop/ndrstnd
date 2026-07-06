@@ -3,8 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
 <title>ndrstnd: understand what your coding agent actually did</title>
-<meta name="description" content="ndrstnd turns large agent-produced branch diffs into an evidence-linked story: semantic chapters, color-coded impact, a reading-order timeline, a test plan, and the full diff. Local, private, open source.">
+<meta name="description" content="ndrstnd turns large agent-produced branch diffs into an evidence-linked story: semantic chapters, color-coded impact, a build-path timeline, a test plan, and the full diff. Local, private, open source.">
 <link rel="canonical" href="https://truizlop.github.io/ndrstnd/">
 <meta property="og:title" content="ndrstnd: understand what your coding agent actually did">
 <meta property="og:description" content="A local comprehension workspace that turns agent-produced branch diffs into an evidence-linked story.">
@@ -18,6 +19,7 @@
  * Light paper surfaces, hairline rules, a single cobalt accent, no gradients.
  */
 :root{
+  color-scheme:light dark;
   --sans:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",system-ui,sans-serif;
   --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
   --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif;
@@ -283,16 +285,29 @@ h2.display{margin:0 0 14px;font:600 clamp(28px,4.4vw,42px)/1.15 var(--serif);let
 .parnas-body{display:grid;grid-template-columns:1fr 1fr;gap:28px;margin-top:46px;padding-top:36px;border-top:1px solid #ffffff1c}
 .parnas-body p{margin:0;font:400 14.5px/1.75 var(--sans);color:#b6bdc4}
 .parnas-body p strong{color:#f0f1f2;font-weight:600}
-.order-motif{display:flex;flex-wrap:wrap;align-items:flex-end;gap:18px 24px;margin-top:44px}
-.order-group{display:grid;gap:9px}
-.order-group small{font:600 9px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;color:#7d858c}
-.order-set{display:flex;flex-wrap:wrap;gap:6px}
-.order-set span{display:grid;place-items:center;min-width:32px;height:28px;padding:0 9px;border-radius:7px;font:700 10.5px var(--mono);letter-spacing:.06em}
-.order-built span{border:1px solid #ffffff26;color:#9aa3ab;font-weight:500}
-.order-read span{background:#fff}
-.order-arrow{display:grid;place-items:center;width:30px;height:28px;color:#8ab0ff}
-.order-arrow svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.tlm{margin-top:46px;max-width:660px;border-radius:14px;background:var(--surface);color:var(--ink);padding:14px 16px 16px;box-shadow:0 24px 60px #00000066}
+.tlm-rail{display:grid;grid-template-columns:22px minmax(0,1fr) 22px;align-items:center;column-gap:8px;border:1px solid var(--hair);border-radius:10px;background:var(--surface);padding:7px 10px 6px}
+.tlm-rail .mticks{height:20px}
+.tlm-nav{display:grid;place-items:center;width:22px;height:22px;border-radius:6px;color:var(--ink-3)}
+.tlm-nav svg{width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.tlm-readout{grid-column:1/-1;display:flex;align-items:baseline;gap:8px;margin-top:4px;min-width:0;font:500 10.5px/1.3 var(--sans);color:var(--ink-2)}
+.tlm-readout b{flex:none;font:700 9.5px/1 var(--mono);letter-spacing:.12em;color:var(--accent);font-variant-numeric:tabular-nums}
+.tlm-readout span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tlm-card{display:grid;grid-template-columns:30px minmax(0,1fr);gap:9px;padding:13px 2px 12px;border-bottom:1px solid var(--hair);align-items:start}
+.tlm-card strong{display:block;font:600 12px/1.35 var(--sans);color:var(--ink)}
+.tlm-card p{margin:3px 0 0;font:400 10px/1.55 var(--sans);color:var(--ink-3)}
+.tlm-files{display:flex;flex-direction:column;gap:3px;margin-top:8px;font:9px/1.4 var(--mono);color:var(--ink-2)}
+.tlm-files span{display:flex;align-items:baseline;gap:10px}
+.tlm-files small{font:600 8.5px var(--mono);font-variant-numeric:tabular-nums}
+.tlm-chip{display:inline-flex;align-items:center;margin-top:9px;padding:4px 8px;border-radius:7px;background:var(--well);color:var(--accent);font:600 9px/1 var(--sans)}
+.tlm-panel{border:1px solid var(--hair);border-radius:10px;background:var(--surface);padding:11px 12px;margin-top:12px}
+.tlm-panel h5,.tlm-cols h5{margin:0 0 5px;font:700 7.5px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3)}
+.tlm-panel p,.tlm-cols p{margin:0;font:400 10px/1.6 var(--sans);color:var(--ink-2)}
+.tlm-cols{display:grid;grid-template-columns:1fr 1fr;gap:14px;border:1px solid var(--hair);border-radius:10px;padding:11px 12px;margin-top:10px}
+.tlm-cols>div+div{border-left:1px solid var(--hair);padding-left:14px}
+.tlm-step-ref{display:inline-grid;place-items:center;min-width:20px;padding:3px 5px;border-radius:6px;background:var(--well);color:var(--accent);font:700 8.5px/1 var(--mono)}
 @media(max-width:760px){.parnas-body{grid-template-columns:1fr}}
+@media(max-width:560px){.tlm-cols{grid-template-columns:1fr}.tlm-cols>div+div{border-left:0;border-top:1px solid var(--hair);padding-left:0;padding-top:10px}}
 
 /* ---------- features ---------- */
 .features{padding:88px 0;border-bottom:1px solid var(--hair);background:var(--rail)}
@@ -308,13 +323,18 @@ h2.display{margin:0 0 14px;font:600 clamp(28px,4.4vw,42px)/1.15 var(--serif);let
 .dots-row{display:flex;flex-wrap:wrap;gap:6px 12px}
 .dots-row span{display:inline-flex;align-items:center;gap:6px;font:600 8px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3)}
 .dots-row i{width:7px;height:7px;border-radius:50%}
-.tl-mini{display:grid;gap:0;position:relative}
-.tl-mini::before{content:"";position:absolute;left:4px;top:8px;bottom:8px;width:1px;background:var(--hair)}
-.tl-mini span{position:relative;display:flex;align-items:baseline;gap:10px;padding:4px 0 4px 16px;font:500 10px/1.4 var(--sans);color:var(--ink-2)}
-.tl-mini span::before{content:"";position:absolute;left:1px;top:9px;width:7px;height:7px;border-radius:50%;box-shadow:0 0 0 2.5px var(--surface);background:var(--low)}
-.tl-mini .t-el::before{background:var(--elevated)}
-.tl-mini .t-hi::before{background:var(--high)}
-.tl-mini small{margin-left:auto;font:600 8.5px var(--mono);color:var(--ink-3);font-variant-numeric:tabular-nums}
+.rail-mini{display:grid;gap:9px}
+.mticks{position:relative;display:flex;align-items:flex-end;justify-content:space-between;height:22px;padding:0 3px;min-width:0}
+.mticks::before{content:"";position:absolute;left:2px;right:2px;bottom:3px;height:1px;background:var(--hair-2)}
+.mticks i{position:relative;z-index:1;width:2px;height:9px;border-radius:1px 1px 0 0}
+.mticks .t-lo{background:var(--low)}
+.mticks .t-co{background:var(--contained)}
+.mticks .t-el{background:var(--elevated)}
+.mticks .t-hi{background:var(--high)}
+.mticks .t-on{background:var(--accent);height:15px;width:2.5px}
+.rm-readout{display:flex;align-items:baseline;gap:8px;min-width:0;font:500 10.5px/1.3 var(--sans);color:var(--ink-2)}
+.rm-readout b{flex:none;font:700 9.5px/1 var(--mono);letter-spacing:.12em;color:var(--accent);font-variant-numeric:tabular-nums}
+.rm-readout span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .selmenu{display:inline-flex;gap:2px;padding:3px;border:1px solid var(--hair);border-radius:9px;background:var(--surface);box-shadow:0 8px 22px #191e2814}
 .selmenu span{padding:6px 9px;border-radius:6px;color:var(--ink-2);font:500 9.5px/1 var(--sans);white-space:nowrap}
 .selmenu span:first-child{background:var(--wash);color:var(--accent)}
@@ -378,6 +398,36 @@ h2.display{margin:0 0 14px;font:600 clamp(28px,4.4vw,42px)/1.15 var(--serif);let
 .toast{position:fixed;right:20px;bottom:20px;z-index:60;max-width:calc(100vw - 32px);background:#22262b;color:#f5f5f3;border-radius:9px;padding:11px 14px;font:500 12.5px/1.4 var(--sans);box-shadow:var(--shadow);animation:rise 200ms ease}
 @keyframes rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 
+/* ---------- dark galley: same system, ink-side out ---------- */
+@media(prefers-color-scheme:dark){
+  :root{
+    --surface:#15181c;--rail:#1b1f24;--well:#191d22;
+    --ink:#e7eaed;--ink-2:#b4bbc2;--ink-3:#868f97;--faint:#565e66;
+    --hair:#272c33;--hair-2:#3a414a;
+    --accent:#7b9ce8;--wash:#1c2536;
+    --low:#46a86c;--contained:#6cb6e6;--elevated:#cfa145;--high:#dd8a5b;--critical:#e07268;
+    --add-ink:#5cb883;--add-bg:#152b1d;--del-ink:#e08a7a;--del-bg:#2f1b17;
+    --shadow:0 18px 44px #00000059;
+    --tk:#c9d1d9;--tk-k:#ff7b72;--tk-s:#a5d6ff;--tk-f:#d2a8ff;--tk-c:#79c0ff;--tk-m:#8b949e;
+  }
+  ::selection{background:#2c3e66}
+  .skip{color:#15181c}
+  .site-head{background:#15181cf0}
+  .site-head.stuck{box-shadow:0 6px 20px #00000047}
+  .btn-primary{background:#3061d8;color:#fff}
+  .btn-primary:hover{background:#3d6de4}
+  .soon{border-color:#2e3c5c}
+  .copy-btn:hover{background:#262c33}
+  .am-action{background:#232930}
+  .hero::before{opacity:.4}
+  .churn .a{background:#3f7f57}
+  .churn .d{background:#96584e}
+  .term{border:1px solid var(--hair)}
+  .parnas{background:#0d0f12}
+  .tlm{border:1px solid var(--hair-2)}
+  .toast{border:1px solid var(--hair-2)}
+}
+
 @media(prefers-reduced-motion:reduce){
   html{scroll-behavior:auto}
   *,*::before,*::after{transition:none!important;animation:none!important}
@@ -417,7 +467,7 @@ h2.display{margin:0 0 14px;font:600 clamp(28px,4.4vw,42px)/1.15 var(--serif);let
     <svg class="hero-mark" viewBox="0 0 20 22" aria-hidden="true"><path d="M4.4 3.4 10 7.6l5.6-4.2"/><path d="M4.4 8.9 10 13.1l5.6-4.2"/><path d="M4.4 14.4 10 18.6l5.6-4.2"/></svg>
     <p class="overline reveal">A local comprehension workspace for agent-produced changes</p>
     <h1 class="reveal" style="--d:60ms">Your agent shipped 3,000 lines overnight. <em>Read them like a story.</em></h1>
-    <p class="hero-lede reveal" style="--d:120ms">ndrstnd turns a branch diff into an evidence-linked narrative: semantic chapters, color-coded impact, a reading-order timeline, a test plan, and the full diff. Understand the change before you judge it.</p>
+    <p class="hero-lede reveal" style="--d:120ms">ndrstnd turns a branch diff into an evidence-linked narrative: semantic chapters, color-coded impact, a build-path timeline, a test plan, and the full diff. Understand the change before you judge it.</p>
     <div class="cta-row reveal" style="--d:180ms">
       <a class="btn btn-primary" href="#install">Install ndrstnd</a>
       <a class="btn btn-ghost" href="https://github.com/truizlop/ndrstnd" rel="noopener">View on GitHub</a>
@@ -455,7 +505,7 @@ h2.display{margin:0 0 14px;font:600 clamp(28px,4.4vw,42px)/1.15 var(--serif);let
             </div>
           </div>
           <p class="am-summary">Payment captures now retry transient gateway failures with jittered exponential backoff, and idempotency keys guarantee a retry can never double-charge.</p>
-          <p class="am-coverage">12 files · 31 evidence hunks · 5 story steps</p>
+          <p class="am-coverage">12 files · 31 evidence hunks · 5 story chapters · 5 build steps</p>
           <div class="chl">
             <article class="ch"><span class="chn el">01</span><span class="ch-copy"><strong>Retry transient capture failures</strong><small>captureCharge retries gateway timeouts with exponential backoff and jitter.</small><span class="ch-tags"><span class="tagp"><svg viewBox="0 0 18 18"><path d="M3 8h12M10 4l4 4-4 4"/></svg>behavior</span><span class="tagp"><svg viewBox="0 0 18 18"><path d="M10 2L4 10h4l-1 6 6-8H9l1-6z"/></svg>performance</span></span></span><span class="ch-chev"><svg viewBox="0 0 12 12"><path d="M2.5 4.25L6 7.75l3.5-3.5"/></svg></span></article>
             <article class="ch"><span class="chn hi">02</span><span class="ch-copy"><strong>Idempotency keys guard every retry</strong><small>A stable key per payment intent makes retries safe from double-charging.</small><span class="ch-tags"><span class="tagp"><svg viewBox="0 0 18 18"><path d="M9 2l5 2v4c0 3.2-2 5.7-5 6.8C6 13.7 4 11.2 4 8V4l5-2z"/><path d="M7 8l1.3 1.3L11 6.6"/></svg>security</span><span class="tagp"><svg viewBox="0 0 18 18"><path d="M3 8h12M10 4l4 4-4 4"/></svg>behavior</span></span></span><span class="ch-chev"><svg viewBox="0 0 12 12"><path d="M2.5 4.25L6 7.75l3.5-3.5"/></svg></span></article>
@@ -468,7 +518,8 @@ h2.display{margin:0 0 14px;font:600 clamp(28px,4.4vw,42px)/1.15 var(--serif);let
           <h4>At a glance</h4>
           <section>
             <h5>This change</h5>
-            <div class="am-stat"><span>Story steps</span><b>5</b></div>
+            <div class="am-stat"><span>Story chapters</span><b>5</b></div>
+            <div class="am-stat"><span>Build steps</span><b>5</b></div>
             <div class="am-stat"><span>Changed files</span><b>12</b></div>
             <div class="am-stat"><span>Evidence hunks</span><b>31</b></div>
           </section>
@@ -501,7 +552,7 @@ h2.display{margin:0 0 14px;font:600 clamp(28px,4.4vw,42px)/1.15 var(--serif);let
       <div class="why-copy reveal" style="--d:120ms">
         <p>Coding agents produce more change per hour than anyone can absorb in file-path order. The diff is <strong>complete</strong>, but completeness isn't comprehension: a lockfile and a payment-critical retry loop get equal billing.</p>
         <p>ndrstnd reads the branch the way you'd want a colleague to walk you through it: <strong>claims first, meaning second, evidence on demand.</strong> Every sentence in the story links to the hunks that prove it.</p>
-        <p class="footnote">It compares the branch to its merge-base, asks Codex for the narrative, and falls back to a complete evidence view when it can't.</p>
+        <p class="footnote">It compares the branch to its merge-base and asks Codex for the narrative. If the analysis fails, it tells you so: it never fabricates a story it can't back with evidence.</p>
       </div>
       <div class="panels reveal" style="--d:180ms" role="img" aria-label="Side by side: a flat alphabetical file list versus five semantic story chapters.">
         <div class="panel" aria-hidden="true">
@@ -644,12 +695,29 @@ h2.display{margin:0 0 14px;font:600 clamp(28px,4.4vw,42px)/1.15 var(--serif);let
     </figure>
     <div class="parnas-body">
       <p class="reveal" style="--d:120ms">No branch is built in the order it's best understood. Agents scaffold, backtrack, revert, and patch their way to a result, and the commit log faithfully records all of that wandering. Replaying it teaches you the journey, not the design.</p>
-      <p class="reveal" style="--d:180ms">The Timeline view takes Parnas seriously: it presents the change as the sequence of steps a rational designer would have taken, each step linked to the files, churn, and evidence behind it. <strong>The history stays honest. The reading order becomes rational.</strong></p>
+      <p class="reveal" style="--d:180ms">The Timeline view takes Parnas seriously. It rebuilds the change as a dependency-ordered build path: each step states its goal, what you now have once it lands, and what it deliberately defers, with the evidence accumulating step by step. <strong>The history stays honest. The reading order becomes rational.</strong></p>
     </div>
-    <div class="order-motif reveal" style="--d:240ms" role="img" aria-label="A messy sequence of work-in-progress commits reordered into five rational reading steps.">
-      <div class="order-group"><small>The order it was built</small><div class="order-set order-built"><span>wip</span><span>retry loop</span><span>fix test</span><span>revert</span><span>backoff, again</span><span>fmt</span></div></div>
-      <div class="order-arrow" aria-hidden="true"><svg viewBox="0 0 16 16"><path d="M2.5 8h11M9.5 4l4 4-4 4"/></svg></div>
-      <div class="order-group"><small>The order you read it</small><div class="order-set order-read"><span class="el">01</span><span class="hi">02</span><span class="co">03</span><span class="lo">04</span><span class="lo">05</span></div></div>
+    <div class="tlm reveal" style="--d:240ms" role="img" aria-label="The Timeline view: a step rail with attention-colored ticks and an accent needle on the active step, above a build step stating its goal, files touched, postcondition, deferred concerns, and forward references.">
+      <div class="tlm-rail" aria-hidden="true">
+        <span class="tlm-nav"><svg viewBox="0 0 16 16"><path d="M9.8 3.8L5.6 8l4.2 4.2"/></svg></span>
+        <span class="mticks"><i class="t-lo"></i><i class="t-on"></i><i class="t-el"></i><i class="t-co"></i><i class="t-lo"></i></span>
+        <span class="tlm-nav"><svg viewBox="0 0 16 16"><path d="M6.2 3.8L10.4 8l-4.2 4.2"/></svg></span>
+        <span class="tlm-readout"><b>02 / 05</b><span>Guard captures with idempotency keys</span></span>
+      </div>
+      <div class="tlm-card" aria-hidden="true">
+        <span class="chn hi">02</span>
+        <div>
+          <strong>Guard captures with idempotency keys</strong>
+          <p>Give every capture attempt a stable key so the retry loop, when it arrives, can never double-charge.</p>
+          <div class="tlm-files"><span>src/payments/idempotency.ts<small><b class="chip-add">+31</b> <b class="chip-del">−0</b></small></span><span>src/payments/capture.ts<small><b class="chip-add">+9</b> <b class="chip-del">−2</b></small></span></div>
+          <span class="tlm-chip">Story · Idempotency keys guard every retry</span>
+        </div>
+      </div>
+      <div class="tlm-panel" aria-hidden="true"><h5>You now have</h5><p>Every capture attempt carries a stable idempotency key. Retries are now safe to introduce.</p></div>
+      <div class="tlm-cols" aria-hidden="true">
+        <div><h5>Deferred for later steps</h5><p>The retry loop itself lands once keys and backoff are in place. <b class="tlm-step-ref">03</b></p></div>
+        <div><h5>Forward references</h5><p>Every symbol used here already exists.</p></div>
+      </div>
     </div>
   </div>
 </section>
@@ -674,9 +742,9 @@ h2.display{margin:0 0 14px;font:600 clamp(28px,4.4vw,42px)/1.15 var(--serif);let
       </article>
       <article class="fcard reveal" style="--d:120ms">
         <span class="fico"><svg viewBox="0 0 18 18"><circle cx="9" cy="9" r="5.5"/><path d="M9 5.5v3.8l2.5 1.5"/></svg></span>
-        <h3>Timeline</h3>
-        <p>A suggested reading order that replays the implementation step by step, with the files and churn each step touched.</p>
-        <div class="fviz"><div class="tl-mini"><span class="t-el">01 · Retry transient failures<small>+64 −12</small></span><span class="t-hi">02 · Guard with idempotency keys<small>+38 −5</small></span><span>03 · Make the policy configurable<small>+22 −3</small></span></div></div>
+        <h3>Timeline: a build path</h3>
+        <p>Dependency-ordered steps replay how you would assemble the change. Each step states its goal, what you now have, and what it defers, with the evidence accumulated so far.</p>
+        <div class="fviz"><div class="rail-mini" aria-hidden="true"><span class="mticks"><i class="t-lo"></i><i class="t-on"></i><i class="t-el"></i><i class="t-co"></i><i class="t-lo"></i></span><span class="rm-readout"><b>02 / 05</b><span>Guard captures with idempotency keys</span></span></div></div>
       </article>
       <article class="fcard reveal">
         <span class="fico"><svg viewBox="0 0 18 18"><path d="M3.5 9.5l3.2 3.2 6.8-7"/></svg></span>
