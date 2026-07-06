@@ -3,10 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>ndrstnd — understand what your coding agent actually did</title>
+<title>ndrstnd: understand what your coding agent actually did</title>
 <meta name="description" content="ndrstnd turns large agent-produced branch diffs into an evidence-linked story: semantic chapters, color-coded impact, a reading-order timeline, a test plan, and the full diff. Local, private, open source.">
 <link rel="canonical" href="https://truizlop.github.io/ndrstnd/">
-<meta property="og:title" content="ndrstnd — understand what your coding agent actually did">
+<meta property="og:title" content="ndrstnd: understand what your coding agent actually did">
 <meta property="og:description" content="A local comprehension workspace that turns agent-produced branch diffs into an evidence-linked story.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://truizlop.github.io/ndrstnd/">
@@ -48,7 +48,7 @@ button:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-off
 .overline::before{content:"";display:inline-block;width:18px;height:2px;margin:0 10px 3px 0;border-radius:2px;background:var(--accent)}
 h2.display{margin:0 0 14px;font:600 clamp(28px,4.4vw,42px)/1.15 var(--serif);letter-spacing:-.015em;color:var(--ink);text-wrap:balance}
 .lede{margin:0;max-width:46em;font:400 16px/1.65 var(--sans);color:var(--ink-2)}
-.mono-note{font:400 12px/1.6 var(--mono);color:var(--ink-3)}
+.footnote{font:400 13px/1.7 var(--sans);color:var(--ink-3)}
 
 /* ---------- brand ---------- */
 .brand{display:inline-flex;align-items:center;gap:9px;color:var(--ink)}
@@ -341,7 +341,7 @@ h2.display{margin:0 0 14px;font:600 clamp(28px,4.4vw,42px)/1.15 var(--serif);let
 .scope h2{margin:0 auto 18px;max-width:14em;font:600 clamp(28px,4.6vw,44px)/1.15 var(--serif);letter-spacing:-.015em}
 .scope h2 em{color:var(--accent);font-style:italic}
 .scope p{margin:0 auto;max-width:42em;color:var(--ink-2);font-size:16px}
-.scope .mono-note{display:block;margin:26px auto 0}
+.scope .footnote{display:block;margin:26px auto 0}
 
 /* ---------- footer ---------- */
 .colophon{padding:30px 0 44px}
@@ -396,7 +396,7 @@ h2.display{margin:0 0 14px;font:600 clamp(28px,4.4vw,42px)/1.15 var(--serif);let
     <svg class="hero-mark" viewBox="0 0 20 22" aria-hidden="true"><path d="M4.4 3.4 10 7.6l5.6-4.2"/><path d="M4.4 8.9 10 13.1l5.6-4.2"/><path d="M4.4 14.4 10 18.6l5.6-4.2"/></svg>
     <p class="overline reveal">A local comprehension workspace for agent-produced changes</p>
     <h1 class="reveal" style="--d:60ms">Your agent shipped 3,000 lines overnight. <em>Read them like a story.</em></h1>
-    <p class="hero-lede reveal" style="--d:120ms">ndrstnd turns a branch diff into an evidence-linked narrative — semantic chapters, color-coded impact, a reading-order timeline, a test plan, and the full diff — so you understand a change before you judge it.</p>
+    <p class="hero-lede reveal" style="--d:120ms">ndrstnd turns a branch diff into an evidence-linked narrative: semantic chapters, color-coded impact, a reading-order timeline, a test plan, and the full diff. Understand the change before you judge it.</p>
     <div class="cta-row reveal" style="--d:180ms">
       <a class="btn btn-primary" href="#install">Install ndrstnd</a>
       <a class="btn btn-ghost" href="https://github.com/truizlop/ndrstnd" rel="noopener">View on GitHub</a>
@@ -405,7 +405,7 @@ h2.display{margin:0 0 14px;font:600 clamp(28px,4.4vw,42px)/1.15 var(--serif);let
     <ul class="hero-meta reveal" style="--d:240ms">
       <li>Runs entirely on your machine</li>
       <li>Open source · Apache-2.0</li>
-      <li>Artifacts live in your repo and expire after seven days</li>
+      <li>Self-contained artifacts, private to your working copy</li>
     </ul>
 
     <!-- Hero product shot: faithful recreation of the Story view -->
@@ -466,7 +466,7 @@ h2.display{margin:0 0 14px;font:600 clamp(28px,4.4vw,42px)/1.15 var(--serif);let
         </aside>
       </div>
     </div>
-    <p class="hero-shot-caption">The Story view of an ndrstnd artifact — one self-contained HTML file, no server required.</p>
+    <p class="hero-shot-caption">The Story view of an ndrstnd artifact: one self-contained HTML file, no server required.</p>
     </div>
   </div>
 </section>
@@ -478,9 +478,9 @@ h2.display{margin:0 0 14px;font:600 clamp(28px,4.4vw,42px)/1.15 var(--serif);let
     <h2 class="display reveal" style="--d:60ms">Alphabetical order is not an explanation.</h2>
     <div class="why-grid">
       <div class="why-copy reveal" style="--d:120ms">
-        <p>Coding agents produce more change per hour than anyone can absorb in file-path order. The diff is <strong>complete</strong>, but completeness isn't comprehension — a lockfile and a payment-critical retry loop get equal billing.</p>
+        <p>Coding agents produce more change per hour than anyone can absorb in file-path order. The diff is <strong>complete</strong>, but completeness isn't comprehension: a lockfile and a payment-critical retry loop get equal billing.</p>
         <p>ndrstnd reads the branch the way you'd want a colleague to walk you through it: <strong>claims first, meaning second, evidence on demand.</strong> Every sentence in the story links to the hunks that prove it.</p>
-        <p class="mono-note">It compares the branch to its merge-base, asks Codex for the narrative, and falls back to a complete evidence view when it can't.</p>
+        <p class="footnote">It compares the branch to its merge-base, asks Codex for the narrative, and falls back to a complete evidence view when it can't.</p>
       </div>
       <div class="panels reveal" style="--d:180ms" role="img" aria-label="Side by side: a flat alphabetical file list versus five semantic story chapters.">
         <div class="panel" aria-hidden="true">
@@ -519,7 +519,7 @@ h2.display{margin:0 0 14px;font:600 clamp(28px,4.4vw,42px)/1.15 var(--serif);let
   <div class="wrap">
     <p class="overline reveal">Zoom controls</p>
     <h2 class="display reveal" style="--d:60ms">One dial, five altitudes.</h2>
-    <p class="lede reveal" style="--d:120ms">The zoom dial moves the whole workspace between meaning and mechanism. Keep scrolling — the workspace below follows the dial.</p>
+    <p class="lede reveal" style="--d:120ms">The zoom dial moves the whole workspace between meaning and mechanism. Keep scrolling, and the workspace below follows the dial.</p>
     <div class="zs-body">
       <div class="zs-sticky">
         <div class="zs-dialrow">
@@ -560,7 +560,7 @@ h2.display{margin:0 0 14px;font:600 clamp(28px,4.4vw,42px)/1.15 var(--serif);let
               <div class="exp-head"><span class="chn hi">02</span><span class="ch-copy"><strong style="font:600 12px/1.35 var(--sans)">Idempotency keys guard every retry</strong><small style="font:400 10px/1.5 var(--sans);color:var(--ink-3)">A stable key per payment intent makes retries safe from double-charging.</small><span class="ch-tags"><span class="tagp"><svg viewBox="0 0 18 18"><path d="M9 2l5 2v4c0 3.2-2 5.7-5 6.8C6 13.7 4 11.2 4 8V4l5-2z"/><path d="M7 8l1.3 1.3L11 6.6"/></svg>security</span><span class="tagp"><svg viewBox="0 0 18 18"><path d="M3 8h12M10 4l4 4-4 4"/></svg>behavior</span></span></span></div>
               <div class="semantic">
                 <div><h5>Before</h5><p>A single capture attempt per intent. Any gateway timeout surfaced to the caller as a failed payment, and manual retries risked charging the customer twice.</p></div>
-                <div><h5>After</h5><p>Transient failures retry up to maxAttempts with jittered exponential backoff, and every attempt reuses the same idempotency key — a retry can never double-charge.</p></div>
+                <div><h5>After</h5><p>Transient failures retry up to maxAttempts with jittered exponential backoff, and every attempt reuses the same idempotency key, so a retry can never double-charge.</p></div>
               </div>
             </div>
           </div>
@@ -586,7 +586,7 @@ h2.display{margin:0 0 14px;font:600 clamp(28px,4.4vw,42px)/1.15 var(--serif);let
         <article class="zs-step" data-level="0">
           <span class="zs-kicker">Level 0 · Map</span>
           <h3>The whole change at a glance</h3>
-          <p>Chapter cards show where the churn went and where the risk lives — five attention colors from low to critical. Know in ten seconds where to spend your next ten minutes.</p>
+          <p>Chapter cards show where the churn went and where the risk lives, in five attention colors from low to critical. Know in ten seconds where to spend your next ten minutes.</p>
         </article>
         <article class="zs-step" data-level="1">
           <span class="zs-kicker">Level 1 · Summary</span>
@@ -601,12 +601,12 @@ h2.display{margin:0 0 14px;font:600 clamp(28px,4.4vw,42px)/1.15 var(--serif);let
         <article class="zs-step" data-level="3">
           <span class="zs-kicker">Level 3 · Evidence</span>
           <h3>Proof, minus the noise</h3>
-          <p>Every claim links to the exact lines that back it. Routine lines fold behind a counted ⌁ divider — omitted, never hidden.</p>
+          <p>Every claim links to the exact lines that back it. Routine lines fold behind a counted ⌁ divider: omitted, never hidden.</p>
         </article>
         <article class="zs-step" data-level="4">
           <span class="zs-kicker">Level 4 · Raw</span>
           <h3>Nothing between you and the patch</h3>
-          <p>At the bottom of the dial the workspace shows complete hunks, exactly as Git sees them. Trust the story, then verify it — without leaving the page.</p>
+          <p>At the bottom of the dial the workspace shows complete hunks, exactly as Git sees them. Trust the story, then verify it, without leaving the page.</p>
         </article>
       </div>
     </div>
@@ -640,7 +640,7 @@ h2.display{margin:0 0 14px;font:600 clamp(28px,4.4vw,42px)/1.15 var(--serif);let
       <article class="fcard reveal">
         <span class="fico"><svg viewBox="0 0 18 18"><path d="M3.5 9.5l3.2 3.2 6.8-7"/></svg></span>
         <h3>Test plan view</h3>
-        <p>Tested behaviors grouped into themes and linked back to story claims — zoomable from summary cards down to raw test artifacts.</p>
+        <p>Tested behaviors grouped into themes and linked back to story claims, zoomable from summary cards down to raw test artifacts.</p>
       </article>
       <article class="fcard reveal" style="--d:60ms">
         <span class="fico"><svg viewBox="0 0 18 18"><path d="M6.5 5L3 9l3.5 4M11.5 5L15 9l-3.5 4"/></svg></span>
@@ -655,18 +655,13 @@ h2.display{margin:0 0 14px;font:600 clamp(28px,4.4vw,42px)/1.15 var(--serif);let
       <article class="fcard reveal">
         <span class="fico"><svg viewBox="0 0 18 18"><path d="M9 3v7M9 10l-3-3M9 10l3-3"/><rect x="3" y="12.5" width="12" height="2.5" rx="1.2"/></svg></span>
         <h3>Ask the change</h3>
-        <p>In a live workspace, select any lines and ask. Answers come back grounded in the evidence you selected — not in vibes.</p>
+        <p>In a live workspace, select any lines and ask. Answers come back grounded in the evidence you selected, not in vibes.</p>
         <div class="fviz"><div class="selmenu" aria-hidden="true"><span>Explain selection</span><span>Trace effects</span><span>Why included?</span></div></div>
       </article>
       <article class="fcard reveal" style="--d:60ms">
-        <span class="fico"><svg viewBox="0 0 18 18"><circle cx="9" cy="9" r="5.8"/><circle cx="9" cy="9" r="2.2"/></svg></span>
-        <h3>Review lenses</h3>
-        <p>Swap the lens and re-run the analysis: grouping, emphasis, and risk signals reshape around how you need to read the change.</p>
-      </article>
-      <article class="fcard reveal" style="--d:120ms">
         <span class="fico"><svg viewBox="0 0 18 18"><rect x="3" y="2.5" width="12" height="13" rx="2"/><path d="M6.5 6h5M6.5 9h5M6.5 12h3"/></svg></span>
         <h3>Private, portable artifacts</h3>
-        <p>Each review is one self-contained HTML file in your repo's Git-ignored <code style="font:500 12px var(--mono)">.ndrstnd</code> — readable on any device, expiring after seven days.</p>
+        <p>Each review is one self-contained HTML file in your repo's <code style="font:500 12px var(--mono)">.ndrstnd</code> directory: readable on any device, private to your machine, and yours to keep for as long as you need.</p>
       </article>
     </div>
   </div>
@@ -679,15 +674,16 @@ h2.display{margin:0 0 14px;font:600 clamp(28px,4.4vw,42px)/1.15 var(--serif);let
     <h2 class="display reveal" style="--d:60ms">Your agent hands you the review.</h2>
     <div class="cx-grid">
       <div class="reveal" style="--d:120ms">
-        <p class="lede">ndrstnd ships as a Codex skill and a CLI. Install the skill once, and Codex can end its coding tasks by preparing an ndrstnd workspace for the human — instead of a wall of diff.</p>
+        <p class="lede">ndrstnd ships as a Codex skill and a CLI. Install the skill once, and Codex can end its coding tasks by preparing an ndrstnd workspace for the human, instead of a wall of diff.</p>
         <ul class="cx-points">
           <li><span class="n">1</span><div><b>Skill-aware</b><p>After finishing a task, Codex runs ndrstnd on the branch and links the artifact in its reply, ready to read on desktop or mobile.</p></div></li>
-          <li><span class="n">2</span><div><b>Conversation-informed</b><p>Pass <code>--conversation</code> and the implementation dialogue becomes part of the story — the decisions, not just the diff.</p></div></li>
-          <li><span class="n">3</span><div><b>Zero token custody</b><p>ndrstnd rides Codex's existing authenticated session. It never stores a credential of its own.</p></div></li>
+          <li><span class="n">2</span><div><b>Read it without leaving Codex</b><p>Ask Codex to use ndrstnd and open the artifact right in the Codex app's side panel. And when you run Codex Remote, the same review reads comfortably from your phone.</p></div></li>
+          <li><span class="n">3</span><div><b>Conversation-informed</b><p>Pass <code>--conversation</code> and the implementation dialogue becomes part of the story: the decisions, not just the diff.</p></div></li>
+          <li><span class="n">4</span><div><b>Zero token custody</b><p>ndrstnd rides Codex's existing authenticated session. It never stores a credential of its own.</p></div></li>
         </ul>
       </div>
       <div class="term reveal" style="--d:180ms" role="img" aria-label="Terminal session: installing the ndrstnd Codex skill and reviewing a branch.">
-        <div class="term-bar" aria-hidden="true"><i></i><i></i><i></i><em>zsh — ~/work/checkout</em></div>
+        <div class="term-bar" aria-hidden="true"><i></i><i></i><i></i><em>zsh · ~/work/checkout</em></div>
         <pre aria-hidden="true"><span class="ps1">$</span> <span class="cmd">ndrstnd skill install</span>
 <span class="out">Installed the ndrstnd Codex skill at ~/.codex/skills/ndrstnd.</span>
 
@@ -695,9 +691,7 @@ h2.display{margin:0 0 14px;font:600 clamp(28px,4.4vw,42px)/1.15 var(--serif);let
 <span class="out">Drafting the review narrative with Codex…</span>
 <span class="out">merge-base=f3a91c02b7d4 files=12 meaningful-files=7</span>
 <span class="out">hunks=31 conversation=42</span>
-<span class="out">ndrstnd artifact: <span class="hl">.ndrstnd/codex-checkout-retry-hardening.html</span></span>
-<span class="out">This self-contained file is in the Git-ignored .ndrstnd</span>
-<span class="out">directory and expires after seven days.</span></pre>
+<span class="out">ndrstnd artifact: <span class="hl">.ndrstnd/codex-checkout-retry-hardening.html</span></span></pre>
       </div>
     </div>
   </div>
@@ -711,7 +705,7 @@ h2.display{margin:0 0 14px;font:600 clamp(28px,4.4vw,42px)/1.15 var(--serif);let
       <span class="soon">Homebrew · shipping soon</span>
     </div>
     <h2 class="display reveal" style="--d:60ms">Four commands to your first story.</h2>
-    <p class="lede reveal" style="--d:120ms">ndrstnd is being prepared for Homebrew. The tap and formula already live in the repository — the moment the first release is tagged, this is the whole setup:</p>
+    <p class="lede reveal" style="--d:120ms">ndrstnd is being prepared for Homebrew. The tap and formula already live in the repository, so the moment the first release is tagged, this is the whole setup:</p>
     <div class="steps">
       <div class="step reveal">
         <span class="step-n">1</span>
@@ -727,7 +721,7 @@ h2.display{margin:0 0 14px;font:600 clamp(28px,4.4vw,42px)/1.15 var(--serif);let
         <span class="step-n">2</span>
         <div>
           <h3>Connect Codex</h3>
-          <p>ndrstnd reuses your existing Codex session — it never stores a token itself.</p>
+          <p>ndrstnd reuses your existing Codex session. It never stores a token itself.</p>
           <div class="codeblock"><pre><span class="ps1">$ </span>ndrstnd auth login</pre><button class="copy-btn" data-copy="ndrstnd auth login" aria-label="Copy auth command"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5.4" y="5.4" width="7.8" height="8.6" rx="1.6"/><path d="M2.8 10.6V4.2a1.4 1.4 0 0 1 1.4-1.4h5.4"/></svg></button></div>
         </div>
       </div>
@@ -748,7 +742,7 @@ h2.display{margin:0 0 14px;font:600 clamp(28px,4.4vw,42px)/1.15 var(--serif);let
         </div>
       </div>
     </div>
-    <p class="inst-foot reveal">Artifacts are written to the reviewed repository's Git-ignored <code style="font:500 11.5px var(--mono)">.ndrstnd/</code> directory, stay private to your working copy, and expire after seven days.</p>
+    <p class="inst-foot reveal">Artifacts are written to the reviewed repository's <code style="font:500 11.5px var(--mono)">.ndrstnd/</code> directory and stay private to your working copy. When you add ndrstnd to a repo, add <code style="font:500 11.5px var(--mono)">.ndrstnd/</code> to its <code style="font:500 11.5px var(--mono)">.gitignore</code> so review artifacts never end up in version control.</p>
   </div>
 </section>
 
@@ -757,8 +751,8 @@ h2.display{margin:0 0 14px;font:600 clamp(28px,4.4vw,42px)/1.15 var(--serif);let
   <div class="wrap">
     <p class="overline reveal" style="display:inline-flex">The point</p>
     <h2 class="reveal" style="--d:60ms">Comprehension, <em>not critique.</em></h2>
-    <p class="reveal" style="--d:120ms">ndrstnd deliberately doesn't leave review comments, doesn't score your agent, and never edits the branch. It explains the implementation story, the evidence, the risk signals — and then gets out of the way. The judgment stays yours.</p>
-    <span class="mono-note reveal" style="--d:180ms">For critique, keep your review workflow. ndrstnd makes sure you understand what you're judging.</span>
+    <p class="reveal" style="--d:120ms">ndrstnd deliberately doesn't leave review comments, doesn't score your agent, and never edits the branch. It explains the implementation story, the evidence, and the risk signals, then gets out of the way. The judgment stays yours.</p>
+    <span class="footnote reveal" style="--d:180ms">For critique, keep your review workflow. ndrstnd makes sure you understand what you're judging.</span>
   </div>
 </section>
 
@@ -843,7 +837,7 @@ h2.display{margin:0 0 14px;font:600 clamp(28px,4.4vw,42px)/1.15 var(--serif);let
       const text = button.getAttribute('data-copy');
       try {
         await navigator.clipboard.writeText(text);
-        toast('Copied — see you in the terminal.');
+        toast('Copied. See you in the terminal.');
       } catch {
         window.prompt('Copy this command:', text);
       }
