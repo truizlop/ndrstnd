@@ -25,9 +25,9 @@ describe("syntax-highlighted diff snapshots", () => {
     const fullDiff = page.match(/<section id="diff"[\s\S]*?<\/section>/)?.[0];
 
     expect(fullDiff).toBeDefined();
-    expect(fullDiff?.match(/▱ src\/example\.ts/g)).toHaveLength(1);
-    expect(fullDiff?.match(/▱ scripts\/example\.py/g)).toHaveLength(1);
-    expect(fullDiff?.match(/▱ config\/settings\.json/g)).toHaveLength(1);
+    expect(fullDiff?.match(/<span class="file-path">src\/example\.ts<\/span>/g)).toHaveLength(1);
+    expect(fullDiff?.match(/<span class="file-path">scripts\/example\.py<\/span>/g)).toHaveLength(1);
+    expect(fullDiff?.match(/<span class="file-path">config\/settings\.json<\/span>/g)).toHaveLength(1);
     expect(fullDiff).toMatchSnapshot();
   });
 });
