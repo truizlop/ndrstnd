@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { afterEach, describe, expect, it } from "vitest";
-import { buildFallbackAnalysis } from "../src/server/analyze.js";
+import { buildTestAnalysis } from "./fixtures/analysis-fixture.js";
 import { writeReviewArtifact } from "../src/server/artifact.js";
 import { GitReader } from "../src/server/git.js";
 import { createReviewPresentationData } from "../src/server/review-presentation.js";
@@ -30,7 +30,7 @@ describe("review artifact e2e", () => {
     const store = new ReviewStore(join(workspace, "store.sqlite"));
     try {
       const session = store.getOrCreateSession(input);
-      const revision = store.createRevision(session.id, "fallback", "partial", buildFallbackAnalysis(input));
+      const revision = store.createRevision(session.id, "codex", "complete", buildTestAnalysis(input));
       const artifactPath = await writeReviewArtifact(session, revision, { directory: join(repository, ".ndrstnd"), now: new Date("2026-07-02T12:00:00.000Z") });
       const artifact = await readFile(artifactPath, "utf8");
 

@@ -34,7 +34,7 @@ export async function startReviewServer({ port = 0, session, revision, store }: 
       response.end("Not found");
       return;
     }
-    const activeRevision = session === undefined ? revision : store?.listRevisions(session.id)[0] ?? revision;
+    const activeRevision = session === undefined ? revision : store?.listRevisions(session.id).find((candidate) => candidate.source === "codex") ?? revision;
 
     if (session !== undefined && requestUrl.pathname === `/api/session/${session.id}` && requestUrl.searchParams.get("token") === launchToken) {
       response.writeHead(200, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });

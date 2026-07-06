@@ -23,6 +23,7 @@ export interface AnalysisRevision {
   id: string;
   sessionId: string;
   status: "partial" | "complete" | "failed";
+  // "fallback" only survives in databases written before fallback analysis was removed.
   source: "fallback" | "codex";
   document: AnalysisDocument;
   createdAt: string;

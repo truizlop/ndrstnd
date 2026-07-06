@@ -2,7 +2,7 @@
 import { spawn } from "node:child_process";
 import process from "node:process";
 import { getCodexAuthStatus } from "./codex.js";
-import { analyzeWithCodex, buildFallbackAnalysis } from "./analyze.js";
+import { analyzeWithCodex } from "./analyze.js";
 import { importConversation } from "./conversation.js";
 import { GitReader } from "./git.js";
 import { ReviewStore } from "./store.js";
@@ -75,20 +75,22 @@ async function runReview(args: string[]): Promise<void> {
   const conversationPath = optionValue(args, "--conversation");
   const conversation = conversationPath === undefined ? undefined : await importConversation(conversationPath);
   const input = await new GitReader().collectReviewInput(repoPath, targetRef, baseRef);
-  const store = new ReviewStore();
+  const store = openReviewStore();
   const lens = store.getLens(lensId);
   if (lens === undefined) fail(`Unknown review lens: ${lensId}`);
   const session = store.getOrCreateSession(input, conversation);
-  let revision = store.listRevisions(session.id)[0];
+  let revision = store.listRevisions(session.id).find((candidate) => candidate.source === "codex");
   if (revision === undefined) {
-    const fallback = store.createRevision(session.id, "fallback", "partial", buildFallbackAnalysis(input));
+    const auth = await getCodexAuthStatus();
+    if (auth.state === "signed-out") fail("Codex is not signed in, so ndrstnd cannot analyze this change. Run `ndrstnd auth login` first.");
+    if (auth.state === "unreachable") fail(`Codex could not be reached, so ndrstnd cannot analyze this change: ${auth.reason}`);
     process.stdout.write("Drafting the review narrative with Codex…\n");
     try {
       const document = await analyzeWithCodex(input, conversation, undefined, lens.instructions);
       revision = store.createRevision(session.id, "codex", "complete", document);
     } catch (error) {
-      process.stdout.write(`Codex analysis was unavailable; opening the complete fallback evidence view. (${error instanceof Error ? error.message : String(error)})\n`);
-      revision = fallback;
+      store.close();
+      fail(`Codex analysis failed, so no review artifact was written: ${error instanceof Error ? error.message : String(error)} Nothing was persisted; re-run the same ndrstnd review command to retry.`);
     }
   }
   const meaningfulFiles = input.files.filter((file) => file.signal === "meaningful").length;
@@ -98,6 +100,18 @@ async function runReview(args: string[]): Promise<void> {
   process.stdout.write("This self-contained file is in the Git-ignored .ndrstnd directory and expires after seven days.\n");
   if (!noOpen) openBrowser(pathToFileURL(artifactPath).href);
   store.close();
+}
+
+function openReviewStore(): ReviewStore {
+  try {
+    return new ReviewStore();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const hint = /NODE_MODULE_VERSION|compiled against a different Node\.js version/.test(message)
+      ? ` The review store's native SQLite module was built for a different Node.js than the current ${process.versions.node}; run \`npm rebuild better-sqlite3\` in the ndrstnd installation or reinstall ndrstnd.`
+      : "";
+    fail(`The ndrstnd review store could not open: ${message}${hint}`);
+  }
 }
 
 function openBrowser(url: string): void {

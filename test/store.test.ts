@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import type { CollectedReviewInput } from "../src/server/git.js";
 import { ReviewStore } from "../src/server/store.js";
-import { buildFallbackAnalysis } from "../src/server/analyze.js";
+import { buildTestAnalysis } from "./fixtures/analysis-fixture.js";
 
 describe("ReviewStore", () => {
   let directory: string | undefined;
@@ -21,8 +21,8 @@ describe("ReviewStore", () => {
     const first = store.getOrCreateSession(sampleInput(), conversation);
     const second = store.getOrCreateSession(sampleInput(), conversation);
     expect(second.id).toBe(first.id);
-    const revision = store.createRevision(first.id, "fallback", "partial", buildFallbackAnalysis(sampleInput()));
-    expect(store.listRevisions(first.id)).toMatchObject([{ id: revision.id, source: "fallback" }]);
+    const revision = store.createRevision(first.id, "codex", "complete", buildTestAnalysis(sampleInput()));
+    expect(store.listRevisions(first.id)).toMatchObject([{ id: revision.id, source: "codex" }]);
     expect(store.listLenses().map((lens) => lens.id)).toContain("security");
     store.setPreference("zoom", "3");
     expect(store.getPreference("zoom")).toBe("3");

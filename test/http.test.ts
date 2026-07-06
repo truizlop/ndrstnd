@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { startReviewServer, type ReviewServer } from "../src/server/http.js";
 import { ReviewStore } from "../src/server/store.js";
-import { buildFallbackAnalysis } from "../src/server/analyze.js";
+import { buildTestAnalysis } from "./fixtures/analysis-fixture.js";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -35,7 +35,7 @@ describe("startReviewServer", () => {
     const store = new ReviewStore(join(directory, "state.sqlite"));
     const input = { repoPath: "/repo", targetRef: "agent", baseRef: "main", mergeBase: "base", files: [{ id: "file", path: "app.ts", status: "modified" as const, binary: false, signal: "meaningful" as const }], hunks: [{ id: "hunk", fileId: "file", oldStart: 1, newStart: 1, lines: [] }] };
     const session = store.getOrCreateSession(input);
-    const revision = store.createRevision(session.id, "fallback", "partial", buildFallbackAnalysis(input));
+    const revision = store.createRevision(session.id, "codex", "complete", buildTestAnalysis(input));
     server = await startReviewServer({ session, revision, store });
 
     const lensUrl = new URL(server.url);

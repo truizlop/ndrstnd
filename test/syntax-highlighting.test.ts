@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { renderArtifact } from "../src/web/page.js";
 import { createReviewPresentationData } from "../src/server/review-presentation.js";
-import { buildFallbackAnalysis } from "../src/server/analyze.js";
+import { buildTestAnalysis } from "./fixtures/analysis-fixture.js";
 import type { StoredReviewSession } from "../src/server/store.js";
 
 describe("syntax-highlighted diff snapshots", () => {
@@ -19,7 +19,7 @@ describe("syntax-highlighted diff snapshots", () => {
       ],
     };
     const session: StoredReviewSession = { id: "session", repoPath: input.repoPath, targetRef: input.targetRef, baseRef: input.baseRef, mergeBase: input.mergeBase, inputHash: "hash", input, createdAt: "now" };
-    const revision = { id: "revision", sessionId: session.id, source: "fallback" as const, status: "partial" as const, document: buildFallbackAnalysis(input), createdAt: "now" };
+    const revision = { id: "revision", sessionId: session.id, source: "codex" as const, status: "complete" as const, document: buildTestAnalysis(input), createdAt: "now" };
 
     const page = await renderArtifact(createReviewPresentationData(session, revision));
     const fullDiff = page.match(/<section id="diff"[\s\S]*?<\/section>/)?.[0];

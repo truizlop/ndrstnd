@@ -3,7 +3,7 @@ import { mkdtemp, readFile, stat, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { cleanupArtifacts, writeReviewArtifact } from "../src/server/artifact.js";
-import { buildFallbackAnalysis } from "../src/server/analyze.js";
+import { buildTestAnalysis } from "./fixtures/analysis-fixture.js";
 import type { StoredReviewSession } from "../src/server/store.js";
 
 function session(): StoredReviewSession {
@@ -15,7 +15,7 @@ describe("ndrstnd artifacts", () => {
   it("writes a private self-contained review in the artifact directory", async () => {
     const directory = await mkdtemp(join(tmpdir(), "ndrstnd-artifact-"));
     const input = session();
-    const revision = { id: "revision", sessionId: input.id, source: "fallback" as const, status: "partial" as const, document: buildFallbackAnalysis(input.input), createdAt: "2026-06-20T10:00:00.000Z" };
+    const revision = { id: "revision", sessionId: input.id, source: "codex" as const, status: "complete" as const, document: buildTestAnalysis(input.input), createdAt: "2026-06-20T10:00:00.000Z" };
     const path = await writeReviewArtifact(input, revision, { directory, now: new Date("2026-06-20T10:00:00.000Z") });
     const html = await readFile(path, "utf8");
 
