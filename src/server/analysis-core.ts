@@ -286,11 +286,14 @@ function compactHunk(hunk: CollectedReviewInput["hunks"][number], path: string |
   const additions = hunk.lines.filter((line) => line.kind === "addition");
   const deletions = hunk.lines.filter((line) => line.kind === "deletion");
   const context = hunk.lines.length - additions.length - deletions.length;
-  const changedLineSamples = [...deletions, ...additions].slice(0, 4).map((line) => ({
+  // Samples only anchor hunk IDs to recognizable content; Codex inspects the
+  // real patch for detail, so two short previews per hunk are enough.
+  const sampleLines = deletions.length > 0 && additions.length > 0 ? [deletions[0], additions[0]] : [...deletions, ...additions].slice(0, 2);
+  const changedLineSamples = sampleLines.map((line) => ({
     kind: line.kind,
     oldLine: line.oldLine,
     newLine: line.newLine,
-    preview: line.content.trim().slice(0, 140),
+    preview: line.content.trim().slice(0, 100),
   }));
   return {
     id: hunk.id,

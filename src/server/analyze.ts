@@ -11,18 +11,23 @@ const REPAIR_ATTEMPTS = 2;
 export async function analyzeWithCodex(input: CollectedReviewInput, conversation?: ConversationContext, onDelta?: (delta: string) => void, lensInstructions?: string) {
   const prompt = analysisPrompt(input, conversation, lensInstructions);
   return withFreshClientRetry(async (client) => {
-    let response = await client.runTextTurn(input.repoPath, prompt, onDelta);
-    let lastError = "";
-    for (let attempt = 0; attempt <= REPAIR_ATTEMPTS; attempt += 1) {
-      try {
-        return parseAnalysisDocument(JSON.parse(extractJson(response)), input, { focus: attempt === REPAIR_ATTEMPTS ? "salvage" : "require" });
-      } catch (error) {
-        lastError = error instanceof Error ? error.message : String(error);
-        if (attempt === REPAIR_ATTEMPTS) break;
-        response = await client.runTextTurn(input.repoPath, `${prompt}\n\nYour prior response failed validation: ${lastError} Return only the corrected JSON document, with every other field kept as it was.`, onDelta);
+    const thread = await client.startTextThread(input.repoPath);
+    try {
+      let response = await thread.send(prompt, onDelta);
+      let lastError = "";
+      for (let attempt = 0; attempt <= REPAIR_ATTEMPTS; attempt += 1) {
+        try {
+          return parseAnalysisDocument(JSON.parse(extractJson(response)), input, { focus: attempt === REPAIR_ATTEMPTS ? "salvage" : "require" });
+        } catch (error) {
+          lastError = error instanceof Error ? error.message : String(error);
+          if (attempt === REPAIR_ATTEMPTS) break;
+          response = await thread.send(`Your prior response failed validation: ${lastError} Return only the corrected JSON document, with every other field kept as it was.`, onDelta);
+        }
       }
+      throw new Error(`Codex produced an analysis that still failed validation after ${REPAIR_ATTEMPTS} repair turns: ${lastError}`);
+    } finally {
+      await thread.close();
     }
-    throw new Error(`Codex produced an analysis that still failed validation after ${REPAIR_ATTEMPTS} repair turns: ${lastError}`);
   });
 }
 

@@ -52,10 +52,28 @@ export class CodexAppServerClient {
   }
 
   async runTextTurn(cwd: string, prompt: string, onDelta?: (delta: string) => void): Promise<string> {
+    const thread = await this.startTextThread(cwd);
+    try {
+      return await thread.send(prompt, onDelta);
+    } finally {
+      await thread.close();
+    }
+  }
+
+  /** Starts a reusable thread so follow-up turns (validation repairs) keep the inspection context instead of resending the full prompt. */
+  async startTextThread(cwd: string): Promise<{ send(prompt: string, onDelta?: (delta: string) => void): Promise<string>; close(): Promise<void> }> {
     const threadResponse = asObject(await this.request("thread/start", { cwd, sandbox: "read-only", approvalPolicy: "never" }));
     const threadId = String(asObject(threadResponse["thread"])["id"] ?? "");
     if (threadId === "") throw new Error("Codex app-server did not return an analysis thread ID.");
+    return {
+      send: (prompt, onDelta) => this.runThreadTurn(threadId, cwd, prompt, onDelta),
+      close: async () => {
+        await this.request("thread/archive", { threadId }).catch(() => undefined);
+      },
+    };
+  }
 
+  private async runThreadTurn(threadId: string, cwd: string, prompt: string, onDelta?: (delta: string) => void): Promise<string> {
     let text = "";
     const completed = new Promise<void>((resolve, reject) => {
       // Inspecting a large branch takes many quiet-but-active tool turns, so time
@@ -99,13 +117,9 @@ export class CodexAppServerClient {
       this.failureListeners.add(failureListener);
     });
 
-    try {
-      await this.request("turn/start", { threadId, cwd, approvalPolicy: "never", input: [{ type: "text", text: prompt }] });
-      await completed;
-      return text;
-    } finally {
-      await this.request("thread/archive", { threadId }).catch(() => undefined);
-    }
+    await this.request("turn/start", { threadId, cwd, approvalPolicy: "never", input: [{ type: "text", text: prompt }] });
+    await completed;
+    return text;
   }
 
   private async start(): Promise<void> {
