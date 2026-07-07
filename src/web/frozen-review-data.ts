@@ -187,6 +187,9 @@ export const frozenReviewData: ReviewPresentationData = {
       { title: "Release bookkeeping", reason: "The changelog entry and lockfile bump restate the change without adding review signal.", evidenceIds: ["changelog-hunk", "lockfile-hunk"] },
     ],
     unclassifiedEvidenceIds: [],
+    testExecution: [
+      { command: "npm test", outcome: "passed", summary: "Runner suite passed; the new run and retry tests cover both execution paths.", source: "conversation" },
+    ],
     focus: {
       "runner-hunk": [{ start: 11, end: 13 }],
       "runner-guard-hunk": [{ start: 27, end: 29 }],

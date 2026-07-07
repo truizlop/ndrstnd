@@ -410,6 +410,11 @@ it("renders the frozen presentation fixture without Git, analysis, or the review
   expect(page).toContain("Release bookkeeping");
   expect(page).toContain("2 low-signal hunks collapsed");
   expect(page).toContain("Test plan</button>");
+  expect(page).toContain("1 observed test run");
+  expect(page).toContain("Observed result: passed");
+  expect(page).toContain("npm test");
+  expect(page).toContain("observed in the conversation");
+  expect(page).toContain("Suite passed");
 });
 
 it("drives the Evidence-zoom focused excerpt from analysis focus ranges with a heuristic fallback", async () => {

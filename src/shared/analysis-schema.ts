@@ -33,6 +33,13 @@ export const AnalysisStepSchema = z.object({
 
 export const FocusRangeSchema = z.object({ start: z.number().int().min(1), end: z.number().int().min(1) });
 
+export const TestExecutionSchema = z.object({
+  command: z.string().min(1).max(200),
+  outcome: z.enum(["passed", "failed", "mixed", "unknown"]),
+  summary: z.string().min(1).max(300),
+  source: z.enum(["conversation", "repository"]),
+});
+
 export const AnalysisDocumentSchema = z.object({
   summary: z.string().min(1).max(560),
   chapters: z.array(ChapterSchema),
@@ -41,6 +48,8 @@ export const AnalysisDocumentSchema = z.object({
   unclassifiedEvidenceIds: z.array(z.string().min(1)),
   /** Reviewer-critical new-file line ranges per evidence ID; they drive the focused excerpts at the Evidence zoom. */
   focus: z.record(z.string().min(1), z.array(FocusRangeSchema).min(1).max(5)).optional(),
+  /** Test or build runs actually observed in the conversation or repository; never inferred. */
+  testExecution: z.array(TestExecutionSchema).max(5).optional(),
 });
 
 export type AnalysisDocument = z.infer<typeof AnalysisDocumentSchema>;

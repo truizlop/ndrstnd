@@ -161,6 +161,20 @@ describe("analysis documents", () => {
     }, focusInput, { focus: "salvage" }).focus).toEqual({ "source-hunk": [{ start: 9, end: 9 }] });
   });
 
+  it("normalizes observed test execution and only asks for real runs", () => {
+    const chapter = { id: "one", title: "Runner behavior", kind: "behavior" as const, synopsis: validSynopsis, confidence: "high" as const, attention: "contained" as const, riskCategories: ["behavior" as const], evidenceIds: ["source-hunk"] };
+    const document = parseAnalysisDocument({
+      summary: validSummary,
+      chapters: [chapter],
+      steps: [sourceStep],
+      omittedGroups: [{ title: "Low-signal changes", reason: "Lockfile evidence is grouped.", evidenceIds: ["lock-hunk"] }],
+      unclassifiedEvidenceIds: [],
+      testExecution: [{ command: "npm test", outcome: "passed", summary: "All 84 tests passed across 15 files.", source: "conversation" }],
+    }, input);
+    expect(document.testExecution).toEqual([{ command: "npm test", outcome: "passed", summary: "All 84 tests passed across 15 files.", source: "conversation" }]);
+    expect(analysisPrompt(input)).toContain("never invent execution evidence");
+  });
+
   it("accepts compact Codex output and normalizes it to the presentation document", () => {
     expect(parseAnalysisDocument({
       s: validSummary,
@@ -189,10 +203,12 @@ describe("analysis documents", () => {
       ]],
       o: [["Low-signal changes", "Lockfile evidence is grouped.", ["lock-hunk"]]],
       u: [],
+      x: [["npm test", "passed", "All tests passed.", "conversation"]],
     }, input)).toMatchObject({
       summary: validSummary,
       chapters: [{ id: "one", title: "Runner behavior", evidenceIds: ["source-hunk"] }],
       omittedGroups: [{ title: "Low-signal changes", evidenceIds: ["lock-hunk"] }],
+      testExecution: [{ command: "npm test", outcome: "passed", summary: "All tests passed.", source: "conversation" }],
     });
   });
 
@@ -289,7 +305,7 @@ describe("analysis documents", () => {
       unclassifiedEvidenceIds: compactDocument.u,
     };
 
-    expect(analysisPrompt(input)).toContain("{s,c:[[id,title,kind,synopsis,before|null,after|null,confidence,attention,riskCategories,evidenceIds]],t:[[id,title,goal,youNowHave,[[concern,resolvedByStepId|null]],dependsOn,forwardRefs,advancesChapterIds,evidenceIds]],o:[[title,reason,evidenceIds]],u:[evidenceId],f:{evidenceId:[[startLine,endLine]]}}");
+    expect(analysisPrompt(input)).toContain("{s,c:[[id,title,kind,synopsis,before|null,after|null,confidence,attention,riskCategories,evidenceIds]],t:[[id,title,goal,youNowHave,[[concern,resolvedByStepId|null]],dependsOn,forwardRefs,advancesChapterIds,evidenceIds]],o:[[title,reason,evidenceIds]],u:[evidenceId],f:{evidenceId:[[startLine,endLine]]},x:[[command,outcome,summary,source]]}");
     expect(JSON.stringify(compactDocument).length).toBeLessThan(JSON.stringify(fullDocument).length * 0.7);
   });
 

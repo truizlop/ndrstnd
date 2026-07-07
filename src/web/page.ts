@@ -302,14 +302,23 @@ function renderTestPlan(document: AnalysisDocument, hunks: DiffHunk[], filePaths
   const testFiles = [...new Set(cases.map((testCase) => testCase.filePath))];
   const changedTestFiles = files.filter((file) => isTestPath(file.path));
   if (cases.length === 0 && changedTestFiles.length === 0) return `<p class="empty-note">No test activity was captured for this change.</p>`;
-  const observedRuns: number = 0;
+  const runs = document.testExecution ?? [];
   const summary = [
     `${cases.length} tested behavior${cases.length === 1 ? "" : "s"}`,
     `${new Set([...testFiles, ...changedTestFiles.map((file) => file.path)]).size} test file${new Set([...testFiles, ...changedTestFiles.map((file) => file.path)]).size === 1 ? "" : "s"}`,
-    `${observedRuns} observed test run${observedRuns === 1 ? "" : "s"}`,
-    "Run result not observed",
+    `${runs.length} observed test run${runs.length === 1 ? "" : "s"}`,
+    runs.length === 0 ? "Run result not observed" : `Observed result: ${aggregateRunOutcome(runs)}`,
   ].map((item) => `<span>${escapeHtml(item)}</span>`).join("");
-  return `<div class="test-plan-summary">${summary}</div><div class="test-plan-level test-plan-map">${renderTestPlanMap(themes)}</div><div class="test-plan-level test-plan-summary-level">${renderTestPlanSummary(themes)}</div><div class="test-plan-level test-plan-explanation">${renderTestPlanExplanation(themes)}</div><div class="test-plan-level test-plan-evidence">${renderTestPlanEvidence(themes, highlighter)}</div><div class="test-plan-level test-plan-raw">${renderTestPlanRaw(themes, highlighter)}</div>`;
+  return `<div class="test-plan-summary">${summary}</div><div class="test-plan-level test-plan-map">${renderTestPlanMap(themes)}</div><div class="test-plan-level test-plan-summary-level">${renderTestPlanSummary(themes)}</div><div class="test-plan-level test-plan-explanation">${renderTestPlanExplanation(themes)}</div><div class="test-plan-level test-plan-evidence">${renderTestPlanEvidence(themes, highlighter, runs)}</div><div class="test-plan-level test-plan-raw">${renderTestPlanRaw(themes, highlighter, runs)}</div>`;
+}
+
+type TestExecutionRun = NonNullable<AnalysisDocument["testExecution"]>[number];
+
+function aggregateRunOutcome(runs: TestExecutionRun[]): TestExecutionRun["outcome"] {
+  if (runs.some((run) => run.outcome === "failed")) return "failed";
+  if (runs.length > 0 && runs.every((run) => run.outcome === "passed")) return "passed";
+  if (runs.some((run) => run.outcome === "mixed" || run.outcome === "passed")) return "mixed";
+  return "unknown";
 }
 
 function renderTestPlanMap(themes: TestThemeModel[]): string {
@@ -325,11 +334,13 @@ function renderTestPlanExplanation(themes: TestThemeModel[]): string {
   return themes.map((theme) => `<section class="test-explanation-group"><h2>${escapeHtml(theme.title)}</h2>${theme.cases.length === 0 ? `<p class="empty-note">No associated test evidence</p>` : theme.cases.map((testCase) => `<article class="test-explanation-card" data-test-case="${escapeHtml(testCase.id)}"><h3>${escapeHtml(testCase.name)}</h3><p class="test-what">${escapeHtml(testCase.chapter.synopsis)}</p>${renderSemantic(testCase.chapter.before, testCase.chapter.after)}<div class="test-refs"><span class="test-ref-file">${escapeHtml(testCase.filePath)}</span>${theme.storyClaims[0] && theme.storyClaims[0].title !== theme.title ? `<span class="test-ref-claim">Story · ${escapeHtml(theme.storyClaims[0].title)}</span>` : ""}</div></article>`).join("")}</section>`).join("");
 }
 
-function renderTestPlanEvidence(themes: TestThemeModel[], highlighter: Highlighter): string {
-  return themes.map((theme) => theme.cases.length === 0 ? `<article class="test-evidence-card"><h2>${escapeHtml(theme.title)}</h2><p class="empty-note">No associated test evidence</p></article>` : theme.cases.map((testCase) => `<details class="test-evidence-card" data-test-case="${escapeHtml(testCase.id)}"><summary><span><strong>${escapeHtml(testCase.name)}</strong><small>${escapeHtml(testCase.filePath)}</small></span><span class="test-state">Test implementation found</span></summary>${renderTestExcerpt(testCase.hunk, testCase.filePath, highlighter, false)}<div class="test-evidence-meta"><div><strong>Associated implementation</strong><span>Source mapping unavailable</span></div><div><strong>Observed execution</strong><span>Execution evidence not observed</span></div><div><strong>Result</strong><span>Not observed</span></div></div></details>`).join("")).join("");
+function renderTestPlanEvidence(themes: TestThemeModel[], highlighter: Highlighter, runs: TestExecutionRun[]): string {
+  const execution = runs.length === 0 ? "Execution evidence not observed" : `${runs[0].command}${runs.length > 1 ? ` and ${runs.length - 1} more run${runs.length === 2 ? "" : "s"}` : ""}`;
+  const result = runs.length === 0 ? "Not observed" : `Suite ${aggregateRunOutcome(runs)}`;
+  return themes.map((theme) => theme.cases.length === 0 ? `<article class="test-evidence-card"><h2>${escapeHtml(theme.title)}</h2><p class="empty-note">No associated test evidence</p></article>` : theme.cases.map((testCase) => `<details class="test-evidence-card" data-test-case="${escapeHtml(testCase.id)}"><summary><span><strong>${escapeHtml(testCase.name)}</strong><small>${escapeHtml(testCase.filePath)}</small></span><span class="test-state">Test implementation found</span></summary>${renderTestExcerpt(testCase.hunk, testCase.filePath, highlighter, false)}<div class="test-evidence-meta"><div><strong>Associated implementation</strong><span>Source mapping unavailable</span></div><div><strong>Observed execution</strong><span>${escapeHtml(execution)}</span></div><div><strong>Result</strong><span>${escapeHtml(result)}</span></div></div></details>`).join("")).join("");
 }
 
-function renderTestPlanRaw(themes: TestThemeModel[], highlighter: Highlighter): string {
+function renderTestPlanRaw(themes: TestThemeModel[], highlighter: Highlighter, runs: TestExecutionRun[]): string {
   const cases = themes.flatMap((theme) => theme.cases);
   if (cases.length === 0) return `<p class="empty-note">No test activity was captured for this change.</p>`;
   const seen = new Set<string>();
@@ -338,7 +349,13 @@ function renderTestPlanRaw(themes: TestThemeModel[], highlighter: Highlighter): 
     seen.add(testCase.hunk.id);
     return [`<article class="test-raw-artifact"><h2>${escapeHtml(testCase.filePath)}</h2>${renderTestExcerpt(testCase.hunk, testCase.filePath, highlighter, true)}</article>`];
   });
-  return `<section class="test-raw-section"><h2>Changed test files</h2>${artifacts.join("")}</section><section class="test-raw-section"><h2>Observed commands</h2><p class="empty-note">Execution evidence not observed</p></section><section class="test-raw-section"><h2>Complete output</h2><p class="empty-note">Execution evidence not observed</p></section>`;
+  const commands = runs.length === 0
+    ? `<p class="empty-note">Execution evidence not observed</p>`
+    : runs.map((run) => `<article class="test-run"><code>${escapeHtml(run.command)}</code><span class="run-outcome run-outcome-${escapeHtml(run.outcome)}">${escapeHtml(run.outcome)}</span><p>${escapeHtml(run.summary)}</p><small>observed in the ${escapeHtml(run.source)}</small></article>`).join("");
+  const output = runs.length === 0
+    ? `<p class="empty-note">Execution evidence not observed</p>`
+    : `<p class="empty-note">Only run summaries were captured; full output was not recorded.</p>`;
+  return `<section class="test-raw-section"><h2>Changed test files</h2>${artifacts.join("")}</section><section class="test-raw-section"><h2>Observed commands</h2>${commands}</section><section class="test-raw-section"><h2>Complete output</h2>${output}</section>`;
 }
 
 function renderTestExcerpt(hunk: DiffHunk, filePath: string, highlighter: Highlighter, raw: boolean): string {
@@ -687,6 +704,14 @@ body.story-level-0 #collapse-all,body.story-level-1 #collapse-all{display:none}
 .test-raw-artifact{margin:12px 0 0}
 .test-raw-artifact h2{margin:0 0 8px;font:600 12px/1.4 var(--mono);color:var(--ink-2)}
 .test-raw-section .empty-note{margin:4px 0 0}
+.test-run{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px;margin:8px 0;font:12.5px/1.5 var(--sans);color:var(--ink-2)}
+.test-run code{font:11.5px var(--mono);color:var(--ink)}
+.test-run p{margin:0;flex-basis:100%}
+.test-run small{color:var(--ink-3)}
+.run-outcome{font:600 11px/1 var(--sans);text-transform:uppercase;letter-spacing:.04em}
+.run-outcome-passed{color:var(--low)}
+.run-outcome-failed{color:var(--critical)}
+.run-outcome-mixed,.run-outcome-unknown{color:var(--elevated)}
 .empty-note{font:400 12.5px/1.5 var(--sans);color:var(--ink-3)}
 
 .inspector{position:sticky;top:0;height:100vh;overflow-y:auto;background:var(--rail);border-left:1px solid var(--hair);padding:22px 20px}
