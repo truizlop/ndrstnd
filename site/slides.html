@@ -1,0 +1,1211 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Your agent wrote 3,000 lines overnight. Now what? — ndrstnd</title>
+<meta name="description" content="Slides: understanding long coding-agent output with ndrstnd, a local comprehension workspace that turns branch diffs into evidence-linked stories.">
+<link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 22"><g fill="none" stroke="%231c2126" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.4 3.4 10 7.6l5.6-4.2"/><path d="M4.4 8.9 10 13.1l5.6-4.2"/><path d="M4.4 14.4 10 18.6l5.6-4.2" stroke="%232757cf"/></g></svg>'>
+<style>
+/*
+ * The ndrstnd talk galley. Same system as the landing page and the artifact:
+ * sans speaks UI chrome, mono speaks identifiers, serif speaks the story.
+ * Light paper surfaces, hairline rules, a single cobalt accent, no gradients.
+ *
+ * Keys: ← → navigate · on the dial slide, → steps through the five levels
+ *       Home/End first/last · D cycles auto/light/dark theme
+ */
+:root{
+  color-scheme:light dark;
+  --sans:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",system-ui,sans-serif;
+  --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+  --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,"Times New Roman",serif;
+  --surface:#fff;--rail:#f6f6f4;--well:#fafaf8;
+  --ink:#1c2126;--ink-2:#4a5258;--ink-3:#7d858c;--faint:#b4bac0;
+  --hair:#e8e7e3;--hair-2:#d7d6d1;
+  --accent:#2757cf;--wash:#eef2fb;
+  --low:#2e8f53;--contained:#4d94c9;--elevated:#a97c15;--high:#b85f2e;--critical:#bf4840;
+  --add-ink:#1c7a41;--add-bg:#eefaf1;--del-ink:#b04a3d;--del-bg:#fdf1ee;
+  --shadow:0 18px 44px #191e2821;
+  --tk:#24292e;--tk-k:#cf222e;--tk-s:#0a3069;--tk-f:#8250df;--tk-c:#0550ae;--tk-m:#6e7781;
+}
+@media(prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --surface:#15181c;--rail:#1b1f24;--well:#191d22;
+    --ink:#e7eaed;--ink-2:#b4bbc2;--ink-3:#868f97;--faint:#565e66;
+    --hair:#272c33;--hair-2:#3a414a;
+    --accent:#7b9ce8;--wash:#1c2536;
+    --low:#46a86c;--contained:#6cb6e6;--elevated:#cfa145;--high:#dd8a5b;--critical:#e07268;
+    --add-ink:#5cb883;--add-bg:#152b1d;--del-ink:#e08a7a;--del-bg:#2f1b17;
+    --shadow:0 18px 44px #00000059;
+    --tk:#c9d1d9;--tk-k:#ff7b72;--tk-s:#a5d6ff;--tk-f:#d2a8ff;--tk-c:#79c0ff;--tk-m:#8b949e;
+  }
+}
+:root[data-theme="dark"]{
+  --surface:#15181c;--rail:#1b1f24;--well:#191d22;
+  --ink:#e7eaed;--ink-2:#b4bbc2;--ink-3:#868f97;--faint:#565e66;
+  --hair:#272c33;--hair-2:#3a414a;
+  --accent:#7b9ce8;--wash:#1c2536;
+  --low:#46a86c;--contained:#6cb6e6;--elevated:#cfa145;--high:#dd8a5b;--critical:#e07268;
+  --add-ink:#5cb883;--add-bg:#152b1d;--del-ink:#e08a7a;--del-bg:#2f1b17;
+  --shadow:0 18px 44px #00000059;
+  --tk:#c9d1d9;--tk-k:#ff7b72;--tk-s:#a5d6ff;--tk-f:#d2a8ff;--tk-c:#79c0ff;--tk-m:#8b949e;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--rail);color:var(--ink);font:20px/1.6 var(--sans);-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;overflow:hidden}
+::selection{background:#d9e3f8}
+:root[data-theme="dark"] ::selection{background:#2c3e66}
+a{color:var(--accent);text-decoration:none}
+button{font-family:inherit}
+button:focus-visible,a:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+
+/* ---------- deck framework ---------- */
+.deck{position:fixed;inset:0}
+.slide{position:absolute;left:50%;top:50%;width:1280px;height:720px;padding:60px 84px;display:flex;flex-direction:column;justify-content:center;background:var(--surface);border:1px solid var(--hair);box-shadow:var(--shadow);transform:translate(-50%,-50%) scale(var(--s,1));opacity:0;visibility:hidden;transition:opacity 280ms ease,visibility 0s linear 280ms;overflow:hidden}
+.slide.current{opacity:1;visibility:visible;transition:opacity 280ms ease}
+.slide.divider{background:var(--rail)}
+.slide.inverse{background:#1c2126;border-color:#2a3038;--ink:#f5f5f3;--ink-2:#b6bdc4;--ink-3:#9aa3ab;--faint:#5c656e;--hair:#ffffff1c;--hair-2:#ffffff2e;--accent:#8ab0ff;--well:#22262b;color:var(--ink)}
+:root[data-theme="dark"] .slide.inverse{background:#0d0f12}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]) .slide.inverse{background:#0d0f12}}
+.rise{opacity:0;transform:translateY(14px);transition:opacity 480ms ease,transform 480ms cubic-bezier(.2,.8,.2,1);transition-delay:var(--d,0ms)}
+.slide.current .rise{opacity:1;transform:none}
+
+/* deck chrome */
+.progress{position:fixed;top:0;left:0;right:0;height:3px;z-index:10;pointer-events:none}
+.progress i{display:block;height:100%;width:0;background:var(--accent);transition:width 280ms ease}
+.counter{position:fixed;right:20px;bottom:14px;z-index:10;font:600 11px/1 var(--mono);letter-spacing:.14em;color:var(--ink-3);font-variant-numeric:tabular-nums;pointer-events:none}
+.deckmark{position:fixed;left:20px;bottom:11px;z-index:10;display:inline-flex;align-items:center;gap:7px;font:600 10px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);pointer-events:none}
+.deckmark svg{width:11px;height:12px}
+.deckmark svg path{fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.deckmark svg .mark-deep{stroke:var(--accent)}
+
+/* ---------- shared voices ---------- */
+.overline{margin:0 0 18px;font:600 12.5px/1 var(--mono);letter-spacing:.18em;text-transform:uppercase;color:var(--ink-3)}
+.overline::before{content:"";display:inline-block;width:22px;height:2px;margin:0 11px 3px 0;border-radius:2px;background:var(--accent)}
+.s-head{margin:0;font:600 46px/1.12 var(--serif);letter-spacing:-.015em;color:var(--ink);text-wrap:balance;max-width:19em}
+.s-head em{font-style:italic;color:var(--accent)}
+.s-lede{margin:16px 0 0;max-width:44em;font:400 21px/1.55 var(--sans);color:var(--ink-2)}
+.s-lede strong{color:var(--ink)}
+.footnote{font:400 15px/1.7 var(--sans);color:var(--ink-3)}
+.shead{margin-bottom:36px}
+.duo{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:60px;align-items:center;min-height:0}
+kbd{display:inline-grid;place-items:center;min-width:23px;height:23px;padding:0 7px;border:1px solid var(--hair-2);border-radius:6px;background:var(--well);font:600 11.5px var(--mono);color:var(--ink-3)}
+
+/* ---------- brand ---------- */
+.brand{display:inline-flex;align-items:center;gap:9px;color:var(--ink)}
+.brand svg{width:19px;height:21px;flex:none}
+.brand svg path,.hero-mark path{fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.brand svg .mark-deep{stroke:var(--accent)}
+.brand b{font:600 15px/1 var(--mono);letter-spacing:-.02em}
+.hero-mark{width:52px;height:58px;margin-bottom:30px;color:var(--ink)}
+.slide.current .hero-mark path{stroke-dasharray:30;stroke-dashoffset:30;animation:draw 700ms ease forwards}
+.slide.current .hero-mark path:nth-child(2){animation-delay:180ms}
+.slide.current .hero-mark path:nth-child(3){stroke:var(--accent);animation-delay:360ms}
+@keyframes draw{to{stroke-dashoffset:0}}
+.t-title{margin:0 0 26px;max-width:13em;font:600 72px/1.07 var(--serif);letter-spacing:-.02em;text-wrap:balance}
+.t-title em{font-style:italic;color:var(--accent)}
+.t-sub{margin:0 0 40px;max-width:36em;font:400 22px/1.6 var(--sans);color:var(--ink-2)}
+
+/* contact chips */
+.contact{display:flex;flex-wrap:wrap;align-items:center;gap:12px}
+.cchip{display:inline-flex;align-items:center;gap:10px;min-height:42px;padding:10px 17px;border:1px solid var(--hair-2);border-radius:9px;background:var(--well);font:600 15px/1 var(--mono);letter-spacing:-.01em;color:var(--ink)}
+.cchip svg{width:15px;height:15px;flex:none;fill:currentColor;color:var(--ink-3)}
+.byline{margin:0 0 16px;font:600 19px/1.4 var(--sans)}
+.keyhint{position:absolute;right:34px;bottom:26px;font:500 13px/1 var(--sans);color:var(--faint);display:flex;align-items:center;gap:8px}
+
+/* pills & chips */
+.soon{display:inline-flex;align-items:center;min-height:20px;padding:3px 8px;border:1px solid #d7e0f4;border-radius:999px;background:var(--wash);color:var(--accent);font:600 10px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;white-space:nowrap}
+:root[data-theme="dark"] .soon{border-color:#2e3c5c}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]) .soon{border-color:#2e3c5c}}
+.hero-chip{display:inline-flex;align-items:center;gap:12px;min-height:46px;padding:0 18px;border:1px solid var(--hair-2);border-radius:9px;background:var(--well);font:500 16px/1 var(--mono);color:var(--ink-2)}
+.hero-chip .ps1{color:var(--faint);user-select:none}
+.meta-list{display:flex;flex-wrap:wrap;gap:8px 24px;margin:22px 0 0;padding:0;list-style:none;font:500 14px/1.5 var(--sans);color:var(--ink-3)}
+.meta-list li{display:inline-flex;align-items:center;gap:8px}
+.meta-list li::before{content:"";width:5px;height:5px;border-radius:50%;background:var(--faint)}
+
+/* stats */
+.statrow{display:flex;flex-wrap:wrap;gap:26px 70px;margin:8px 0 30px}
+.stat b{display:block;font:700 62px/1.05 var(--mono);letter-spacing:-.035em;font-variant-numeric:tabular-nums}
+.stat>span{display:block;margin-top:8px;font:600 12px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--ink-3)}
+.chip-add{color:var(--add-ink);font-weight:600}
+.chip-del{color:var(--del-ink);font-weight:600}
+
+/* ---------- browser frame + app mock (from the landing galley) ---------- */
+.shot{border:1px solid var(--hair-2);border-radius:14px;background:var(--surface);box-shadow:var(--shadow);overflow:hidden}
+.shot-bar{display:flex;align-items:center;gap:14px;padding:10px 14px;border-bottom:1px solid var(--hair);background:var(--rail)}
+.shot-dots{display:flex;gap:6px}
+.shot-dots i{width:10px;height:10px;border-radius:50%;background:var(--hair-2)}
+.shot-url{flex:1;max-width:430px;margin:0 auto;padding:5px 12px;border:1px solid var(--hair);border-radius:7px;background:var(--surface);font:400 11px/1.4 var(--mono);color:var(--ink-3);text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.shot-caption{margin:16px 0 0;text-align:center;font:400 14px/1.6 var(--sans);color:var(--ink-3)}
+.am{display:grid;grid-template-columns:170px minmax(0,1fr) 168px;background:var(--surface);font-size:12px;text-align:left}
+.am-side{background:var(--rail);border-right:1px solid var(--hair);padding:14px 11px}
+.am-brand{display:flex;align-items:center;gap:6px;padding:2px 4px 15px}
+.am-brand svg{width:14px;height:16px}
+.am-brand svg path{fill:none;stroke:var(--ink);stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.am-brand svg .mark-deep{stroke:var(--accent)}
+.am-brand b{font:600 11.5px/1 var(--mono);letter-spacing:-.02em}
+.am-nav{display:grid;gap:2px}
+.am-nav span{position:relative;display:flex;align-items:center;gap:8px;padding:7px 8px;border-radius:6px;color:var(--ink-2);font:500 11px/1.2 var(--sans)}
+.am-nav svg{width:13px;height:13px;flex:none;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.am-nav .on{color:var(--accent)}
+.am-nav .on::before{content:"";position:absolute;left:-11px;top:6px;bottom:6px;width:2px;border-radius:2px;background:var(--accent)}
+.am-main{min-width:0;padding:17px 20px 19px}
+.am-masthead{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;border-bottom:1px solid var(--hair);padding-bottom:12px}
+.am-overline{margin:0 0 7px;font:600 8.5px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--ink-3)}
+.am-ref{margin:0 0 6px;font:600 14.5px/1.25 var(--mono);letter-spacing:-.02em;overflow-wrap:anywhere}
+.am-crumbs{display:flex;flex-wrap:wrap;gap:9px;font-size:9.5px;color:var(--ink-3)}
+.am-crumbs code{font:500 9px var(--mono);color:var(--ink-2);background:var(--well);border:1px solid var(--hair);border-radius:4px;padding:1px 4px}
+.am-summary{margin:13px 0 5px;font:400 13.5px/1.5 var(--sans);letter-spacing:-.01em}
+.am-coverage{margin:0 0 13px;font-size:9.5px;color:var(--ink-3);font-variant-numeric:tabular-nums}
+.am-insp{background:var(--rail);border-left:1px solid var(--hair);padding:14px 13px;font-size:10px}
+.am-insp h4{margin:0 0 9px;font:600 10px/1.2 var(--sans);color:var(--ink)}
+.am-insp h5{margin:0 0 6px;font:600 8px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3)}
+.am-insp section{padding:9px 0;border-bottom:1px solid var(--hair)}
+.am-insp section:last-child{border-bottom:0}
+.am-stat{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:3px 0;color:var(--ink-2);font-variant-numeric:tabular-nums}
+.am-stat b{font:600 9.5px var(--mono);color:var(--ink)}
+.am-stat .cat{display:inline-flex;align-items:center;gap:5px;text-transform:capitalize}
+.am-stat .cat svg{width:10px;height:10px;fill:none;stroke:var(--ink-3);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.am-action{display:flex;align-items:center;gap:6px;width:100%;margin-top:5px;padding:7px 9px;border:0;border-radius:6px;background:#ecece9;color:var(--ink);font:500 9.5px/1.2 var(--sans)}
+.am-action:first-of-type{margin-top:0}
+.am-action svg{width:11px;height:11px;flex:none;fill:none;stroke:var(--ink-3);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+:root[data-theme="dark"] .am-action{background:#232930}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]) .am-action{background:#232930}}
+
+/* chapter rows */
+.chl{border:1px solid var(--hair);border-radius:10px;overflow:hidden;background:var(--surface)}
+.ch{display:grid;grid-template-columns:38px minmax(0,1fr) 13px;gap:10px;padding:12px 13px 11px;border-bottom:1px solid var(--hair);align-items:start}
+.ch:last-child{border-bottom:0}
+.chn{position:relative;font:700 10.5px/1 var(--mono);letter-spacing:.08em;padding:4px 0 12px}
+.chn::after{content:"";position:absolute;left:1px;bottom:2px;width:14px;height:2.5px;border-radius:2px;background:var(--hair-2)}
+.lo{color:var(--low)}.lo::after{background:var(--low)}
+.co{color:var(--contained)}.co::after{background:var(--contained)}
+.el{color:var(--elevated)}.el::after{background:var(--elevated)}
+.hi{color:var(--high)}.hi::after{background:var(--high)}
+.cr{color:var(--critical)}.cr::after{background:var(--critical)}
+.ch-copy{display:grid;gap:3px;min-width:0}
+.ch-copy strong{font:600 12.5px/1.35 var(--sans)}
+.ch-copy small{font:400 10.5px/1.5 var(--sans);color:var(--ink-3)}
+.ch-tags{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px}
+.tagp{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border:1px solid var(--hair);border-radius:999px;background:var(--surface);font:600 7.5px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3)}
+.tagp svg{width:9px;height:9px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.ch-chev{margin-top:3px;color:var(--faint)}
+.ch-chev svg{width:10px;height:10px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+
+/* diff / evidence card */
+.ev{border:1px solid var(--hair);border-radius:9px;overflow:hidden;background:var(--surface)}
+.ev-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:7px 12px;border-bottom:1px solid var(--hair);background:var(--well);font:400 10px/1.4 var(--mono);color:var(--ink-3)}
+.ev-head b{font-weight:600;color:var(--ink-2)}
+.ev pre{margin:0;padding:7px 0;overflow-x:auto;font:11.5px/1.65 var(--mono)}
+.cl{display:grid;grid-template-columns:30px 30px 1fr;min-width:max-content;padding:0 12px}
+.cl>b{font-weight:400;font-size:10px;color:var(--faint);text-align:right;padding-right:8px;user-select:none;font-variant-numeric:tabular-nums}
+.cl>code{font:inherit;color:var(--tk);white-space:pre}
+.cl .pfx{display:inline-block;width:1.2ch;color:var(--faint)}
+.cl.add{background:var(--add-bg)}
+.cl.add .pfx{color:var(--add-ink)}
+.cl.del{background:var(--del-bg)}
+.cl.del .pfx{color:var(--del-ink)}
+.cl.om{display:block;min-width:0;padding:4px 12px}
+.cl.om .omd{display:flex;align-items:center;gap:7px;color:var(--faint)}
+.cl.om .omd i{height:0;flex:1;border-top:1px dashed var(--hair-2)}
+.cl.om .omd b{font:600 11px/1 var(--mono);letter-spacing:-2px}
+.ev-foot{margin:0;padding:6px 12px;border-top:1px solid var(--hair);background:var(--well);font-size:9.5px;color:var(--ink-3)}
+.tk-k{color:var(--tk-k)}.tk-s{color:var(--tk-s)}.tk-f{color:var(--tk-f)}.tk-c{color:var(--tk-c)}.tk-m{color:var(--tk-m)}
+
+/* file panel (the forge view) */
+.panel{border:1px solid var(--hair);border-radius:12px;background:var(--surface);overflow:hidden;box-shadow:var(--shadow)}
+.panel h3{margin:0;padding:11px 14px;border-bottom:1px solid var(--hair);background:var(--well);font:600 9.5px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3)}
+.filelist{margin:0;padding:7px 0;list-style:none;font:11.5px/1.55 var(--mono);color:var(--ink-3)}
+.filelist li{display:flex;justify-content:space-between;gap:10px;padding:4.5px 14px}
+.filelist li span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.filelist li small{flex:none;font-size:10.5px;font-variant-numeric:tabular-nums}
+.filelist .lock{background:var(--well)}
+
+/* dense app mock (Story-view slide, fits the full mock in the frame) */
+.dense.am{grid-template-columns:160px minmax(0,1fr) 160px}
+.dense .ch{padding:8px 12px 7px}
+.dense .am-main{padding:13px 18px 13px}
+.dense .am-masthead{padding-bottom:9px}
+.dense .am-summary{margin:10px 0 4px}
+.dense .am-coverage{margin:0 0 10px}
+.dense .am-side{padding:12px 10px}
+.dense .am-insp{padding:12px}
+.dense .am-insp section{padding:7px 0}
+</style>
+<style>
+/* ---------- dial + zoom stage ---------- */
+.dialrow{display:flex;justify-content:center;margin-bottom:34px}
+.dial{position:relative;display:flex;align-items:flex-end;justify-content:space-between;width:280px;height:38px;padding:0 6px}
+.dial::before{content:"";position:absolute;left:10px;right:10px;bottom:3px;height:1px;background:var(--hair-2)}
+.dial button{position:relative;z-index:1;width:38px;height:38px;padding:0;border:0;background:transparent;cursor:pointer}
+.dial button::before{content:"";position:absolute;left:50%;bottom:3px;width:2px;height:11px;border-radius:1px 1px 0 0;background:var(--hair-2);transform:translateX(-50%);transition:background-color 160ms ease,height 200ms cubic-bezier(.3,1.3,.4,1)}
+.dial button:hover::before{background:var(--ink-3);height:15px}
+.dial button.active::before{background:var(--accent);height:21px;width:2.5px}
+.dial button::after{content:"";position:absolute;left:50%;bottom:28px;width:5px;height:5px;border-radius:50%;background:var(--accent);transform:translateX(-50%) scale(0);opacity:0;transition:transform 200ms cubic-bezier(.3,1.3,.4,1),opacity 160ms ease}
+.dial button.active::after{opacity:1;transform:translateX(-50%) scale(1)}
+.dial-callout{position:absolute;left:50%;top:calc(100% + 8px);transform:translateX(-50%);white-space:nowrap;text-align:center}
+.dial-callout output{font:700 12px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
+.dial-callout span{margin-left:9px;font:400 13px/1 var(--sans);color:var(--ink-3)}
+.zs-stage{position:relative;height:400px;border:1px solid var(--hair);border-radius:14px;background:var(--well);overflow:hidden}
+.zs-view{position:absolute;inset:0;padding:20px;opacity:0;transform:translateY(12px) scale(.985);transition:opacity 340ms ease,transform 340ms cubic-bezier(.2,.8,.2,1);pointer-events:none;overflow:hidden}
+.zs-view[data-view="2"],.zs-view[data-view="3"],.zs-view[data-view="4"]{display:flex;flex-direction:column;justify-content:center}
+.zs-stage[data-level="0"] .zs-view[data-view="0"],.zs-stage[data-level="1"] .zs-view[data-view="1"],.zs-stage[data-level="2"] .zs-view[data-view="2"],.zs-stage[data-level="3"] .zs-view[data-view="3"],.zs-stage[data-level="4"] .zs-view[data-view="4"]{opacity:1;transform:none;pointer-events:auto}
+.lvl-copy{position:relative;min-height:230px}
+.lvl{position:absolute;inset:0;opacity:0;transform:translateY(10px);transition:opacity 300ms ease,transform 300ms cubic-bezier(.2,.8,.2,1);pointer-events:none}
+.lvl.on{opacity:1;transform:none;pointer-events:auto}
+.lvl-kicker{display:block;margin-bottom:14px;font:700 12.5px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--accent)}
+.lvl h3{margin:0 0 14px;font:600 32px/1.2 var(--serif);letter-spacing:-.01em}
+.lvl p{margin:0;max-width:26em;font:400 18px/1.6 var(--sans);color:var(--ink-2)}
+/* map view bits */
+.mapline{display:flex;flex-wrap:wrap;gap:7px 16px;margin:0 0 14px;font:500 10.5px/1 var(--sans);color:var(--ink-2)}
+.mapline em{font-style:normal;text-transform:capitalize;display:inline-flex;align-items:center;gap:5px}
+.mapline .dot{width:7px;height:7px;border-radius:50%;background:var(--low)}
+.mapline .dot.d-co{background:var(--contained)}.mapline .dot.d-el{background:var(--elevated)}.mapline .dot.d-hi{background:var(--high)}
+.mapline b{font-variant-numeric:tabular-nums}
+.mapgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:11px}
+.mapcard{display:flex;flex-direction:column;gap:6px;min-height:96px;border:1px solid var(--hair);border-radius:10px;background:var(--surface);padding:11px}
+.mapcard b{font:600 11px/1.3 var(--sans)}
+.mapcard .meta{margin-top:auto;font:400 8.5px/1.4 var(--mono);color:var(--ink-3)}
+.mapcard .meta .chip-add,.mapcard .meta .chip-del{font-size:9px}
+.churn{display:flex;width:100%;height:3px;overflow:hidden;border-radius:999px;background:var(--hair)}
+.churn i{display:block}
+.churn .a{background:#79bd93;width:calc(var(--a)*1%)}
+.churn .d{background:#dd9d92;width:calc(var(--dd)*1%)}
+:root[data-theme="dark"] .churn .a{background:#3f7f57}
+:root[data-theme="dark"] .churn .d{background:#96584e}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]) .churn .a{background:#3f7f57}:root:not([data-theme="light"]) .churn .d{background:#96584e}}
+/* explanation view bits */
+.exp-card{border:1px solid var(--hair);border-radius:12px;background:var(--surface);padding:16px}
+.exp-head{display:grid;grid-template-columns:34px minmax(0,1fr);gap:10px;margin-bottom:7px;align-items:start}
+.semantic{display:grid;grid-template-columns:1fr 1fr;gap:18px;padding:12px 0 4px;margin-top:9px;border-top:1px solid var(--hair)}
+.semantic>div+div{border-left:1px solid var(--hair);padding-left:18px}
+.semantic h5{margin:0 0 7px;font:600 8.5px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3)}
+.semantic p{margin:0;font:400 11.5px/1.6 var(--sans);color:var(--ink-2)}
+
+/* ---------- parnas / quote ---------- */
+.quote{margin:0}
+.quote blockquote{margin:0;max-width:20em;font:600 54px/1.26 var(--serif);letter-spacing:-.015em;color:var(--ink);text-wrap:balance}
+.quote blockquote em{font-style:italic;color:var(--accent)}
+.quote cite{display:block;margin-top:28px;font:500 13.5px/1.7 var(--mono);font-style:normal;color:var(--ink-3)}
+
+/* ---------- timeline mock ---------- */
+.tlm{max-width:640px;border-radius:14px;background:var(--surface);color:var(--ink);padding:15px 17px 17px;border:1px solid var(--hair);box-shadow:var(--shadow)}
+.slide.inverse .tlm{--ink:#1c2126;--ink-2:#4a5258;--ink-3:#7d858c;--faint:#b4bac0;--hair:#e8e7e3;--hair-2:#d7d6d1;--accent:#2757cf;--well:#fafaf8;background:#fff;border:0;box-shadow:0 24px 60px #00000066}
+.tlm-rail{display:grid;grid-template-columns:24px minmax(0,1fr) 24px;align-items:center;column-gap:9px;border:1px solid var(--hair);border-radius:10px;background:var(--surface);padding:8px 11px 7px}
+.slide.inverse .tlm .tlm-rail,.slide.inverse .tlm .tlm-panel,.slide.inverse .tlm .tlm-cols{background:#fff}
+.tlm-rail .mticks{height:22px}
+.tlm-nav{display:grid;place-items:center;width:24px;height:24px;border-radius:6px;color:var(--ink-3)}
+.tlm-nav svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.tlm-readout{grid-column:1/-1;display:flex;align-items:baseline;gap:9px;margin-top:5px;min-width:0;font:500 11.5px/1.3 var(--sans);color:var(--ink-2)}
+.tlm-readout b{flex:none;font:700 10.5px/1 var(--mono);letter-spacing:.12em;color:var(--accent);font-variant-numeric:tabular-nums}
+.tlm-readout span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tlm-card{display:grid;grid-template-columns:34px minmax(0,1fr);gap:10px;padding:14px 2px 13px;border-bottom:1px solid var(--hair);align-items:start}
+.tlm-card strong{display:block;font:600 13.5px/1.35 var(--sans);color:var(--ink)}
+.tlm-card p{margin:3px 0 0;font:400 11px/1.55 var(--sans);color:var(--ink-3)}
+.tlm-files{display:flex;flex-direction:column;gap:3px;margin-top:9px;font:10px/1.4 var(--mono);color:var(--ink-2)}
+.tlm-files span{display:flex;align-items:baseline;gap:10px}
+.tlm-files small{font:600 9.5px var(--mono);font-variant-numeric:tabular-nums}
+.tlm-chip{display:inline-flex;align-items:center;margin-top:10px;padding:4px 9px;border-radius:7px;background:var(--well);color:var(--accent);font:600 10px/1 var(--sans)}
+.tlm-panel{border:1px solid var(--hair);border-radius:10px;background:var(--surface);padding:12px 13px;margin-top:13px}
+.tlm-panel h5,.tlm-cols h5{margin:0 0 5px;font:700 8.5px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3)}
+.tlm-panel p,.tlm-cols p{margin:0;font:400 11px/1.6 var(--sans);color:var(--ink-2)}
+.tlm-cols{display:grid;grid-template-columns:1fr 1fr;gap:15px;border:1px solid var(--hair);border-radius:10px;padding:12px 13px;margin-top:11px}
+.tlm-cols>div+div{border-left:1px solid var(--hair);padding-left:15px}
+.tlm-step-ref{display:inline-grid;place-items:center;min-width:21px;padding:3px 5px;border-radius:6px;background:var(--well);color:var(--accent);font:700 9.5px/1 var(--mono)}
+.mticks{position:relative;display:flex;align-items:flex-end;justify-content:space-between;height:24px;padding:0 3px;min-width:0}
+.mticks::before{content:"";position:absolute;left:2px;right:2px;bottom:3px;height:1px;background:var(--hair-2)}
+.mticks i{position:relative;z-index:1;width:2px;height:10px;border-radius:1px 1px 0 0}
+.mticks .t-lo{background:var(--low)}
+.mticks .t-co{background:var(--contained)}
+.mticks .t-el{background:var(--elevated)}
+.mticks .t-hi{background:var(--high)}
+.mticks .t-on{background:var(--accent);height:16px;width:2.5px}
+.rail-mini{display:grid;gap:10px}
+.rm-readout{display:flex;align-items:baseline;gap:9px;min-width:0;font:500 12px/1.3 var(--sans);color:var(--ink-2)}
+.rm-readout b{flex:none;font:700 10.5px/1 var(--mono);letter-spacing:.12em;color:var(--accent);font-variant-numeric:tabular-nums}
+.rm-readout span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ---------- feature cards ---------- */
+.fgrid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.fcard{display:flex;flex-direction:column;border:1px solid var(--hair);border-radius:14px;background:var(--surface);padding:26px 26px 24px}
+.fico{display:grid;place-items:center;width:42px;height:42px;margin-bottom:16px;border:1px solid var(--hair);border-radius:10px;background:var(--well);color:var(--accent)}
+.fico svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.fico.glyph{font:600 18px/1 var(--mono);color:var(--accent)}
+.fcard h3{margin:0 0 9px;font:600 20px/1.3 var(--sans);letter-spacing:-.01em}
+.fcard p{margin:0;font:400 15.5px/1.6 var(--sans);color:var(--ink-2)}
+.fviz{margin-top:18px;padding-top:16px;border-top:1px solid var(--hair)}
+.dots-row{display:flex;flex-wrap:wrap;gap:8px 16px}
+.dots-row span{display:inline-flex;align-items:center;gap:7px;font:600 10px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-3)}
+.dots-row i{width:9px;height:9px;border-radius:50%}
+.dots-row.big{gap:14px 34px}
+.dots-row.big span{font-size:14px;gap:11px}
+.dots-row.big i{width:15px;height:15px}
+.selmenu{display:inline-flex;gap:3px;padding:4px;border:1px solid var(--hair);border-radius:10px;background:var(--surface);box-shadow:0 8px 22px #191e2814}
+.selmenu span{padding:9px 13px;border-radius:7px;color:var(--ink-2);font:500 13px/1 var(--sans);white-space:nowrap}
+.selmenu span:first-child{background:var(--wash);color:var(--accent)}
+
+/* ---------- numbered points ---------- */
+.cx-points{margin:0;padding:0;list-style:none;display:grid;gap:22px}
+.cx-points li{display:grid;grid-template-columns:30px minmax(0,1fr);gap:14px}
+.cx-points .n{display:grid;place-items:center;width:30px;height:30px;border:1px solid var(--hair-2);border-radius:8px;font:700 13px/1 var(--mono);color:var(--accent);background:var(--well)}
+.cx-points b{display:block;margin-bottom:3px;font:600 17.5px/1.4 var(--sans)}
+.cx-points p{margin:0;font:400 15px/1.6 var(--sans);color:var(--ink-2)}
+.cx-points code{font:500 13.5px var(--mono);color:var(--ink-2);background:var(--well);border:1px solid var(--hair);border-radius:5px;padding:1px 5px}
+
+/* ---------- terminal ---------- */
+.term{border:1px solid transparent;border-radius:13px;background:#22262b;box-shadow:var(--shadow);overflow:hidden}
+:root[data-theme="dark"] .term{border-color:var(--hair)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]) .term{border-color:var(--hair)}}
+.term-bar{display:flex;align-items:center;gap:6px;padding:11px 14px;border-bottom:1px solid #ffffff14}
+.term-bar i{width:9px;height:9px;border-radius:50%;background:#ffffff2e}
+.term-bar em{margin-left:8px;font:500 11px/1 var(--mono);font-style:normal;color:#f5f5f37a}
+.term pre{margin:0;padding:18px 20px 20px;overflow-x:auto;font:13.5px/1.8 var(--mono);color:#e8eaed}
+.term .ps1{color:#7d858c;user-select:none}
+.term .cmd{color:#fff;font-weight:600}
+.term .out{color:#9aa3ab}
+.term .hl{color:#8ab0ff}
+
+/* ---------- install ---------- */
+.steps{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.step{display:grid;grid-template-columns:44px minmax(0,1fr);gap:16px;border:1px solid var(--hair);border-radius:14px;background:var(--surface);padding:22px}
+.step-n{font:700 14px/1 var(--mono);color:var(--ink-3);padding-top:4px}
+.step-n::after{content:"";display:block;width:17px;height:3px;margin-top:8px;border-radius:2px;background:var(--accent)}
+.step h3{display:flex;flex-wrap:wrap;align-items:center;gap:10px;margin:0 0 10px;font:600 17px/1.3 var(--sans)}
+.codeblock{display:flex;align-items:center;border:1px solid var(--hair);border-radius:10px;background:var(--well);padding:4px 14px}
+.codeblock pre{flex:1;margin:0;padding:9px 0;overflow-x:auto;font:13.5px/1.7 var(--mono);color:var(--ink)}
+.codeblock .ps1{color:var(--faint);user-select:none}
+
+/* ---------- pipeline ---------- */
+.pipe{display:flex;align-items:stretch;gap:9px;margin-top:6px}
+.pstage{flex:1;display:flex;flex-direction:column;gap:9px;border:1px solid var(--hair);border-radius:13px;background:var(--surface);padding:20px 17px}
+.pstage i{font:700 11px/1 var(--mono);font-style:normal;letter-spacing:.14em;color:var(--accent)}
+.pstage h4{margin:0;font:600 17px/1.25 var(--sans);letter-spacing:-.01em}
+.pstage p{margin:0;font:400 13px/1.55 var(--sans);color:var(--ink-2)}
+.pstage code{font:500 11.5px var(--mono);color:var(--ink-2);background:var(--well);border:1px solid var(--hair);border-radius:5px;padding:1px 5px}
+.parrow{align-self:center;flex:none;color:var(--faint)}
+.parrow svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+
+/* ---------- decision / module cards ---------- */
+.dgrid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+.dcard{display:grid;grid-template-columns:34px minmax(0,1fr);gap:15px;border:1px solid var(--hair);border-radius:14px;background:var(--surface);padding:24px}
+.dcard .n{display:grid;place-items:center;width:34px;height:34px;border:1px solid var(--hair-2);border-radius:9px;font:700 14px/1 var(--mono);color:var(--accent);background:var(--well)}
+.dcard b{display:block;margin-bottom:5px;font:600 19px/1.3 var(--sans);letter-spacing:-.01em}
+.dcard p{margin:0;font:400 14.5px/1.6 var(--sans);color:var(--ink-2)}
+.modgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:15px}
+.mod{border:1px solid var(--hair);border-radius:12px;background:var(--surface);padding:18px}
+.mod code{display:block;margin-bottom:7px;font:600 14px/1.4 var(--mono);color:var(--accent)}
+.mod p{margin:0;font:400 13.5px/1.55 var(--sans);color:var(--ink-2)}
+.chips{display:flex;flex-wrap:wrap;gap:9px;margin-top:26px}
+.chips b{padding:8px 14px;border:1px solid var(--hair);border-radius:999px;background:var(--surface);font:600 13px/1 var(--mono);color:var(--ink-2)}
+
+/* ---------- phone mock ---------- */
+.phone{position:relative;width:264px;height:520px;flex:none;border:1px solid var(--hair-2);border-radius:40px;background:var(--surface);box-shadow:var(--shadow);padding:22px 16px 16px;overflow:hidden}
+.phone::before{content:"";position:absolute;left:50%;top:11px;transform:translateX(-50%);width:74px;height:7px;border-radius:999px;background:var(--hair)}
+.phone .am-overline{margin-top:10px}
+.phone .chl{margin-top:10px}
+.phone-pill{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);display:flex;align-items:center;gap:10px;padding:9px 15px;border:1px solid var(--hair);border-radius:999px;background:var(--surface);box-shadow:0 10px 26px #191e281f;white-space:nowrap}
+.phone-pill .mticks{width:96px;height:18px}
+.phone-pill b{font:700 9.5px/1 var(--mono);letter-spacing:.12em;color:var(--accent)}
+
+/* ---------- voices (design language) ---------- */
+.voices{display:grid;gap:0;border:1px solid var(--hair);border-radius:14px;background:var(--surface);overflow:hidden}
+.voice{display:grid;grid-template-columns:120px 200px minmax(0,1fr);gap:26px;align-items:center;padding:20px 26px;border-bottom:1px solid var(--hair)}
+.voice:last-child{border-bottom:0}
+.voice .aa{font-size:38px;line-height:1;color:var(--ink)}
+.voice h4{margin:0;font:600 12px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--accent)}
+.voice p{margin:0;font:400 15px/1.55 var(--sans);color:var(--ink-2)}
+
+/* big list bullets */
+.asklist{margin:0;padding:0;list-style:none;display:grid;gap:24px}
+.asklist li{display:grid;grid-template-columns:30px minmax(0,1fr);gap:16px;align-items:start}
+.asklist svg{width:26px;height:26px;margin-top:4px;fill:none;stroke:var(--accent);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.asklist b{display:block;font:600 22px/1.35 var(--sans);letter-spacing:-.01em}
+.asklist p{margin:4px 0 0;font:400 16.5px/1.6 var(--sans);color:var(--ink-2)}
+
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{transition:none!important;animation:none!important}
+  .rise,.slide.current .rise{opacity:1;transform:none}
+}
+@media print{
+  body{overflow:visible;background:#fff}
+  .deck{position:static}
+  .slide{position:relative;left:auto;top:auto;transform:none;margin:0 auto 20px;opacity:1;visibility:visible;page-break-after:always;box-shadow:none}
+  .progress,.counter,.deckmark{display:none}
+  .rise{opacity:1;transform:none}
+}
+</style>
+</head>
+<body>
+<div class="progress" aria-hidden="true"><i id="pbar"></i></div>
+<span class="deckmark" aria-hidden="true"><svg viewBox="0 0 20 22"><path d="M4.4 3.4 10 7.6l5.6-4.2"/><path d="M4.4 8.9 10 13.1l5.6-4.2"/><path class="mark-deep" d="M4.4 14.4 10 18.6l5.6-4.2"/></svg>ndrstnd</span>
+<span class="counter" id="counter" aria-hidden="true">01 / 01</span>
+
+<main class="deck" id="deck">
+
+<!-- 1 · TITLE -->
+<section class="slide" aria-label="Title">
+  <svg class="hero-mark" viewBox="0 0 20 22" aria-hidden="true"><path d="M4.4 3.4 10 7.6l5.6-4.2"/><path d="M4.4 8.9 10 13.1l5.6-4.2"/><path d="M4.4 14.4 10 18.6l5.6-4.2"/></svg>
+  <p class="overline rise">Understanding long coding-agent output</p>
+  <h1 class="t-title rise" style="--d:60ms">Your agent wrote 3,000 lines overnight. <em>Now what?</em></h1>
+  <p class="t-sub rise" style="--d:120ms">A talk about reading agent-sized changes like a story — and the tool I built to do it.</p>
+  <div class="rise" style="--d:180ms">
+    <p class="byline">Tomás Ruiz-López</p>
+    <div class="contact">
+      <span class="cchip"><svg viewBox="0 0 24 24" aria-label="X"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>@tomasruizlopez</span>
+      <span class="cchip"><svg viewBox="0 0 16 16" aria-label="GitHub"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>@truizlop</span>
+      <a class="cchip" href="https://github.com/truizlop/ndrstnd" rel="noopener">github.com/truizlop/ndrstnd</a>
+    </div>
+  </div>
+  <span class="keyhint"><kbd>→</kbd> to advance</span>
+</section>
+
+<!-- 2 · PROBLEM: VOLUME -->
+<section class="slide" aria-label="The problem: volume">
+  <div class="shead">
+    <p class="overline rise">The problem</p>
+    <h2 class="s-head rise" style="--d:60ms">Agents don't ship at human pace.</h2>
+  </div>
+  <div class="statrow rise" style="--d:120ms">
+    <div class="stat"><b><span class="chip-add">+3,124</span> <span class="chip-del">−847</span></b><span>lines changed</span></div>
+    <div class="stat"><b>47</b><span>files touched</span></div>
+    <div class="stat"><b>1</b><span>night of work</span></div>
+  </div>
+  <p class="s-lede rise" style="--d:180ms">Coding agents produce more change per hour than anyone can absorb. The bottleneck has moved: <strong>writing the code is cheap now — understanding it isn't.</strong> And whoever merges it still owns every line.</p>
+</section>
+
+<!-- 3 · PROBLEM: REVIEW TOOLS -->
+<section class="slide" aria-label="The problem: review tools">
+  <div class="duo" style="grid-template-columns:minmax(0,6fr) minmax(0,5fr)">
+    <div>
+      <p class="overline rise">The problem</p>
+      <h2 class="s-head rise" style="--d:60ms">Alphabetical order is not an explanation.</h2>
+      <p class="s-lede rise" style="--d:120ms">Our review tools were built for human-sized diffs. They sort the change by file path and call it a day — so a lockfile and a payment-critical retry loop get <strong>equal billing.</strong></p>
+      <p class="s-lede rise" style="--d:180ms">You start at <code style="font:500 17px var(--mono)">.github/</code> and hope the design reveals itself by <code style="font:500 17px var(--mono)">test/</code>.</p>
+    </div>
+    <div class="panel rise" style="--d:200ms" role="img" aria-label="A flat alphabetical file list, the way a forge presents a diff.">
+      <h3>What your forge shows</h3>
+      <ul class="filelist">
+        <li><span>.github/workflows/ci.yml</span><small>+6 −1</small></li>
+        <li><span>config/payment.schema.json</span><small>+18 −2</small></li>
+        <li class="lock"><span>package-lock.json</span><small>+1,204 −87</small></li>
+        <li><span>src/payments/backoff.ts</span><small>+47 −0</small></li>
+        <li><span>src/payments/capture.ts</span><small>+52 −17</small></li>
+        <li><span>src/payments/gateway.ts</span><small>+9 −4</small></li>
+        <li><span>src/payments/idempotency.ts</span><small>+31 −0</small></li>
+        <li><span>test/payments/backoff.test.ts</span><small>+44 −0</small></li>
+        <li><span>test/payments/capture.test.ts</span><small>+59 −0</small></li>
+        <li><span>… 3 more files</span><small></small></li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- 4 · PROBLEM: COMPREHENSION -->
+<section class="slide" aria-label="The problem: completeness is not comprehension">
+  <p class="overline rise">The problem</p>
+  <h2 class="s-head rise" style="--d:60ms;font-size:54px;max-width:15em">The diff is complete. <em>Completeness isn't comprehension.</em></h2>
+  <p class="s-lede rise" style="--d:120ms;margin-top:26px">A diff answers <strong>what changed</strong>, line by line. It never answers <strong>why</strong>, or what belongs together, or which of those 47 files deserves your next ten minutes.</p>
+  <p class="s-lede rise" style="--d:180ms">So reviewers reverse-engineer intent from hunks: scrolling, guessing, rebuilding the design in their heads — for a branch nobody on the team actually wrote.</p>
+</section>
+
+<!-- 5 · MEET NDRSTND -->
+<section class="slide" aria-label="Meet ndrstnd">
+  <p class="overline rise">The tool</p>
+  <div class="rise" style="--d:60ms;display:flex;align-items:center;gap:22px;margin:6px 0 26px">
+    <svg style="width:46px;height:51px;color:var(--ink)" viewBox="0 0 20 22" aria-hidden="true"><g style="fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round"><path d="M4.4 3.4 10 7.6l5.6-4.2"/><path d="M4.4 8.9 10 13.1l5.6-4.2"/><path style="stroke:var(--accent)" d="M4.4 14.4 10 18.6l5.6-4.2"/></g></svg>
+    <span style="font:600 64px/1 var(--mono);letter-spacing:-.03em">ndrstnd</span>
+  </div>
+  <p class="s-lede rise" style="--d:120ms;font-size:24px;max-width:40em">A <strong>local comprehension workspace</strong> for agent-produced changes. It turns a branch diff into an evidence-linked story, and reads it to you the way you'd want a colleague to: <strong>claims first, meaning second, evidence on demand.</strong></p>
+  <div class="rise" style="--d:180ms;margin-top:36px">
+    <span class="hero-chip"><span class="ps1">$</span>ndrstnd review codex/checkout-retry-hardening --repo .</span>
+  </div>
+  <ul class="meta-list rise" style="--d:240ms">
+    <li>Runs entirely on your machine</li>
+    <li>Open source · Apache-2.0</li>
+    <li>Self-contained artifacts, private to your working copy</li>
+  </ul>
+</section>
+
+<!-- 6 · THE STORY VIEW -->
+<section class="slide" aria-label="The Story view" style="padding:36px 84px 30px">
+  <div class="shead" style="margin-bottom:14px">
+    <p class="overline rise" style="margin-bottom:12px">The workspace</p>
+    <h2 class="s-head rise" style="--d:60ms;font-size:34px">Every change becomes a story.</h2>
+  </div>
+  <div class="rise" style="--d:120ms">
+    <div class="shot" role="img" aria-label="The ndrstnd Story view: a review summary, five semantic chapters with color-coded attention levels, and an at-a-glance inspector.">
+      <div class="shot-bar" aria-hidden="true"><span class="shot-dots"><i></i><i></i><i></i></span><span class="shot-url">.ndrstnd/codex-checkout-retry-hardening.html</span><span style="width:46px"></span></div>
+      <div class="am dense" aria-hidden="true">
+        <aside class="am-side">
+          <div class="am-brand"><svg viewBox="0 0 20 22"><path d="M4.4 3.4 10 7.6l5.6-4.2"/><path d="M4.4 8.9 10 13.1l5.6-4.2"/><path class="mark-deep" d="M4.4 14.4 10 18.6l5.6-4.2"/></svg><b>ndrstnd</b></div>
+          <nav class="am-nav">
+            <span class="on"><svg viewBox="0 0 18 18"><circle cx="5" cy="4" r="1.5"/><circle cx="5" cy="12" r="1.5"/><path d="M5 5.5v5M9 4h4M9 12h4"/></svg>Story</span>
+            <span><svg viewBox="0 0 18 18"><circle cx="9" cy="9" r="5.5"/><path d="M9 5.5v3.8l2.5 1.5"/></svg>Timeline</span>
+            <span><svg viewBox="0 0 18 18"><path d="M6.5 5L3 9l3.5 4M11.5 5L15 9l-3.5 4"/></svg>Full diff</span>
+            <span><svg viewBox="0 0 18 18"><path d="M3.5 9.5l3.2 3.2 6.8-7"/></svg>Test plan</span>
+          </nav>
+        </aside>
+        <div class="am-main">
+          <div class="am-masthead">
+            <div>
+              <p class="am-overline">Change review</p>
+              <p class="am-ref">codex/checkout-retry-hardening</p>
+              <div class="am-crumbs"><span>against <strong>main</strong></span><span>merge base <code>f3a91c02</code></span></div>
+            </div>
+            <div class="dial" style="width:150px;height:24px;flex:none" aria-hidden="true">
+              <button style="width:20px;height:24px;cursor:default"></button><button style="width:20px;height:24px;cursor:default" class="active"></button><button style="width:20px;height:24px;cursor:default"></button><button style="width:20px;height:24px;cursor:default"></button><button style="width:20px;height:24px;cursor:default"></button>
+            </div>
+          </div>
+          <p class="am-summary">Payment captures now retry transient gateway failures with jittered exponential backoff, and idempotency keys guarantee a retry can never double-charge.</p>
+          <p class="am-coverage">12 files · 31 evidence hunks · 5 story chapters · 5 build steps</p>
+          <div class="chl">
+            <article class="ch"><span class="chn el">01</span><span class="ch-copy"><strong>Retry transient capture failures</strong><small>captureCharge retries gateway timeouts with exponential backoff and jitter.</small><span class="ch-tags"><span class="tagp"><svg viewBox="0 0 18 18"><path d="M3 8h12M10 4l4 4-4 4"/></svg>behavior</span><span class="tagp"><svg viewBox="0 0 18 18"><path d="M10 2L4 10h4l-1 6 6-8H9l1-6z"/></svg>performance</span></span></span><span class="ch-chev"><svg viewBox="0 0 12 12"><path d="M2.5 4.25L6 7.75l3.5-3.5"/></svg></span></article>
+            <article class="ch"><span class="chn hi">02</span><span class="ch-copy"><strong>Idempotency keys guard every retry</strong><small>A stable key per payment intent makes retries safe from double-charging.</small><span class="ch-tags"><span class="tagp"><svg viewBox="0 0 18 18"><path d="M9 2l5 2v4c0 3.2-2 5.7-5 6.8C6 13.7 4 11.2 4 8V4l5-2z"/><path d="M7 8l1.3 1.3L11 6.6"/></svg>security</span><span class="tagp"><svg viewBox="0 0 18 18"><path d="M3 8h12M10 4l4 4-4 4"/></svg>behavior</span></span></span><span class="ch-chev"><svg viewBox="0 0 12 12"><path d="M2.5 4.25L6 7.75l3.5-3.5"/></svg></span></article>
+            <article class="ch"><span class="chn co">03</span><span class="ch-copy"><strong>Retry policy is configurable</strong><small>Attempts, base delay, and jitter validate through the config schema.</small></span><span class="ch-chev"><svg viewBox="0 0 12 12"><path d="M2.5 4.25L6 7.75l3.5-3.5"/></svg></span></article>
+            <article class="ch"><span class="chn lo">04</span><span class="ch-copy"><strong>Extract a pure backoff module</strong><small>Delay math moves to src/payments/backoff.ts with no behavior change.</small></span><span class="ch-chev"><svg viewBox="0 0 12 12"><path d="M2.5 4.25L6 7.75l3.5-3.5"/></svg></span></article>
+            <article class="ch"><span class="chn lo">05</span><span class="ch-copy"><strong>Cover exhaustion, jitter bounds, and key reuse</strong><small>New tests pin retry exhaustion, delay bounds, and idempotency reuse.</small></span><span class="ch-chev"><svg viewBox="0 0 12 12"><path d="M2.5 4.25L6 7.75l3.5-3.5"/></svg></span></article>
+          </div>
+        </div>
+        <aside class="am-insp">
+          <h4>At a glance</h4>
+          <section>
+            <h5>This change</h5>
+            <div class="am-stat"><span>Story chapters</span><b>5</b></div>
+            <div class="am-stat"><span>Build steps</span><b>5</b></div>
+            <div class="am-stat"><span>Changed files</span><b>12</b></div>
+            <div class="am-stat"><span>Evidence hunks</span><b>31</b></div>
+          </section>
+          <section>
+            <h5>Focus areas</h5>
+            <div class="am-stat"><span class="cat"><svg viewBox="0 0 18 18"><path d="M3 8h12M10 4l4 4-4 4"/></svg>behavior</span><b>3</b></div>
+            <div class="am-stat"><span class="cat"><svg viewBox="0 0 18 18"><path d="M9 2l5 2v4c0 3.2-2 5.7-5 6.8C6 13.7 4 11.2 4 8V4l5-2z"/><path d="M7 8l1.3 1.3L11 6.6"/></svg>security</span><b>1</b></div>
+            <div class="am-stat"><span class="cat"><svg viewBox="0 0 18 18"><path d="M10 2L4 10h4l-1 6 6-8H9l1-6z"/></svg>performance</span><b>1</b></div>
+            <div class="am-stat"><span class="cat"><svg viewBox="0 0 18 18"><path d="M5 3v10M5 3l-2 2M5 3l2 2M13 13V3M13 13l-2-2M13 13l2-2"/></svg>refactor</span><b>1</b></div>
+          </section>
+          <section>
+            <h5>Actions</h5>
+            <div class="am-action"><svg viewBox="0 0 16 16"><path d="M8 9.8V2.6M5.2 5.2L8 2.4l2.8 2.8"/><path d="M2.8 9.6v2.6a1.2 1.2 0 0 0 1.2 1.2h8a1.2 1.2 0 0 0 1.2-1.2V9.6"/></svg>Export review…</div>
+            <div class="am-action"><svg viewBox="0 0 16 16"><rect x="5.4" y="5.4" width="7.8" height="8.6" rx="1.6"/><path d="M2.8 10.6V4.2a1.4 1.4 0 0 1 1.4-1.4h5.4"/></svg>Copy Codex prompt</div>
+          </section>
+        </aside>
+      </div>
+    </div>
+    <p class="shot-caption">One self-contained HTML file in your repo's <code style="font:500 13px var(--mono)">.ndrstnd/</code> directory. No server required.</p>
+  </div>
+</section>
+
+<!-- 7 · FEATURE: SEMANTIC CHAPTERS -->
+<section class="slide" aria-label="Feature: semantic chapters">
+  <div class="duo" style="grid-template-columns:minmax(0,6fr) minmax(0,5fr)">
+    <div>
+      <p class="overline rise">What's inside · 01</p>
+      <h2 class="s-head rise" style="--d:60ms">Chapters, not file paths.</h2>
+      <p class="s-lede rise" style="--d:120ms">Hunks are grouped by <strong>what they mean, not where they live.</strong> A claim, its synopsis, its risk tags, and its evidence travel together as one chapter.</p>
+      <p class="s-lede rise" style="--d:180ms">Skim the story like a table of contents — then open only the chapters that earn your attention.</p>
+    </div>
+    <div class="chl rise" style="--d:200ms" role="img" aria-label="Five story chapters ordered by meaning, each with a colored attention number.">
+      <article class="ch"><span class="chn el">01</span><span class="ch-copy"><strong>Retry transient capture failures</strong><small>captureCharge retries gateway timeouts with exponential backoff and jitter.</small><span class="ch-tags"><span class="tagp"><svg viewBox="0 0 18 18"><path d="M3 8h12M10 4l4 4-4 4"/></svg>behavior</span><span class="tagp"><svg viewBox="0 0 18 18"><path d="M10 2L4 10h4l-1 6 6-8H9l1-6z"/></svg>performance</span></span></span><span class="ch-chev"><svg viewBox="0 0 12 12"><path d="M2.5 4.25L6 7.75l3.5-3.5"/></svg></span></article>
+      <article class="ch"><span class="chn hi">02</span><span class="ch-copy"><strong>Idempotency keys guard every retry</strong><small>A stable key per payment intent makes retries safe from double-charging.</small><span class="ch-tags"><span class="tagp"><svg viewBox="0 0 18 18"><path d="M9 2l5 2v4c0 3.2-2 5.7-5 6.8C6 13.7 4 11.2 4 8V4l5-2z"/><path d="M7 8l1.3 1.3L11 6.6"/></svg>security</span></span></span><span class="ch-chev"><svg viewBox="0 0 12 12"><path d="M2.5 4.25L6 7.75l3.5-3.5"/></svg></span></article>
+      <article class="ch"><span class="chn co">03</span><span class="ch-copy"><strong>Retry policy is configurable</strong><small>Attempts, base delay, and jitter validate through the config schema.</small></span><span class="ch-chev"><svg viewBox="0 0 12 12"><path d="M2.5 4.25L6 7.75l3.5-3.5"/></svg></span></article>
+      <article class="ch"><span class="chn lo">04</span><span class="ch-copy"><strong>Extract a pure backoff module</strong><small>Delay math moves to src/payments/backoff.ts with no behavior change.</small></span><span class="ch-chev"><svg viewBox="0 0 12 12"><path d="M2.5 4.25L6 7.75l3.5-3.5"/></svg></span></article>
+      <article class="ch"><span class="chn lo">05</span><span class="ch-copy"><strong>Cover exhaustion, jitter bounds, and key reuse</strong><small>New tests pin retry exhaustion, delay bounds, and idempotency reuse.</small></span><span class="ch-chev"><svg viewBox="0 0 12 12"><path d="M2.5 4.25L6 7.75l3.5-3.5"/></svg></span></article>
+    </div>
+  </div>
+</section>
+
+<!-- 8 · FEATURE: COLOR-CODED IMPACT -->
+<section class="slide" aria-label="Feature: color-coded impact">
+  <div class="shead">
+    <p class="overline rise">What's inside · 02</p>
+    <h2 class="s-head rise" style="--d:60ms">Risk you can see from any altitude.</h2>
+    <p class="s-lede rise" style="--d:120ms">Five attention levels mark every chapter number, map card, and timeline tick — so a glance tells you where the change is routine and where it touches money, auth, or data.</p>
+  </div>
+  <div class="rise" style="--d:180ms;display:flex;flex-direction:column;gap:38px">
+    <div class="dots-row big" role="img" aria-label="The five attention levels: low, contained, elevated, high, critical.">
+      <span><i style="background:var(--low)"></i>low</span>
+      <span><i style="background:var(--contained)"></i>contained</span>
+      <span><i style="background:var(--elevated)"></i>elevated</span>
+      <span><i style="background:var(--high)"></i>high</span>
+      <span><i style="background:var(--critical)"></i>critical</span>
+    </div>
+    <p class="footnote" style="max-width:44em">Attention is a heat level, not a verdict: it says <em>look here first</em>, never <em>this is wrong</em>. Know in ten seconds where to spend your next ten minutes.</p>
+  </div>
+</section>
+
+<!-- 9 · FEATURE: THE ZOOM DIAL (interactive) -->
+<section class="slide" aria-label="Feature: the zoom dial" data-dial-slide>
+  <div class="duo" style="grid-template-columns:minmax(0,5fr) minmax(0,6fr);align-items:start">
+    <div>
+      <p class="overline rise">What's inside · 03</p>
+      <h2 class="s-head rise" style="--d:60ms">One dial, five altitudes.</h2>
+      <p class="s-lede rise" style="--d:120ms;margin-bottom:40px">The zoom dial moves the whole workspace between meaning and mechanism.</p>
+      <div class="lvl-copy rise" style="--d:180ms">
+        <div class="lvl on" data-lvl="0"><span class="lvl-kicker">Level 0 · Map</span><h3>The whole change at a glance</h3><p>Chapter cards show where the churn went and where the risk lives. Know in ten seconds where to spend your next ten minutes.</p></div>
+        <div class="lvl" data-lvl="1"><span class="lvl-kicker">Level 1 · Summary</span><h3>Every chapter is a claim</h3><p>The story states what the change does in plain sentences, ordered by meaning instead of file path.</p></div>
+        <div class="lvl" data-lvl="2"><span class="lvl-kicker">Level 2 · Explanation</span><h3>Before and after, in words</h3><p>Each claim explains the system it replaced: what used to happen, what happens now, and why the difference matters.</p></div>
+        <div class="lvl" data-lvl="3"><span class="lvl-kicker">Level 3 · Evidence</span><h3>Proof, minus the noise</h3><p>Every claim links to the exact lines that back it. Routine lines fold behind a counted ⌁ divider: omitted, never hidden.</p></div>
+        <div class="lvl" data-lvl="4"><span class="lvl-kicker">Level 4 · Raw</span><h3>Nothing between you and the patch</h3><p>Complete hunks, exactly as Git sees them. Trust the story, then verify it, without leaving the page.</p></div>
+      </div>
+      <p class="footnote rise" style="--d:220ms;margin-top:6px"><kbd>→</kbd> steps through the levels</p>
+    </div>
+    <div class="rise" style="--d:160ms">
+      <div class="dialrow" style="margin-top:6px">
+        <div class="dial" role="group" aria-label="Story detail level">
+          <div class="dial-callout" aria-live="polite"><output id="dial-label">Map</output><span id="dial-desc">Themes and risk distribution</span></div>
+          <button data-dial="0" aria-label="Map" class="active"></button>
+          <button data-dial="1" aria-label="Summary"></button>
+          <button data-dial="2" aria-label="Explanation"></button>
+          <button data-dial="3" aria-label="Evidence"></button>
+          <button data-dial="4" aria-label="Raw"></button>
+        </div>
+      </div>
+      <div class="zs-stage" id="stage" data-level="0">
+        <div class="zs-view" data-view="0" aria-hidden="false">
+          <div class="mapline"><em><i class="dot"></i>low <b>2</b></em><em><i class="dot d-co"></i>contained <b>1</b></em><em><i class="dot d-el"></i>elevated <b>1</b></em><em><i class="dot d-hi"></i>high <b>1</b></em></div>
+          <div class="mapgrid">
+            <div class="mapcard"><span class="chn el">01</span><b>Retry transient capture failures</b><span class="meta"><span class="chip-add">+64</span> <span class="chip-del">−12</span> · 3 files · 6 hunks</span><span class="churn"><i class="a" style="--a:72"></i><i class="d" style="--dd:14"></i></span></div>
+            <div class="mapcard"><span class="chn hi">02</span><b>Idempotency keys guard every retry</b><span class="meta"><span class="chip-add">+38</span> <span class="chip-del">−5</span> · 2 files · 4 hunks</span><span class="churn"><i class="a" style="--a:64"></i><i class="d" style="--dd:9"></i></span></div>
+            <div class="mapcard"><span class="chn co">03</span><b>Retry policy is configurable</b><span class="meta"><span class="chip-add">+22</span> <span class="chip-del">−3</span> · 2 files · 3 hunks</span><span class="churn"><i class="a" style="--a:56"></i><i class="d" style="--dd:8"></i></span></div>
+            <div class="mapcard"><span class="chn lo">04</span><b>Extract a pure backoff module</b><span class="meta"><span class="chip-add">+41</span> <span class="chip-del">−29</span> · 2 files · 5 hunks</span><span class="churn"><i class="a" style="--a:42"></i><i class="d" style="--dd:30"></i></span></div>
+            <div class="mapcard"><span class="chn lo">05</span><b>Cover exhaustion and key reuse</b><span class="meta"><span class="chip-add">+103</span> <span class="chip-del">−0</span> · 3 files · 8 hunks</span><span class="churn"><i class="a" style="--a:88"></i><i class="d" style="--dd:0"></i></span></div>
+          </div>
+        </div>
+        <div class="zs-view" data-view="1" aria-hidden="true">
+          <div class="chl">
+            <article class="ch"><span class="chn el">01</span><span class="ch-copy"><strong>Retry transient capture failures</strong><small>captureCharge retries gateway timeouts with exponential backoff and jitter.</small></span></article>
+            <article class="ch"><span class="chn hi">02</span><span class="ch-copy"><strong>Idempotency keys guard every retry</strong><small>A stable key per payment intent makes retries safe from double-charging.</small></span></article>
+            <article class="ch"><span class="chn co">03</span><span class="ch-copy"><strong>Retry policy is configurable</strong><small>Attempts, base delay, and jitter validate through the config schema.</small></span></article>
+            <article class="ch"><span class="chn lo">04</span><span class="ch-copy"><strong>Extract a pure backoff module</strong><small>Delay math moves to src/payments/backoff.ts with no behavior change.</small></span></article>
+            <article class="ch"><span class="chn lo">05</span><span class="ch-copy"><strong>Cover exhaustion, jitter bounds, and key reuse</strong><small>New tests pin retry exhaustion, delay bounds, and idempotency reuse.</small></span></article>
+          </div>
+        </div>
+        <div class="zs-view" data-view="2" aria-hidden="true">
+          <div class="exp-card">
+            <div class="exp-head"><span class="chn hi">02</span><span class="ch-copy"><strong style="font:600 13px/1.35 var(--sans)">Idempotency keys guard every retry</strong><small style="font:400 11px/1.5 var(--sans);color:var(--ink-3)">A stable key per payment intent makes retries safe from double-charging.</small></span></div>
+            <div class="semantic">
+              <div><h5>Before</h5><p>A single capture attempt per intent. Any gateway timeout surfaced to the caller as a failed payment, and manual retries risked charging the customer twice.</p></div>
+              <div><h5>After</h5><p>Transient failures retry up to maxAttempts with jittered exponential backoff, and every attempt reuses the same idempotency key, so a retry can never double-charge.</p></div>
+            </div>
+          </div>
+        </div>
+        <div class="zs-view" data-view="3" aria-hidden="true">
+          <div class="ev">
+            <div class="ev-head"><b>src/payments/capture.ts</b><span>Focused excerpt · @@ −18 +18 @@</span></div>
+            <pre><span class="cl"><b>18</b><b>18</b><code><i class="pfx"> </i><span class="tk-k">export async function</span> <span class="tk-f">captureCharge</span>(intent: PaymentIntent) {</code></span><span class="cl del"><b>19</b><b></b><code><i class="pfx">-</i>  <span class="tk-k">return</span> gateway.<span class="tk-f">capture</span>(intent);</code></span><span class="cl add"><b></b><b>19</b><code><i class="pfx">+</i>  <span class="tk-k">const</span> <span class="tk-c">key</span> = <span class="tk-f">idempotencyKey</span>(intent);</code></span><span class="cl add"><b></b><b>20</b><code><i class="pfx">+</i>  <span class="tk-k">for</span> (<span class="tk-k">let</span> attempt = <span class="tk-c">0</span>; ; attempt += <span class="tk-c">1</span>) {</code></span><span class="cl add"><b></b><b>22</b><code><i class="pfx">+</i>      <span class="tk-k">return await</span> gateway.<span class="tk-f">capture</span>(intent, { idempotencyKey: key });</code></span><span class="cl om"><span class="omd"><i></i><b>⌁</b><i></i></span></span><span class="cl add"><b></b><b>24</b><code><i class="pfx">+</i>      <span class="tk-k">if</span> (!<span class="tk-f">isTransient</span>(error) || attempt === policy.maxAttempts) <span class="tk-k">throw</span> error;</code></span><span class="cl add"><b></b><b>25</b><code><i class="pfx">+</i>      <span class="tk-k">await</span> <span class="tk-f">sleep</span>(<span class="tk-f">backoffDelay</span>(policy, attempt));</code></span></pre>
+            <p class="ev-foot">4 routine lines omitted</p>
+          </div>
+        </div>
+        <div class="zs-view" data-view="4" aria-hidden="true">
+          <div class="ev">
+            <div class="ev-head"><b>src/payments/capture.ts</b><span>Complete excerpt · @@ −18 +18 @@</span></div>
+            <pre><span class="cl"><b>18</b><b>18</b><code><i class="pfx"> </i><span class="tk-k">export async function</span> <span class="tk-f">captureCharge</span>(intent: PaymentIntent) {</code></span><span class="cl del"><b>19</b><b></b><code><i class="pfx">-</i>  <span class="tk-k">return</span> gateway.<span class="tk-f">capture</span>(intent);</code></span><span class="cl add"><b></b><b>19</b><code><i class="pfx">+</i>  <span class="tk-k">const</span> <span class="tk-c">key</span> = <span class="tk-f">idempotencyKey</span>(intent);</code></span><span class="cl add"><b></b><b>20</b><code><i class="pfx">+</i>  <span class="tk-k">for</span> (<span class="tk-k">let</span> attempt = <span class="tk-c">0</span>; ; attempt += <span class="tk-c">1</span>) {</code></span><span class="cl add"><b></b><b>21</b><code><i class="pfx">+</i>    <span class="tk-k">try</span> {</code></span><span class="cl add"><b></b><b>22</b><code><i class="pfx">+</i>      <span class="tk-k">return await</span> gateway.<span class="tk-f">capture</span>(intent, { idempotencyKey: key });</code></span><span class="cl add"><b></b><b>23</b><code><i class="pfx">+</i>    } <span class="tk-k">catch</span> (error) {</code></span><span class="cl add"><b></b><b>24</b><code><i class="pfx">+</i>      <span class="tk-k">if</span> (!<span class="tk-f">isTransient</span>(error) || attempt === policy.maxAttempts) <span class="tk-k">throw</span> error;</code></span><span class="cl add"><b></b><b>25</b><code><i class="pfx">+</i>      <span class="tk-k">await</span> <span class="tk-f">sleep</span>(<span class="tk-f">backoffDelay</span>(policy, attempt));</code></span><span class="cl add"><b></b><b>26</b><code><i class="pfx">+</i>    }</code></span><span class="cl add"><b></b><b>27</b><code><i class="pfx">+</i>  }</code></span><span class="cl"><b>20</b><b>28</b><code><i class="pfx"> </i>}</code></span></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 10 · FEATURE: EVIDENCE -->
+<section class="slide" aria-label="Feature: focused evidence">
+  <div class="duo" style="grid-template-columns:minmax(0,5fr) minmax(0,6fr)">
+    <div>
+      <p class="overline rise">What's inside · 04</p>
+      <h2 class="s-head rise" style="--d:60ms">Proof, minus the noise.</h2>
+      <p class="s-lede rise" style="--d:120ms">Every sentence in the story links to the exact lines that back it. ndrstnd never asks you to trust a summary.</p>
+      <p class="s-lede rise" style="--d:180ms">Routine lines fold behind a counted <strong style="font-family:var(--mono)">⌁</strong> divider: <strong>omitted, never hidden.</strong> You always know exactly what you're not looking at.</p>
+    </div>
+    <div class="ev rise" style="--d:200ms" role="img" aria-label="A focused code excerpt with an omission divider and a counted footer.">
+      <div class="ev-head"><b>src/payments/capture.ts</b><span>Focused excerpt · @@ −18 +18 @@</span></div>
+      <pre><span class="cl"><b>18</b><b>18</b><code><i class="pfx"> </i><span class="tk-k">export async function</span> <span class="tk-f">captureCharge</span>(intent: PaymentIntent) {</code></span><span class="cl del"><b>19</b><b></b><code><i class="pfx">-</i>  <span class="tk-k">return</span> gateway.<span class="tk-f">capture</span>(intent);</code></span><span class="cl add"><b></b><b>19</b><code><i class="pfx">+</i>  <span class="tk-k">const</span> <span class="tk-c">key</span> = <span class="tk-f">idempotencyKey</span>(intent);</code></span><span class="cl add"><b></b><b>20</b><code><i class="pfx">+</i>  <span class="tk-k">for</span> (<span class="tk-k">let</span> attempt = <span class="tk-c">0</span>; ; attempt += <span class="tk-c">1</span>) {</code></span><span class="cl add"><b></b><b>22</b><code><i class="pfx">+</i>      <span class="tk-k">return await</span> gateway.<span class="tk-f">capture</span>(intent, { idempotencyKey: key });</code></span><span class="cl om"><span class="omd"><i></i><b>⌁</b><i></i></span></span><span class="cl add"><b></b><b>24</b><code><i class="pfx">+</i>      <span class="tk-k">if</span> (!<span class="tk-f">isTransient</span>(error) || attempt === policy.maxAttempts) <span class="tk-k">throw</span> error;</code></span><span class="cl add"><b></b><b>25</b><code><i class="pfx">+</i>      <span class="tk-k">await</span> <span class="tk-f">sleep</span>(<span class="tk-f">backoffDelay</span>(policy, attempt));</code></span></pre>
+      <p class="ev-foot">4 routine lines omitted</p>
+    </div>
+  </div>
+</section>
+
+<!-- 11 · PARNAS QUOTE (inverse) -->
+<section class="slide inverse" aria-label="The Parnas quote">
+  <p class="overline rise">The timeline view</p>
+  <figure class="quote rise" style="--d:60ms">
+    <blockquote>&ldquo;We cannot follow the ideal design process. But we can <em>fake it</em> in the documentation.&rdquo;</blockquote>
+    <cite>after David L. Parnas and Paul C. Clements, &ldquo;A Rational Design Process: How and Why to Fake It&rdquo; (1986)</cite>
+  </figure>
+  <p class="s-lede rise" style="--d:140ms;margin-top:44px;max-width:38em">No branch is built in the order it's best understood. Agents scaffold, backtrack, revert, and patch — and the commit log faithfully records all of that wandering.</p>
+</section>
+
+<!-- 12 · FEATURE: TIMELINE -->
+<section class="slide" aria-label="Feature: the Timeline view">
+  <div class="duo" style="grid-template-columns:minmax(0,5fr) minmax(0,6fr)">
+    <div>
+      <p class="overline rise">What's inside · 05</p>
+      <h2 class="s-head rise" style="--d:60ms">The history stays honest. The reading order becomes rational.</h2>
+      <p class="s-lede rise" style="--d:120ms">The Timeline rebuilds the change as a <strong>dependency-ordered build path</strong>: each step states its goal, what you now have once it lands, and what it deliberately defers — with the evidence accumulating step by step.</p>
+      <p class="s-lede rise" style="--d:180ms">Replaying commits teaches you the journey. The Timeline teaches you the design.</p>
+    </div>
+    <div class="tlm rise" style="--d:200ms" role="img" aria-label="The Timeline view: a step rail with attention-colored ticks, a build step with its goal, files, postcondition, and deferred concerns.">
+      <div class="tlm-rail" aria-hidden="true">
+        <span class="tlm-nav"><svg viewBox="0 0 16 16"><path d="M9.8 3.8L5.6 8l4.2 4.2"/></svg></span>
+        <span class="mticks"><i class="t-lo"></i><i class="t-on"></i><i class="t-el"></i><i class="t-co"></i><i class="t-lo"></i></span>
+        <span class="tlm-nav"><svg viewBox="0 0 16 16"><path d="M6.2 3.8L10.4 8l-4.2 4.2"/></svg></span>
+        <span class="tlm-readout"><b>02 / 05</b><span>Guard captures with idempotency keys</span></span>
+      </div>
+      <div class="tlm-card" aria-hidden="true">
+        <span class="chn hi">02</span>
+        <div>
+          <strong>Guard captures with idempotency keys</strong>
+          <p>Give every capture attempt a stable key so the retry loop, when it arrives, can never double-charge.</p>
+          <div class="tlm-files"><span>src/payments/idempotency.ts<small><b class="chip-add">+31</b> <b class="chip-del">−0</b></small></span><span>src/payments/capture.ts<small><b class="chip-add">+9</b> <b class="chip-del">−2</b></small></span></div>
+          <span class="tlm-chip">Story · Idempotency keys guard every retry</span>
+        </div>
+      </div>
+      <div class="tlm-panel" aria-hidden="true"><h5>You now have</h5><p>Every capture attempt carries a stable idempotency key. Retries are now safe to introduce.</p></div>
+      <div class="tlm-cols" aria-hidden="true">
+        <div><h5>Deferred for later steps</h5><p>The retry loop itself lands once keys and backoff are in place. <b class="tlm-step-ref">03</b></p></div>
+        <div><h5>Forward references</h5><p>Every symbol used here already exists.</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 13 · FEATURE: TEST PLAN + FULL DIFF -->
+<section class="slide" aria-label="Feature: test plan and full diff">
+  <div class="shead">
+    <p class="overline rise">What's inside · 06</p>
+    <h2 class="s-head rise" style="--d:60ms">The story never replaces the diff.</h2>
+  </div>
+  <div class="fgrid">
+    <article class="fcard rise" style="--d:120ms">
+      <span class="fico"><svg viewBox="0 0 18 18"><path d="M3.5 9.5l3.2 3.2 6.8-7"/></svg></span>
+      <h3>Test plan view</h3>
+      <p>Tested behaviors grouped into themes and linked back to story claims, zoomable from summary cards down to raw test artifacts. See at a glance what the agent claims to have covered — and what it didn't.</p>
+    </article>
+    <article class="fcard rise" style="--d:180ms">
+      <span class="fico"><svg viewBox="0 0 18 18"><path d="M6.5 5L3 9l3.5 4M11.5 5L15 9l-3.5 4"/></svg></span>
+      <h3>Full diff, always</h3>
+      <p>Every patch hunk, syntax-highlighted, with low-signal files collapsed but one click away. The narrative is a lens over the change, never a substitute for it. Trust the story, then verify it.</p>
+    </article>
+  </div>
+</section>
+
+<!-- 14 · FEATURE: ASK THE CHANGE -->
+<section class="slide" aria-label="Feature: ask the change">
+  <div class="duo" style="grid-template-columns:minmax(0,6fr) minmax(0,5fr)">
+    <div>
+      <p class="overline rise">What's inside · 07</p>
+      <h2 class="s-head rise" style="--d:60ms">Select lines. Ask questions.</h2>
+      <p class="s-lede rise" style="--d:120ms">In a live workspace, select any lines and ask. Answers come back <strong>grounded in the evidence you selected, not in vibes</strong> — and each answer says what it was based on.</p>
+    </div>
+    <div class="rise" style="--d:180ms;display:flex;justify-content:center">
+      <div class="selmenu" role="img" aria-label="The selection menu: Explain selection, Trace effects, Why included?">
+        <span>Explain selection</span><span>Trace effects</span><span>Why included?</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 15 · FEATURE: ARTIFACTS -->
+<section class="slide" aria-label="Feature: private, portable artifacts">
+  <div class="duo" style="grid-template-columns:minmax(0,6fr) minmax(0,5fr)">
+    <div>
+      <p class="overline rise">What's inside · 08</p>
+      <h2 class="s-head rise" style="--d:60ms">One file. No server. Yours.</h2>
+      <p class="s-lede rise" style="--d:120ms">Each review is <strong>one self-contained HTML file</strong> in your repo's <code style="font:500 17px var(--mono)">.ndrstnd/</code> directory: readable on any device, private to your machine, and yours to keep for as long as you need.</p>
+      <ul class="meta-list rise" style="--d:180ms;flex-direction:column;gap:12px;margin-top:26px">
+        <li>Nothing to deploy, nothing to keep running</li>
+        <li>Opens straight from disk — works offline</li>
+        <li>Git-ignored: review artifacts never reach version control</li>
+      </ul>
+    </div>
+    <div class="rise" style="--d:200ms">
+      <div class="shot" role="img" aria-label="A browser window opening a local ndrstnd artifact file.">
+        <div class="shot-bar" aria-hidden="true"><span class="shot-dots"><i></i><i></i><i></i></span><span class="shot-url">file://…/repo/.ndrstnd/codex-checkout-retry-hardening.html</span><span style="width:46px"></span></div>
+        <div style="display:flex;align-items:center;justify-content:center;gap:14px;padding:64px 20px;background:var(--well)" aria-hidden="true">
+          <svg style="width:30px;height:33px;color:var(--ink)" viewBox="0 0 20 22"><g style="fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round"><path d="M4.4 3.4 10 7.6l5.6-4.2"/><path d="M4.4 8.9 10 13.1l5.6-4.2"/><path style="stroke:var(--accent)" d="M4.4 14.4 10 18.6l5.6-4.2"/></g></svg>
+          <span style="font:500 15px/1.6 var(--mono);color:var(--ink-2)">1 file · 0 dependencies · 0 servers</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 16 · CODEX INTEGRATION -->
+<section class="slide" aria-label="Codex integration">
+  <div class="shead" style="margin-bottom:30px">
+    <p class="overline rise">Codex integration</p>
+    <h2 class="s-head rise" style="--d:60ms">Your agent hands you the review.</h2>
+  </div>
+  <div class="duo" style="align-items:start">
+    <ul class="cx-points rise" style="--d:120ms">
+      <li><span class="n">1</span><div><b>Skill-aware</b><p>Install the skill once, and Codex ends its coding tasks by preparing an ndrstnd workspace for the human — instead of a wall of diff.</p></div></li>
+      <li><span class="n">2</span><div><b>Conversation-informed</b><p>Pass <code>--conversation</code> and the implementation dialogue becomes part of the story: the decisions, not just the diff.</p></div></li>
+      <li><span class="n">3</span><div><b>Zero token custody</b><p>ndrstnd rides Codex's existing authenticated session. It never stores a credential of its own.</p></div></li>
+    </ul>
+    <div class="term rise" style="--d:180ms" role="img" aria-label="Terminal session: installing the ndrstnd Codex skill and reviewing a branch.">
+      <div class="term-bar" aria-hidden="true"><i></i><i></i><i></i><em>zsh · ~/work/checkout</em></div>
+      <pre aria-hidden="true"><span class="ps1">$</span> <span class="cmd">ndrstnd skill install</span>
+<span class="out">Installed the ndrstnd Codex skill at ~/.codex/skills/ndrstnd.</span>
+
+<span class="ps1">$</span> <span class="cmd">ndrstnd review codex/checkout-retry-hardening --repo .</span>
+<span class="out">Drafting the review narrative with Codex…</span>
+<span class="out">merge-base=f3a91c02b7d4 files=12 meaningful-files=7</span>
+<span class="out">hunks=31 conversation=42</span>
+<span class="out">ndrstnd artifact: <span class="hl">.ndrstnd/codex-checkout-retry-hardening.html</span></span></pre>
+    </div>
+  </div>
+</section>
+
+<!-- 17 · SCOPE -->
+<section class="slide" aria-label="Comprehension, not critique" style="align-items:center;text-align:center">
+  <p class="overline rise" style="display:inline-flex">The point</p>
+  <h2 class="rise" style="--d:60ms;margin:0 auto 26px;max-width:13em;font:600 62px/1.15 var(--serif);letter-spacing:-.015em">Comprehension, <em style="color:var(--accent)">not critique.</em></h2>
+  <p class="s-lede rise" style="--d:120ms;margin:0 auto;max-width:38em">ndrstnd deliberately doesn't leave review comments, doesn't score your agent, and never edits the branch. It explains the implementation story, the evidence, and the risk signals — then gets out of the way.</p>
+  <p class="rise" style="--d:180ms;margin:30px auto 0;font:600 24px/1.4 var(--serif);font-style:italic;color:var(--ink)">The judgment stays yours.</p>
+</section>
+
+<!-- 18 · UNDER THE HOOD: PIPELINE -->
+<section class="slide" aria-label="Under the hood: the pipeline">
+  <div class="shead">
+    <p class="overline rise">Under the hood</p>
+    <h2 class="s-head rise" style="--d:60ms">From branch to story, in five steps.</h2>
+  </div>
+  <div class="pipe rise" style="--d:120ms">
+    <div class="pstage"><i>01</i><h4>Diff</h4><p>Compare the branch to its Git <strong>merge-base</strong> — or to <code>--base</code>, or the uncommitted worktree.</p></div>
+    <span class="parrow"><svg viewBox="0 0 16 16"><path d="M2.5 8h11M9.5 4l4 4-4 4"/></svg></span>
+    <div class="pstage"><i>02</i><h4>Classify</h4><p>Parse and index every hunk; separate meaningful changes from lockfiles, generated, and vendored code.</p></div>
+    <span class="parrow"><svg viewBox="0 0 16 16"><path d="M2.5 8h11M9.5 4l4 4-4 4"/></svg></span>
+    <div class="pstage"><i>03</i><h4>Analyze</h4><p>Ask Codex for the narrative: chapters, timeline, test plan — every claim bound to real hunks, validated against a schema.</p></div>
+    <span class="parrow"><svg viewBox="0 0 16 16"><path d="M2.5 8h11M9.5 4l4 4-4 4"/></svg></span>
+    <div class="pstage"><i>04</i><h4>Render</h4><p>Bake models, syntax highlighting, and UI into <strong>one self-contained HTML artifact</strong>.</p></div>
+    <span class="parrow"><svg viewBox="0 0 16 16"><path d="M2.5 8h11M9.5 4l4 4-4 4"/></svg></span>
+    <div class="pstage"><i>05</i><h4>Open</h4><p>Write it to the repo's <code>.ndrstnd/</code> directory and open it in your browser. Old artifacts expire after seven days.</p></div>
+  </div>
+  <p class="footnote rise" style="--d:180ms;margin-top:30px">Node ≥ 22 · TypeScript · everything runs locally — the diff goes to Codex through your own session, and nothing else leaves the machine.</p>
+</section>
+
+<!-- 19 · UNDER THE HOOD: DECISIONS -->
+<section class="slide" aria-label="Under the hood: main decisions">
+  <div class="shead" style="margin-bottom:28px">
+    <p class="overline rise">Under the hood</p>
+    <h2 class="s-head rise" style="--d:60ms">Four decisions that shaped it.</h2>
+  </div>
+  <div class="dgrid">
+    <div class="dcard rise" style="--d:100ms"><span class="n">1</span><div><b>Artifact, not app</b><p>A review is a static HTML file, not a running server. Nothing to install for readers, nothing to keep alive, nothing that phones home.</p></div></div>
+    <div class="dcard rise" style="--d:150ms"><span class="n">2</span><div><b>Never fabricate</b><p>The analysis validates against a strict schema, with one repair turn. If it still fails, ndrstnd writes nothing and tells you — it never invents a story it can't back.</p></div></div>
+    <div class="dcard rise" style="--d:200ms"><span class="n">3</span><div><b>Evidence-linked by construction</b><p>Claims that can't point at real hunks don't ship. Every sentence in the story is a link to the code that proves it.</p></div></div>
+    <div class="dcard rise" style="--d:250ms"><span class="n">4</span><div><b>Zero token custody</b><p>ndrstnd reuses Codex's authenticated session and never stores a credential of its own. Auth stays someone else's well-solved problem.</p></div></div>
+  </div>
+</section>
+
+<!-- 20 · UNDER THE HOOD: MOBILE -->
+<section class="slide" aria-label="Under the hood: mobile support">
+  <div class="duo" style="grid-template-columns:minmax(0,7fr) minmax(0,4fr)">
+    <div>
+      <p class="overline rise">Under the hood</p>
+      <h2 class="s-head rise" style="--d:60ms">Reviews that read from a phone.</h2>
+      <p class="s-lede rise" style="--d:120ms">Agents finish while you're away from your desk. So the artifact treats mobile as a <strong>first-class layout</strong>, not a shrunken desktop: chapters read like an article, the zoom dial docks as a floating pill at the bottom, and the page never scrolls sideways.</p>
+      <p class="s-lede rise" style="--d:180ms">It pairs naturally with Codex Remote: kick off the work from anywhere, and read the finished story on your phone before you're back at a keyboard.</p>
+    </div>
+    <div class="rise" style="--d:200ms;display:flex;justify-content:center">
+      <div class="phone" role="img" aria-label="The artifact on a phone: story chapters stacked vertically with a floating zoom dial pill docked at the bottom.">
+        <p class="am-overline">Change review</p>
+        <p class="am-ref" style="font-size:12.5px">codex/checkout-retry-hardening</p>
+        <div class="chl" aria-hidden="true">
+          <article class="ch" style="grid-template-columns:32px minmax(0,1fr)"><span class="chn el">01</span><span class="ch-copy"><strong style="font-size:11px">Retry transient capture failures</strong><small style="font-size:9.5px">Gateway timeouts retry with backoff and jitter.</small></span></article>
+          <article class="ch" style="grid-template-columns:32px minmax(0,1fr)"><span class="chn hi">02</span><span class="ch-copy"><strong style="font-size:11px">Idempotency keys guard every retry</strong><small style="font-size:9.5px">A stable key makes retries safe.</small></span></article>
+          <article class="ch" style="grid-template-columns:32px minmax(0,1fr)"><span class="chn co">03</span><span class="ch-copy"><strong style="font-size:11px">Retry policy is configurable</strong><small style="font-size:9.5px">Attempts and delay validate via schema.</small></span></article>
+          <article class="ch" style="grid-template-columns:32px minmax(0,1fr)"><span class="chn lo">04</span><span class="ch-copy"><strong style="font-size:11px">Extract a pure backoff module</strong><small style="font-size:9.5px">Delay math moves to backoff.ts.</small></span></article>
+        </div>
+        <div class="phone-pill" aria-hidden="true"><b>SUMMARY</b><span class="mticks"><i class="t-lo"></i><i class="t-on"></i><i class="t-el"></i><i class="t-co"></i><i class="t-lo"></i></span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 21 · INSTALL -->
+<section class="slide" aria-label="Install">
+  <div class="shead" style="margin-bottom:28px">
+    <p class="overline rise">Get started</p>
+    <h2 class="s-head rise" style="--d:60ms">Four commands to your first story.</h2>
+  </div>
+  <div class="steps">
+    <div class="step rise" style="--d:100ms">
+      <span class="step-n">1</span>
+      <div>
+        <h3>Install the CLI <span class="soon">Soon</span></h3>
+        <div class="codeblock"><pre><span class="ps1">$ </span>brew tap truizlop/ndrstnd \
+    https://github.com/truizlop/ndrstnd
+<span class="ps1">$ </span>brew install ndrstnd</pre></div>
+      </div>
+    </div>
+    <div class="step rise" style="--d:150ms">
+      <span class="step-n">2</span>
+      <div>
+        <h3>Connect Codex</h3>
+        <div class="codeblock"><pre><span class="ps1">$ </span>ndrstnd auth login</pre></div>
+      </div>
+    </div>
+    <div class="step rise" style="--d:200ms">
+      <span class="step-n">3</span>
+      <div>
+        <h3>Teach your agent</h3>
+        <div class="codeblock"><pre><span class="ps1">$ </span>ndrstnd skill install</pre></div>
+      </div>
+    </div>
+    <div class="step rise" style="--d:250ms">
+      <span class="step-n">4</span>
+      <div>
+        <h3>Understand a branch</h3>
+        <div class="codeblock"><pre><span class="ps1">$ </span>ndrstnd review feature/my-change --repo .</pre></div>
+      </div>
+    </div>
+  </div>
+  <p class="footnote rise" style="--d:300ms;margin-top:26px">The repository doubles as a Homebrew tap. Artifacts land in <code style="font:500 13.5px var(--mono)">.ndrstnd/</code> — add it to your <code style="font:500 13.5px var(--mono)">.gitignore</code>.</p>
+</section>
+
+<!-- 22 · FEEDBACK -->
+<section class="slide" aria-label="The ask: feedback">
+  <div class="shead" style="margin-bottom:34px">
+    <p class="overline rise">The ask</p>
+    <h2 class="s-head rise" style="--d:60ms">This is where you come in.</h2>
+  </div>
+  <ul class="asklist" style="max-width:46em">
+    <li class="rise" style="--d:120ms"><svg viewBox="0 0 24 24"><path d="M5 12l4.5 4.5L19 7"/></svg><div><b>Try it on a real agent branch.</b><p>Not a demo — the gnarliest thing your agent shipped this week. That's the workload it was built for.</p></div></li>
+    <li class="rise" style="--d:180ms"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.01"/></svg><div><b>Tell me where the story lies.</b><p>Where the narrative misleads you, where the dial has the wrong altitude, where the evidence isn't enough.</p></div></li>
+    <li class="rise" style="--d:240ms"><svg viewBox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 0 1-8.4 8.4c-1.6 0-3.1-.4-4.4-1.2L3 20l1.3-4.9A8.38 8.38 0 0 1 12.6 3a8.38 8.38 0 0 1 8.4 8.5z"/></svg><div><b>Open an issue — or just tell me.</b><p>Feature ideas, broken artifacts, other agents you'd want supported. I read everything.</p></div></li>
+  </ul>
+  <div class="contact rise" style="--d:300ms;margin-top:40px">
+    <span class="cchip"><svg viewBox="0 0 24 24" aria-label="X"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>@tomasruizlopez</span>
+    <span class="cchip"><svg viewBox="0 0 16 16" aria-label="GitHub"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>@truizlop</span>
+    <a class="cchip" href="https://github.com/truizlop/ndrstnd/issues" rel="noopener">github.com/truizlop/ndrstnd</a>
+  </div>
+</section>
+
+<!-- 23 · THANKS -->
+<section class="slide" aria-label="Thank you">
+  <svg class="hero-mark" viewBox="0 0 20 22" aria-hidden="true"><path d="M4.4 3.4 10 7.6l5.6-4.2"/><path d="M4.4 8.9 10 13.1l5.6-4.2"/><path d="M4.4 14.4 10 18.6l5.6-4.2"/></svg>
+  <h2 class="t-title rise" style="font-size:64px;max-width:14em">Thank you. <em>Understand the change before you judge it.</em></h2>
+  <div class="rise" style="--d:120ms;margin-top:14px">
+    <p class="byline">Tomás Ruiz-López</p>
+    <div class="contact">
+      <span class="cchip"><svg viewBox="0 0 24 24" aria-label="X"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>@tomasruizlopez</span>
+      <span class="cchip"><svg viewBox="0 0 16 16" aria-label="GitHub"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>@truizlop</span>
+      <a class="cchip" href="https://github.com/truizlop/ndrstnd" rel="noopener">github.com/truizlop/ndrstnd</a>
+    </div>
+  </div>
+</section>
+
+<!-- 24 · APPENDIX DIVIDER -->
+<section class="slide divider" aria-label="Appendix">
+  <p class="overline rise">Backup slides</p>
+  <h2 class="rise" style="--d:60ms;margin:0;font:600 76px/1.1 var(--serif);letter-spacing:-.02em">Appendix<em style="color:var(--accent)">.</em></h2>
+  <p class="s-lede rise" style="--d:120ms">For the questions — architecture, the analysis contract, review scopes, and the design system.</p>
+</section>
+
+<!-- 25 · APPENDIX: ARCHITECTURE -->
+<section class="slide" aria-label="Appendix: architecture">
+  <div class="shead" style="margin-bottom:26px">
+    <p class="overline rise">Appendix · Architecture</p>
+    <h2 class="s-head rise" style="--d:60ms;font-size:38px">A small TypeScript CLI, end to end.</h2>
+  </div>
+  <div class="modgrid rise" style="--d:120ms">
+    <div class="mod"><code>server/cli.ts</code><p>Command surface: <b>auth</b>, <b>skill install</b>, <b>review</b> with scope flags. Scope confirmation and inferred-base warnings live here.</p></div>
+    <div class="mod"><code>server/git.ts · git-model.ts</code><p>Runs Git, finds the merge-base, parses hunks, and classifies files as meaningful vs. low-signal (lockfiles, generated, vendored, binary).</p></div>
+    <div class="mod"><code>server/analysis-core.ts · analyze.ts</code><p>Builds the prompts, calls Codex, validates the narrative against the schema, and runs the single repair turn.</p></div>
+    <div class="mod"><code>web/page.ts + models</code><p>Renders the artifact: evidence and test-plan presentation models, language heuristics, and the whole UI baked into one HTML file.</p></div>
+    <div class="mod"><code>skill-assets/ndrstnd</code><p>The Codex skill: teaches the agent to choose a review scope, default to a conversation export, and hand back the artifact link.</p></div>
+    <div class="mod"><code>test/</code><p>Unit and DOM tests over the models and rendering; the artifact is asserted against real generated pages.</p></div>
+  </div>
+  <div class="chips rise" style="--d:180ms">
+    <b>Node ≥ 22</b><b>TypeScript · ESM</b><b>zod</b><b>shiki</b><b>diff2html</b><b>better-sqlite3</b><b>vitest</b><b>playwright</b>
+  </div>
+</section>
+
+<!-- 26 · APPENDIX: ANALYSIS CONTRACT -->
+<section class="slide" aria-label="Appendix: the analysis contract">
+  <div class="duo" style="grid-template-columns:minmax(0,6fr) minmax(0,5fr);align-items:start">
+    <div>
+      <p class="overline rise">Appendix · Never fabricate</p>
+      <h2 class="s-head rise" style="--d:60ms;font-size:38px">The analysis is a contract, not a vibe.</h2>
+      <ul class="cx-points rise" style="--d:120ms;margin-top:30px">
+        <li><span class="n">1</span><div><b>Strict schema</b><p>The narrative must parse and validate — chapters, timeline steps, test themes, evidence references — or it doesn't exist.</p></div></li>
+        <li><span class="n">2</span><div><b>One repair turn</b><p>Invalid output gets exactly one chance to fix itself, with the validation errors echoed back. No endless retry loops.</p></div></li>
+        <li><span class="n">3</span><div><b>Evidence must resolve</b><p>Every claim's hunk references and focus ranges are checked against the real diff. Dangling evidence invalidates the claim.</p></div></li>
+        <li><span class="n">4</span><div><b>Fail loudly</b><p>If validation still fails, no artifact is written. You get an explicit error instead of a confident fiction.</p></div></li>
+      </ul>
+    </div>
+    <div class="rise" style="--d:180ms">
+      <div class="quote" style="border-left:2px solid var(--accent);padding-left:28px">
+        <blockquote style="font-size:30px;max-width:16em">&ldquo;If the analysis fails, it tells you so: it never fabricates a story it can't back with evidence.&rdquo;</blockquote>
+        <cite style="margin-top:16px">the ndrstnd landing page, and the test suite that enforces it</cite>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 27 · APPENDIX: SCOPES & CLASSIFICATION -->
+<section class="slide" aria-label="Appendix: review scopes and classification">
+  <div class="shead" style="margin-bottom:26px">
+    <p class="overline rise">Appendix · Scopes &amp; signal</p>
+    <h2 class="s-head rise" style="--d:60ms;font-size:38px">Review exactly the change you mean.</h2>
+  </div>
+  <div class="duo" style="align-items:start">
+    <div class="rise" style="--d:120ms">
+      <h3 style="margin:0 0 16px;font:600 20px/1.3 var(--sans)">Choosing the base</h3>
+      <ul class="cx-points" style="gap:14px">
+        <li><span class="n" style="font-size:10px">A</span><div><p><code>ndrstnd review my-branch</code> — branch against its <strong>merge-base</strong>: the default, reviews only what the branch introduced.</p></div></li>
+        <li><span class="n" style="font-size:10px">B</span><div><p><code>--base main</code> — the checked-out worktree against a branch, staged and unstaged changes included.</p></div></li>
+        <li><span class="n" style="font-size:10px">C</span><div><p><code>--uncommitted</code> — just what isn't committed yet (an alias for <code>--base HEAD</code>).</p></div></li>
+        <li><span class="n" style="font-size:10px">D</span><div><p><code>--base empty</code> — everything, for brand-new repositories. When a base is inferred, the CLI says so before analyzing.</p></div></li>
+      </ul>
+    </div>
+    <div class="rise" style="--d:180ms">
+      <h3 style="margin:0 0 16px;font:600 20px/1.3 var(--sans)">Separating signal from noise</h3>
+      <p class="s-lede" style="font-size:17px;margin:0 0 18px">Files are classified before analysis: lockfiles, generated code, vendored dependencies, and binaries are <strong>low-signal</strong> — collapsed in every view, excluded from the narrative's attention, but always one click away and always counted.</p>
+      <p class="footnote">Omitted, never hidden — the same rule as the ⌁ divider, applied at file scale.</p>
+    </div>
+  </div>
+</section>
+
+<!-- 28 · APPENDIX: CONVERSATION & LENSES -->
+<section class="slide" aria-label="Appendix: conversation and lenses">
+  <div class="shead" style="margin-bottom:26px">
+    <p class="overline rise">Appendix · Context</p>
+    <h2 class="s-head rise" style="--d:60ms;font-size:38px">The decisions, not just the diff.</h2>
+  </div>
+  <div class="duo" style="align-items:start">
+    <div class="rise" style="--d:120ms">
+      <h3 style="margin:0 0 14px;font:600 20px/1.3 var(--sans)">Conversation-informed analysis</h3>
+      <p class="s-lede" style="font-size:17px;margin:0 0 16px">Pass <code style="font:500 15px var(--mono)">--conversation</code> with the agent's session export and the implementation dialogue becomes part of the story: why an approach was chosen, what was tried and abandoned, what the human asked for along the way.</p>
+      <p class="s-lede" style="font-size:17px;margin:0">Answers carry provenance — <em>based on the branch, the conversation, or both</em> — so you always know what a statement rests on.</p>
+    </div>
+    <div class="rise" style="--d:180ms">
+      <h3 style="margin:0 0 14px;font:600 20px/1.3 var(--sans)">Analysis lenses</h3>
+      <p class="s-lede" style="font-size:17px;margin:0 0 18px">Re-run the analysis through a different lens when the default story isn't the story you need. Each run is an immutable revision — nothing gets overwritten.</p>
+      <div class="chips" style="margin-top:0">
+        <b>default</b><b>security</b><b>performance</b><b>api compatibility</b><b>data migrations</b><b>test coverage</b>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 29 · APPENDIX: DESIGN LANGUAGE -->
+<section class="slide" aria-label="Appendix: design language">
+  <div class="shead" style="margin-bottom:26px">
+    <p class="overline rise">Appendix · Design language</p>
+    <h2 class="s-head rise" style="--d:60ms;font-size:38px">Three voices, one accent, no gradients.</h2>
+  </div>
+  <div class="voices rise" style="--d:120ms">
+    <div class="voice"><span class="aa" style="font-family:var(--sans);font-weight:600">Aa</span><h4>Sans · UI chrome</h4><p>Controls, labels, prose. The quiet voice that gets out of the way.</p></div>
+    <div class="voice"><span class="aa" style="font-family:var(--mono);font-weight:600">Aa</span><h4>Mono · identifiers</h4><p>File paths, counts, step numbers, readouts. If it's a fact, it's mono.</p></div>
+    <div class="voice"><span class="aa" style="font-family:var(--serif);font-weight:600;font-style:italic">Aa</span><h4>Serif · the story</h4><p>Headlines and claims. The narrative voice — because the story is the product.</p></div>
+  </div>
+  <div class="rise" style="--d:180ms;display:flex;flex-wrap:wrap;align-items:center;gap:18px 40px;margin-top:28px">
+    <div class="dots-row"><span><i style="background:var(--low)"></i>low</span><span><i style="background:var(--contained)"></i>contained</span><span><i style="background:var(--elevated)"></i>elevated</span><span><i style="background:var(--high)"></i>high</span><span><i style="background:var(--critical)"></i>critical</span></div>
+    <p class="footnote" style="margin:0">Paper surfaces · hairline rules · a single cobalt accent, reserved for interaction · thin-stroke icons, never emoji. These slides run on the same stylesheet as the landing page and the artifact.</p>
+  </div>
+</section>
+
+</main>
+
+<script>
+(() => {
+  const slides = [...document.querySelectorAll('.slide')];
+  const pbar = document.getElementById('pbar');
+  const counter = document.getElementById('counter');
+  const root = document.documentElement;
+  let index = 0;
+
+  /* Fit the fixed 1280x720 canvas to the viewport, with a small margin. */
+  const fit = () => {
+    const scale = Math.min(window.innerWidth / 1330, window.innerHeight / 764);
+    root.style.setProperty('--s', String(scale));
+  };
+  window.addEventListener('resize', fit);
+  fit();
+
+  /* ---- zoom dial (slide 9) ---- */
+  const levels = [
+    { name: 'Map', description: 'Themes and risk distribution' },
+    { name: 'Summary', description: 'Story claims and summaries' },
+    { name: 'Explanation', description: 'Before and after meaning' },
+    { name: 'Evidence', description: 'Focused code excerpts' },
+    { name: 'Raw', description: 'Complete change evidence' },
+  ];
+  const stage = document.getElementById('stage');
+  const dialLabel = document.getElementById('dial-label');
+  const dialDesc = document.getElementById('dial-desc');
+  const ticks = [...document.querySelectorAll('[data-dial]')];
+  const lvlCopies = [...document.querySelectorAll('.lvl')];
+  const dialSlide = document.querySelector('[data-dial-slide]');
+  let level = 0;
+  const setLevel = (next) => {
+    level = Math.max(0, Math.min(4, next));
+    stage.dataset.level = String(level);
+    dialLabel.textContent = levels[level].name;
+    dialDesc.textContent = levels[level].description;
+    ticks.forEach((tick, i) => tick.classList.toggle('active', i === level));
+    lvlCopies.forEach((copy) => copy.classList.toggle('on', Number(copy.dataset.lvl) === level));
+    stage.querySelectorAll('.zs-view').forEach((view) => view.setAttribute('aria-hidden', String(view.dataset.view !== String(level))));
+  };
+  ticks.forEach((tick, i) => tick.addEventListener('click', () => { setLevel(i); tick.blur(); }));
+
+  /* ---- navigation ---- */
+  const go = (next) => {
+    index = Math.max(0, Math.min(slides.length - 1, next));
+    slides.forEach((slide, i) => slide.classList.toggle('current', i === index));
+    pbar.style.width = `${((index + 1) / slides.length) * 100}%`;
+    const pad = (n) => String(n).padStart(2, '0');
+    counter.textContent = `${pad(index + 1)} / ${pad(slides.length)}`;
+    if (String(index + 1) !== location.hash.slice(1)) history.replaceState(null, '', `#${index + 1}`);
+  };
+  const onDialSlide = () => slides[index] === dialSlide;
+  const next = () => {
+    if (onDialSlide() && level < 4) { setLevel(level + 1); return; }
+    go(index + 1);
+  };
+  const prev = () => {
+    if (onDialSlide() && level > 0) { setLevel(level - 1); return; }
+    go(index - 1);
+  };
+
+  document.addEventListener('keydown', (event) => {
+    if (event.metaKey || event.ctrlKey || event.altKey) return;
+    switch (event.key) {
+      case 'ArrowRight': case 'ArrowDown': case ' ': case 'PageDown': event.preventDefault(); next(); break;
+      case 'ArrowLeft': case 'ArrowUp': case 'PageUp': event.preventDefault(); prev(); break;
+      case 'Home': event.preventDefault(); go(0); break;
+      case 'End': event.preventDefault(); go(slides.length - 1); break;
+      case 'd': case 'D': {
+        const modes = ['', 'light', 'dark'];
+        const current = modes.indexOf(root.dataset.theme || '');
+        const mode = modes[(current + 1) % modes.length];
+        if (mode) root.dataset.theme = mode; else delete root.dataset.theme;
+        break;
+      }
+    }
+  });
+
+  /* touch swipe */
+  let touchX = null;
+  document.addEventListener('touchstart', (event) => { touchX = event.touches[0].clientX; }, { passive: true });
+  document.addEventListener('touchend', (event) => {
+    if (touchX === null) return;
+    const delta = event.changedTouches[0].clientX - touchX;
+    if (Math.abs(delta) > 48) (delta < 0 ? next : prev)();
+    touchX = null;
+  }, { passive: true });
+
+  /* deep link */
+  const fromHash = () => {
+    const n = parseInt(location.hash.slice(1), 10);
+    go(Number.isFinite(n) ? n - 1 : 0);
+  };
+  window.addEventListener('hashchange', fromHash);
+  setLevel(0);
+  fromHash();
+})();
+</script>
+</body>
+</html>
