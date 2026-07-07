@@ -18,6 +18,9 @@ describe("installSkill", () => {
     home = await mkdtemp(join(tmpdir(), "ndrstnd-skill-"));
     process.env.CODEX_HOME = home;
     const destination = await installSkill();
-    await expect(readFile(join(destination, "SKILL.md"), "utf8")).resolves.toContain("evidence-led ndrstnd workspace");
+    const skill = await readFile(join(destination, "SKILL.md"), "utf8");
+    expect(skill).toContain("evidence-led ndrstnd workspace");
+    expect(skill).toContain("ndrstnd review --uncommitted");
+    expect(skill).toContain("Export the conversation unless it contains no intent.");
   });
 });
