@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light dark">
-<title>Your agent wrote 3,000 lines overnight. Now what? — ndrstnd</title>
+<title>Your agent wrote 3,000 lines overnight. Now what? · ndrstnd</title>
 <meta name="description" content="Slides: understanding long coding-agent output with ndrstnd, a local comprehension workspace that turns branch diffs into evidence-linked stories.">
 <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 22"><g fill="none" stroke="%231c2126" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.4 3.4 10 7.6l5.6-4.2"/><path d="M4.4 8.9 10 13.1l5.6-4.2"/><path d="M4.4 14.4 10 18.6l5.6-4.2" stroke="%232757cf"/></g></svg>'>
 <style>
@@ -449,7 +449,7 @@ kbd{display:inline-grid;place-items:center;min-width:23px;height:23px;padding:0 
   <svg class="hero-mark" viewBox="0 0 20 22" aria-hidden="true"><path d="M4.4 3.4 10 7.6l5.6-4.2"/><path d="M4.4 8.9 10 13.1l5.6-4.2"/><path d="M4.4 14.4 10 18.6l5.6-4.2"/></svg>
   <p class="overline rise">Understanding long coding-agent output</p>
   <h1 class="t-title rise" style="--d:60ms">Your agent wrote 3,000 lines overnight. <em>Now what?</em></h1>
-  <p class="t-sub rise" style="--d:120ms">A talk about reading agent-sized changes like a story — and the tool I built to do it.</p>
+  <p class="t-sub rise" style="--d:120ms">A talk about reading agent-sized changes like a story, and the tool I built to do it.</p>
   <div class="rise" style="--d:180ms">
     <p class="byline">Tomás Ruiz-López</p>
     <div class="contact">
@@ -472,7 +472,7 @@ kbd{display:inline-grid;place-items:center;min-width:23px;height:23px;padding:0 
     <div class="stat"><b>47</b><span>files touched</span></div>
     <div class="stat"><b>1</b><span>night of work</span></div>
   </div>
-  <p class="s-lede rise" style="--d:180ms">Coding agents produce more change per hour than anyone can absorb. The bottleneck has moved: <strong>writing the code is cheap now — understanding it isn't.</strong> And whoever merges it still owns every line.</p>
+  <p class="s-lede rise" style="--d:180ms">Coding agents produce more change per hour than anyone can absorb. The bottleneck has moved: <strong>writing the code is cheap now; understanding it isn't.</strong> And whoever merges it still owns every line.</p>
 </section>
 
 <!-- 3 · PROBLEM: REVIEW TOOLS -->
@@ -481,7 +481,7 @@ kbd{display:inline-grid;place-items:center;min-width:23px;height:23px;padding:0 
     <div>
       <p class="overline rise">The problem</p>
       <h2 class="s-head rise" style="--d:60ms">Alphabetical order is not an explanation.</h2>
-      <p class="s-lede rise" style="--d:120ms">Our review tools were built for human-sized diffs. They sort the change by file path and call it a day — so a lockfile and a payment-critical retry loop get <strong>equal billing.</strong></p>
+      <p class="s-lede rise" style="--d:120ms">Our review tools were built for human-sized diffs. They sort the change by file path and call it a day, so a lockfile and a payment-critical retry loop get <strong>equal billing.</strong></p>
       <p class="s-lede rise" style="--d:180ms">You start at <code style="font:500 17px var(--mono)">.github/</code> and hope the design reveals itself by <code style="font:500 17px var(--mono)">test/</code>.</p>
     </div>
     <div class="panel rise" style="--d:200ms" role="img" aria-label="A flat alphabetical file list, the way a forge presents a diff.">
@@ -507,7 +507,7 @@ kbd{display:inline-grid;place-items:center;min-width:23px;height:23px;padding:0 
   <p class="overline rise">The problem</p>
   <h2 class="s-head rise" style="--d:60ms;font-size:54px;max-width:15em">The diff is complete. <em>Completeness isn't comprehension.</em></h2>
   <p class="s-lede rise" style="--d:120ms;margin-top:26px">A diff answers <strong>what changed</strong>, line by line. It never answers <strong>why</strong>, or what belongs together, or which of those 47 files deserves your next ten minutes.</p>
-  <p class="s-lede rise" style="--d:180ms">So reviewers reverse-engineer intent from hunks: scrolling, guessing, rebuilding the design in their heads — for a branch nobody on the team actually wrote.</p>
+  <p class="s-lede rise" style="--d:180ms">So reviewers reverse-engineer intent from hunks: scrolling, guessing, rebuilding the design in their heads, for a branch nobody on the team actually wrote.</p>
 </section>
 
 <!-- 5 · MEET NDRSTND -->
@@ -603,7 +603,7 @@ kbd{display:inline-grid;place-items:center;min-width:23px;height:23px;padding:0 
       <p class="overline rise">What's inside · 01</p>
       <h2 class="s-head rise" style="--d:60ms">Chapters, not file paths.</h2>
       <p class="s-lede rise" style="--d:120ms">Hunks are grouped by <strong>what they mean, not where they live.</strong> A claim, its synopsis, its risk tags, and its evidence travel together as one chapter.</p>
-      <p class="s-lede rise" style="--d:180ms">Skim the story like a table of contents — then open only the chapters that earn your attention.</p>
+      <p class="s-lede rise" style="--d:180ms">Skim the story like a table of contents, then open only the chapters that earn your attention.</p>
     </div>
     <div class="chl rise" style="--d:200ms" role="img" aria-label="Five story chapters ordered by meaning, each with a colored attention number.">
       <article class="ch"><span class="chn el">01</span><span class="ch-copy"><strong>Retry transient capture failures</strong><small>captureCharge retries gateway timeouts with exponential backoff and jitter.</small><span class="ch-tags"><span class="tagp"><svg viewBox="0 0 18 18"><path d="M3 8h12M10 4l4 4-4 4"/></svg>behavior</span><span class="tagp"><svg viewBox="0 0 18 18"><path d="M10 2L4 10h4l-1 6 6-8H9l1-6z"/></svg>performance</span></span></span><span class="ch-chev"><svg viewBox="0 0 12 12"><path d="M2.5 4.25L6 7.75l3.5-3.5"/></svg></span></article>
@@ -620,7 +620,7 @@ kbd{display:inline-grid;place-items:center;min-width:23px;height:23px;padding:0 
   <div class="shead">
     <p class="overline rise">What's inside · 02</p>
     <h2 class="s-head rise" style="--d:60ms">Risk you can see from any altitude.</h2>
-    <p class="s-lede rise" style="--d:120ms">Five attention levels mark every chapter number, map card, and timeline tick — so a glance tells you where the change is routine and where it touches money, auth, or data.</p>
+    <p class="s-lede rise" style="--d:120ms">Five attention levels mark every chapter number, map card, and timeline tick, so a glance tells you where the change is routine and where it touches money, auth, or data.</p>
   </div>
   <div class="rise" style="--d:180ms;display:flex;flex-direction:column;gap:38px">
     <div class="dots-row big" role="img" aria-label="The five attention levels: low, contained, elevated, high, critical.">
@@ -732,7 +732,7 @@ kbd{display:inline-grid;place-items:center;min-width:23px;height:23px;padding:0 
     <blockquote>&ldquo;We cannot follow the ideal design process. But we can <em>fake it</em> in the documentation.&rdquo;</blockquote>
     <cite>after David L. Parnas and Paul C. Clements, &ldquo;A Rational Design Process: How and Why to Fake It&rdquo; (1986)</cite>
   </figure>
-  <p class="s-lede rise" style="--d:140ms;margin-top:44px;max-width:38em">No branch is built in the order it's best understood. Agents scaffold, backtrack, revert, and patch — and the commit log faithfully records all of that wandering.</p>
+  <p class="s-lede rise" style="--d:140ms;margin-top:44px;max-width:38em">No branch is built in the order it's best understood. Agents scaffold, backtrack, revert, and patch; the commit log faithfully records all of that wandering.</p>
 </section>
 
 <!-- 12 · FEATURE: TIMELINE -->
@@ -741,7 +741,7 @@ kbd{display:inline-grid;place-items:center;min-width:23px;height:23px;padding:0 
     <div>
       <p class="overline rise">What's inside · 05</p>
       <h2 class="s-head rise" style="--d:60ms">The history stays honest. The reading order becomes rational.</h2>
-      <p class="s-lede rise" style="--d:120ms">The Timeline rebuilds the change as a <strong>dependency-ordered build path</strong>: each step states its goal, what you now have once it lands, and what it deliberately defers — with the evidence accumulating step by step.</p>
+      <p class="s-lede rise" style="--d:120ms">The Timeline rebuilds the change as a <strong>dependency-ordered build path</strong>: each step states its goal, what you now have once it lands, and what it deliberately defers, with the evidence accumulating step by step.</p>
       <p class="s-lede rise" style="--d:180ms">Replaying commits teaches you the journey. The Timeline teaches you the design.</p>
     </div>
     <div class="tlm rise" style="--d:200ms" role="img" aria-label="The Timeline view: a step rail with attention-colored ticks, a build step with its goal, files, postcondition, and deferred concerns.">
@@ -779,7 +779,7 @@ kbd{display:inline-grid;place-items:center;min-width:23px;height:23px;padding:0 
     <article class="fcard rise" style="--d:120ms">
       <span class="fico"><svg viewBox="0 0 18 18"><path d="M3.5 9.5l3.2 3.2 6.8-7"/></svg></span>
       <h3>Test plan view</h3>
-      <p>Tested behaviors grouped into themes and linked back to story claims, zoomable from summary cards down to raw test artifacts. See at a glance what the agent claims to have covered — and what it didn't.</p>
+      <p>Tested behaviors grouped into themes and linked back to story claims, zoomable from summary cards down to raw test artifacts. See at a glance what the agent claims to have covered, and what it didn't.</p>
     </article>
     <article class="fcard rise" style="--d:180ms">
       <span class="fico"><svg viewBox="0 0 18 18"><path d="M6.5 5L3 9l3.5 4M11.5 5L15 9l-3.5 4"/></svg></span>
@@ -795,7 +795,7 @@ kbd{display:inline-grid;place-items:center;min-width:23px;height:23px;padding:0 
     <div>
       <p class="overline rise">What's inside · 07</p>
       <h2 class="s-head rise" style="--d:60ms">Select lines. Ask questions.</h2>
-      <p class="s-lede rise" style="--d:120ms">In a live workspace, select any lines and ask. Answers come back <strong>grounded in the evidence you selected, not in vibes</strong> — and each answer says what it was based on.</p>
+      <p class="s-lede rise" style="--d:120ms">In a live workspace, select any lines and ask. Answers come back <strong>grounded in the evidence you selected, not in vibes</strong>, and each answer says what it was based on.</p>
     </div>
     <div class="rise" style="--d:180ms;display:flex;justify-content:center">
       <div class="selmenu" role="img" aria-label="The selection menu: Explain selection, Trace effects, Why included?">
@@ -814,7 +814,7 @@ kbd{display:inline-grid;place-items:center;min-width:23px;height:23px;padding:0 
       <p class="s-lede rise" style="--d:120ms">Each review is <strong>one self-contained HTML file</strong> in your repo's <code style="font:500 17px var(--mono)">.ndrstnd/</code> directory: readable on any device, private to your machine, and yours to keep for as long as you need.</p>
       <ul class="meta-list rise" style="--d:180ms;flex-direction:column;gap:12px;margin-top:26px">
         <li>Nothing to deploy, nothing to keep running</li>
-        <li>Opens straight from disk — works offline</li>
+        <li>Opens straight from disk and works offline</li>
         <li>Git-ignored: review artifacts never reach version control</li>
       </ul>
     </div>
@@ -838,7 +838,7 @@ kbd{display:inline-grid;place-items:center;min-width:23px;height:23px;padding:0 
   </div>
   <div class="duo" style="align-items:start">
     <ul class="cx-points rise" style="--d:120ms">
-      <li><span class="n">1</span><div><b>Skill-aware</b><p>Install the skill once, and Codex ends its coding tasks by preparing an ndrstnd workspace for the human — instead of a wall of diff.</p></div></li>
+      <li><span class="n">1</span><div><b>Skill-aware</b><p>Install the skill once, and Codex ends its coding tasks by preparing an ndrstnd workspace for the human instead of a wall of diff.</p></div></li>
       <li><span class="n">2</span><div><b>Conversation-informed</b><p>Pass <code>--conversation</code> and the implementation dialogue becomes part of the story: the decisions, not just the diff.</p></div></li>
       <li><span class="n">3</span><div><b>Zero token custody</b><p>ndrstnd rides Codex's existing authenticated session. It never stores a credential of its own.</p></div></li>
     </ul>
@@ -860,7 +860,7 @@ kbd{display:inline-grid;place-items:center;min-width:23px;height:23px;padding:0 
 <section class="slide" aria-label="Comprehension, not critique" style="align-items:center;text-align:center">
   <p class="overline rise" style="display:inline-flex">The point</p>
   <h2 class="rise" style="--d:60ms;margin:0 auto 26px;max-width:13em;font:600 62px/1.15 var(--serif);letter-spacing:-.015em">Comprehension, <em style="color:var(--accent)">not critique.</em></h2>
-  <p class="s-lede rise" style="--d:120ms;margin:0 auto;max-width:38em">ndrstnd deliberately doesn't leave review comments, doesn't score your agent, and never edits the branch. It explains the implementation story, the evidence, and the risk signals — then gets out of the way.</p>
+  <p class="s-lede rise" style="--d:120ms;margin:0 auto;max-width:38em">ndrstnd deliberately doesn't leave review comments, doesn't score your agent, and never edits the branch. It explains the implementation story, the evidence, and the risk signals, then gets out of the way.</p>
   <p class="rise" style="--d:180ms;margin:30px auto 0;font:600 24px/1.4 var(--serif);font-style:italic;color:var(--ink)">The judgment stays yours.</p>
 </section>
 
@@ -871,17 +871,17 @@ kbd{display:inline-grid;place-items:center;min-width:23px;height:23px;padding:0 
     <h2 class="s-head rise" style="--d:60ms">From branch to story, in five steps.</h2>
   </div>
   <div class="pipe rise" style="--d:120ms">
-    <div class="pstage"><i>01</i><h4>Diff</h4><p>Compare the branch to its Git <strong>merge-base</strong> — or to <code>--base</code>, or the uncommitted worktree.</p></div>
+    <div class="pstage"><i>01</i><h4>Diff</h4><p>Compare the branch to its Git <strong>merge-base</strong>, or to <code>--base</code>, or the uncommitted worktree.</p></div>
     <span class="parrow"><svg viewBox="0 0 16 16"><path d="M2.5 8h11M9.5 4l4 4-4 4"/></svg></span>
     <div class="pstage"><i>02</i><h4>Classify</h4><p>Parse and index every hunk; separate meaningful changes from lockfiles, generated, and vendored code.</p></div>
     <span class="parrow"><svg viewBox="0 0 16 16"><path d="M2.5 8h11M9.5 4l4 4-4 4"/></svg></span>
-    <div class="pstage"><i>03</i><h4>Analyze</h4><p>Ask Codex for the narrative: chapters, timeline, test plan — every claim bound to real hunks, validated against a schema.</p></div>
+    <div class="pstage"><i>03</i><h4>Analyze</h4><p>Ask Codex for the narrative: chapters, timeline, test plan. Every claim is bound to real hunks and validated against a schema.</p></div>
     <span class="parrow"><svg viewBox="0 0 16 16"><path d="M2.5 8h11M9.5 4l4 4-4 4"/></svg></span>
     <div class="pstage"><i>04</i><h4>Render</h4><p>Bake models, syntax highlighting, and UI into <strong>one self-contained HTML artifact</strong>.</p></div>
     <span class="parrow"><svg viewBox="0 0 16 16"><path d="M2.5 8h11M9.5 4l4 4-4 4"/></svg></span>
     <div class="pstage"><i>05</i><h4>Open</h4><p>Write it to the repo's <code>.ndrstnd/</code> directory and open it in your browser. Old artifacts expire after seven days.</p></div>
   </div>
-  <p class="footnote rise" style="--d:180ms;margin-top:30px">Node ≥ 22 · TypeScript · everything runs locally — the diff goes to Codex through your own session, and nothing else leaves the machine.</p>
+  <p class="footnote rise" style="--d:180ms;margin-top:30px">Node ≥ 22 · TypeScript · everything runs locally: the diff goes to Codex through your own session, and nothing else leaves the machine.</p>
 </section>
 
 <!-- 19 · UNDER THE HOOD: DECISIONS -->
@@ -892,7 +892,7 @@ kbd{display:inline-grid;place-items:center;min-width:23px;height:23px;padding:0 
   </div>
   <div class="dgrid">
     <div class="dcard rise" style="--d:100ms"><span class="n">1</span><div><b>Artifact, not app</b><p>A review is a static HTML file, not a running server. Nothing to install for readers, nothing to keep alive, nothing that phones home.</p></div></div>
-    <div class="dcard rise" style="--d:150ms"><span class="n">2</span><div><b>Never fabricate</b><p>The analysis validates against a strict schema, with one repair turn. If it still fails, ndrstnd writes nothing and tells you — it never invents a story it can't back.</p></div></div>
+    <div class="dcard rise" style="--d:150ms"><span class="n">2</span><div><b>Never fabricate</b><p>The analysis validates against a strict schema, with one repair turn. If it still fails, ndrstnd writes nothing and tells you. It never invents a story it can't back.</p></div></div>
     <div class="dcard rise" style="--d:200ms"><span class="n">3</span><div><b>Evidence-linked by construction</b><p>Claims that can't point at real hunks don't ship. Every sentence in the story is a link to the code that proves it.</p></div></div>
     <div class="dcard rise" style="--d:250ms"><span class="n">4</span><div><b>Zero token custody</b><p>ndrstnd reuses Codex's authenticated session and never stores a credential of its own. Auth stays someone else's well-solved problem.</p></div></div>
   </div>
@@ -961,7 +961,7 @@ kbd{display:inline-grid;place-items:center;min-width:23px;height:23px;padding:0 
       </div>
     </div>
   </div>
-  <p class="footnote rise" style="--d:300ms;margin-top:26px">The repository doubles as a Homebrew tap. Artifacts land in <code style="font:500 13.5px var(--mono)">.ndrstnd/</code> — add it to your <code style="font:500 13.5px var(--mono)">.gitignore</code>.</p>
+  <p class="footnote rise" style="--d:300ms;margin-top:26px">The repository doubles as a Homebrew tap. Artifacts land in <code style="font:500 13.5px var(--mono)">.ndrstnd/</code>, so add it to your <code style="font:500 13.5px var(--mono)">.gitignore</code>.</p>
 </section>
 
 <!-- 22 · FEEDBACK -->
@@ -971,9 +971,9 @@ kbd{display:inline-grid;place-items:center;min-width:23px;height:23px;padding:0 
     <h2 class="s-head rise" style="--d:60ms">This is where you come in.</h2>
   </div>
   <ul class="asklist" style="max-width:46em">
-    <li class="rise" style="--d:120ms"><svg viewBox="0 0 24 24"><path d="M5 12l4.5 4.5L19 7"/></svg><div><b>Try it on a real agent branch.</b><p>Not a demo — the gnarliest thing your agent shipped this week. That's the workload it was built for.</p></div></li>
+    <li class="rise" style="--d:120ms"><svg viewBox="0 0 24 24"><path d="M5 12l4.5 4.5L19 7"/></svg><div><b>Try it on a real agent branch.</b><p>Not a demo: the gnarliest thing your agent shipped this week. That's the workload it was built for.</p></div></li>
     <li class="rise" style="--d:180ms"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.01"/></svg><div><b>Tell me where the story lies.</b><p>Where the narrative misleads you, where the dial has the wrong altitude, where the evidence isn't enough.</p></div></li>
-    <li class="rise" style="--d:240ms"><svg viewBox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 0 1-8.4 8.4c-1.6 0-3.1-.4-4.4-1.2L3 20l1.3-4.9A8.38 8.38 0 0 1 12.6 3a8.38 8.38 0 0 1 8.4 8.5z"/></svg><div><b>Open an issue — or just tell me.</b><p>Feature ideas, broken artifacts, other agents you'd want supported. I read everything.</p></div></li>
+    <li class="rise" style="--d:240ms"><svg viewBox="0 0 24 24"><path d="M21 11.5a8.38 8.38 0 0 1-8.4 8.4c-1.6 0-3.1-.4-4.4-1.2L3 20l1.3-4.9A8.38 8.38 0 0 1 12.6 3a8.38 8.38 0 0 1 8.4 8.5z"/></svg><div><b>Open an issue, or just tell me.</b><p>Feature ideas, broken artifacts, other agents you'd want supported. I read everything.</p></div></li>
   </ul>
   <div class="contact rise" style="--d:300ms;margin-top:40px">
     <span class="cchip"><svg viewBox="0 0 24 24" aria-label="X"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>@tomasruizlopez</span>
@@ -1000,7 +1000,7 @@ kbd{display:inline-grid;place-items:center;min-width:23px;height:23px;padding:0 
 <section class="slide divider" aria-label="Appendix">
   <p class="overline rise">Backup slides</p>
   <h2 class="rise" style="--d:60ms;margin:0;font:600 76px/1.1 var(--serif);letter-spacing:-.02em">Appendix<em style="color:var(--accent)">.</em></h2>
-  <p class="s-lede rise" style="--d:120ms">For the questions — architecture, the analysis contract, review scopes, and the design system.</p>
+  <p class="s-lede rise" style="--d:120ms">For the questions: architecture, the analysis contract, review scopes, and the design system.</p>
 </section>
 
 <!-- 25 · APPENDIX: ARCHITECTURE -->
@@ -1029,7 +1029,7 @@ kbd{display:inline-grid;place-items:center;min-width:23px;height:23px;padding:0 
       <p class="overline rise">Appendix · Never fabricate</p>
       <h2 class="s-head rise" style="--d:60ms;font-size:38px">The analysis is a contract, not a vibe.</h2>
       <ul class="cx-points rise" style="--d:120ms;margin-top:30px">
-        <li><span class="n">1</span><div><b>Strict schema</b><p>The narrative must parse and validate — chapters, timeline steps, test themes, evidence references — or it doesn't exist.</p></div></li>
+        <li><span class="n">1</span><div><b>Strict schema</b><p>The narrative must parse and validate (chapters, timeline steps, test themes, evidence references) or it doesn't exist.</p></div></li>
         <li><span class="n">2</span><div><b>One repair turn</b><p>Invalid output gets exactly one chance to fix itself, with the validation errors echoed back. No endless retry loops.</p></div></li>
         <li><span class="n">3</span><div><b>Evidence must resolve</b><p>Every claim's hunk references and focus ranges are checked against the real diff. Dangling evidence invalidates the claim.</p></div></li>
         <li><span class="n">4</span><div><b>Fail loudly</b><p>If validation still fails, no artifact is written. You get an explicit error instead of a confident fiction.</p></div></li>
@@ -1054,16 +1054,16 @@ kbd{display:inline-grid;place-items:center;min-width:23px;height:23px;padding:0 
     <div class="rise" style="--d:120ms">
       <h3 style="margin:0 0 16px;font:600 20px/1.3 var(--sans)">Choosing the base</h3>
       <ul class="cx-points" style="gap:14px">
-        <li><span class="n" style="font-size:10px">A</span><div><p><code>ndrstnd review my-branch</code> — branch against its <strong>merge-base</strong>: the default, reviews only what the branch introduced.</p></div></li>
-        <li><span class="n" style="font-size:10px">B</span><div><p><code>--base main</code> — the checked-out worktree against a branch, staged and unstaged changes included.</p></div></li>
-        <li><span class="n" style="font-size:10px">C</span><div><p><code>--uncommitted</code> — just what isn't committed yet (an alias for <code>--base HEAD</code>).</p></div></li>
-        <li><span class="n" style="font-size:10px">D</span><div><p><code>--base empty</code> — everything, for brand-new repositories. When a base is inferred, the CLI says so before analyzing.</p></div></li>
+        <li><span class="n" style="font-size:10px">A</span><div><p><code>ndrstnd review my-branch</code>: the branch against its <strong>merge-base</strong>. The default; it reviews only what the branch introduced.</p></div></li>
+        <li><span class="n" style="font-size:10px">B</span><div><p><code>--base main</code>: the checked-out worktree against a branch, staged and unstaged changes included.</p></div></li>
+        <li><span class="n" style="font-size:10px">C</span><div><p><code>--uncommitted</code>: just what isn't committed yet (an alias for <code>--base HEAD</code>).</p></div></li>
+        <li><span class="n" style="font-size:10px">D</span><div><p><code>--base empty</code>: everything, for brand-new repositories. When a base is inferred, the CLI says so before analyzing.</p></div></li>
       </ul>
     </div>
     <div class="rise" style="--d:180ms">
       <h3 style="margin:0 0 16px;font:600 20px/1.3 var(--sans)">Separating signal from noise</h3>
-      <p class="s-lede" style="font-size:17px;margin:0 0 18px">Files are classified before analysis: lockfiles, generated code, vendored dependencies, and binaries are <strong>low-signal</strong> — collapsed in every view, excluded from the narrative's attention, but always one click away and always counted.</p>
-      <p class="footnote">Omitted, never hidden — the same rule as the ⌁ divider, applied at file scale.</p>
+      <p class="s-lede" style="font-size:17px;margin:0 0 18px">Files are classified before analysis: lockfiles, generated code, vendored dependencies, and binaries are <strong>low-signal</strong>. They stay collapsed in every view and out of the narrative's attention, but always one click away and always counted.</p>
+      <p class="footnote">Omitted, never hidden: the same rule as the ⌁ divider, applied at file scale.</p>
     </div>
   </div>
 </section>
@@ -1078,11 +1078,11 @@ kbd{display:inline-grid;place-items:center;min-width:23px;height:23px;padding:0 
     <div class="rise" style="--d:120ms">
       <h3 style="margin:0 0 14px;font:600 20px/1.3 var(--sans)">Conversation-informed analysis</h3>
       <p class="s-lede" style="font-size:17px;margin:0 0 16px">Pass <code style="font:500 15px var(--mono)">--conversation</code> with the agent's session export and the implementation dialogue becomes part of the story: why an approach was chosen, what was tried and abandoned, what the human asked for along the way.</p>
-      <p class="s-lede" style="font-size:17px;margin:0">Answers carry provenance — <em>based on the branch, the conversation, or both</em> — so you always know what a statement rests on.</p>
+      <p class="s-lede" style="font-size:17px;margin:0">Answers carry provenance (<em>based on the branch, the conversation, or both</em>), so you always know what a statement rests on.</p>
     </div>
     <div class="rise" style="--d:180ms">
       <h3 style="margin:0 0 14px;font:600 20px/1.3 var(--sans)">Analysis lenses</h3>
-      <p class="s-lede" style="font-size:17px;margin:0 0 18px">Re-run the analysis through a different lens when the default story isn't the story you need. Each run is an immutable revision — nothing gets overwritten.</p>
+      <p class="s-lede" style="font-size:17px;margin:0 0 18px">Re-run the analysis through a different lens when the default story isn't the story you need. Each run is an immutable revision; nothing gets overwritten.</p>
       <div class="chips" style="margin-top:0">
         <b>default</b><b>security</b><b>performance</b><b>api compatibility</b><b>data migrations</b><b>test coverage</b>
       </div>
@@ -1099,7 +1099,7 @@ kbd{display:inline-grid;place-items:center;min-width:23px;height:23px;padding:0 
   <div class="voices rise" style="--d:120ms">
     <div class="voice"><span class="aa" style="font-family:var(--sans);font-weight:600">Aa</span><h4>Sans · UI chrome</h4><p>Controls, labels, prose. The quiet voice that gets out of the way.</p></div>
     <div class="voice"><span class="aa" style="font-family:var(--mono);font-weight:600">Aa</span><h4>Mono · identifiers</h4><p>File paths, counts, step numbers, readouts. If it's a fact, it's mono.</p></div>
-    <div class="voice"><span class="aa" style="font-family:var(--serif);font-weight:600;font-style:italic">Aa</span><h4>Serif · the story</h4><p>Headlines and claims. The narrative voice — because the story is the product.</p></div>
+    <div class="voice"><span class="aa" style="font-family:var(--serif);font-weight:600;font-style:italic">Aa</span><h4>Serif · the story</h4><p>Headlines and claims. The narrative voice, because the story is the product.</p></div>
   </div>
   <div class="rise" style="--d:180ms;display:flex;flex-wrap:wrap;align-items:center;gap:18px 40px;margin-top:28px">
     <div class="dots-row"><span><i style="background:var(--low)"></i>low</span><span><i style="background:var(--contained)"></i>contained</span><span><i style="background:var(--elevated)"></i>elevated</span><span><i style="background:var(--high)"></i>high</span><span><i style="background:var(--critical)"></i>critical</span></div>
