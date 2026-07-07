@@ -5,6 +5,30 @@ export type AuthStatus =
   | { state: "signed-out" }
   | { state: "unreachable"; reason: string };
 
+/** A liveness snapshot of a running turn, emitted on every app-server thread notification. */
+export interface TurnActivity {
+  label: string;
+  notifications: number;
+  draftCharacters: number;
+}
+
+/** Turns a thread notification into reviewer-facing phrasing; undefined means the previous label still applies. */
+export function describeThreadNotification(method: string, params: Record<string, unknown>): string | undefined {
+  if (method === "item/agentMessage/delta") return "drafting the narrative";
+  const item = asObject(params["item"]);
+  const itemType = item["type"];
+  if (itemType === "commandExecution") {
+    const command = typeof item["command"] === "string" ? item["command"].replace(/\s+/g, " ").trim() : "";
+    if (command === "") return "inspecting the repository";
+    const compact = command.length > 90 ? `${command.slice(0, 87)}…` : command;
+    return method === "item/completed" ? `finished \`${compact}\`` : `running \`${compact}\``;
+  }
+  if (itemType === "reasoning") return "reasoning about the branch";
+  if (itemType === "agentMessage") return "drafting the narrative";
+  if (itemType === "webSearch") return "searching the web";
+  return undefined;
+}
+
 export async function getCodexAuthStatus(): Promise<AuthStatus> {
   const client = new CodexAppServerClient();
   try {
@@ -51,35 +75,36 @@ export class CodexAppServerClient {
     this.initialized = false;
   }
 
-  async runTextTurn(cwd: string, prompt: string, onDelta?: (delta: string) => void): Promise<string> {
+  async runTextTurn(cwd: string, prompt: string, onActivity?: (activity: TurnActivity) => void): Promise<string> {
     const thread = await this.startTextThread(cwd);
     try {
-      return await thread.send(prompt, onDelta);
+      return await thread.send(prompt, onActivity);
     } finally {
       await thread.close();
     }
   }
 
   /** Starts a reusable thread so follow-up turns (validation repairs) keep the inspection context instead of resending the full prompt. */
-  async startTextThread(cwd: string): Promise<{ send(prompt: string, onDelta?: (delta: string) => void): Promise<string>; close(): Promise<void> }> {
+  async startTextThread(cwd: string): Promise<{ send(prompt: string, onActivity?: (activity: TurnActivity) => void): Promise<string>; close(): Promise<void> }> {
     const threadResponse = asObject(await this.request("thread/start", { cwd, sandbox: "read-only", approvalPolicy: "never" }));
     const threadId = String(asObject(threadResponse["thread"])["id"] ?? "");
     if (threadId === "") throw new Error("Codex app-server did not return an analysis thread ID.");
     return {
-      send: (prompt, onDelta) => this.runThreadTurn(threadId, cwd, prompt, onDelta),
+      send: (prompt, onActivity) => this.runThreadTurn(threadId, cwd, prompt, onActivity),
       close: async () => {
         await this.request("thread/archive", { threadId }).catch(() => undefined);
       },
     };
   }
 
-  private async runThreadTurn(threadId: string, cwd: string, prompt: string, onDelta?: (delta: string) => void): Promise<string> {
+  private async runThreadTurn(threadId: string, cwd: string, prompt: string, onActivity?: (activity: TurnActivity) => void): Promise<string> {
     let text = "";
     const completed = new Promise<void>((resolve, reject) => {
       // Inspecting a large branch takes many quiet-but-active tool turns, so time
       // out on inactivity across any thread notification rather than total duration.
       let timeout: NodeJS.Timeout;
       let notifications = 0;
+      let label = "starting the analysis turn";
       const cleanup = () => {
         clearTimeout(timeout);
         this.notificationListeners.delete(listener);
@@ -101,16 +126,19 @@ export class CodexAppServerClient {
         if (method === "item/agentMessage/delta") {
           const delta = typeof params["delta"] === "string" ? params["delta"] : "";
           text += delta;
-          onDelta?.(delta);
         }
         if (method === "turn/failed") {
           const reason = asObject(params["error"])["message"];
           failWith(new Error(`Codex analysis turn failed: ${typeof reason === "string" && reason !== "" ? reason : "the app-server reported no reason"}.${this.stderrHint()}`));
+          return;
         }
         if (method === "turn/completed") {
           cleanup();
           resolve();
+          return;
         }
+        label = describeThreadNotification(method, params) ?? label;
+        onActivity?.({ label, notifications, draftCharacters: text.length });
       };
       armTimeout();
       this.notificationListeners.add(listener);

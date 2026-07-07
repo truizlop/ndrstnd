@@ -9,7 +9,7 @@ ndrstnd is a local comprehension workspace for large, agent-produced branch chan
     ndrstnd skill install
     ndrstnd review feature/my-change --base main --repo /path/to/repository
 
-The command prints the review scope (base, changed files, whether uncommitted changes are included), drafts the narrative with Codex, then writes and opens a self-contained HTML review artifact. Artifacts live under the reviewed repository’s Git-ignored `.ndrstnd/` directory, are private to the local working copy, and are meant to be short-lived; delete them when the review is done.
+The command prints the review scope (base, changed files, whether uncommitted changes are included), drafts the narrative with Codex — printing a heartbeat line every 15 seconds naming what Codex is doing, so a long analysis is never mistaken for a hang — then writes and opens a self-contained HTML review artifact. Artifacts live under the reviewed repository’s Git-ignored `.ndrstnd/` directory, are private to the local working copy, and are meant to be short-lived; delete them when the review is done.
 
 ndrstnd uses Codex’s existing authenticated session. It never stores a Codex token itself.
 

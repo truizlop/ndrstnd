@@ -1,19 +1,24 @@
 import { z } from "zod";
 import type { CollectedReviewInput } from "./git.js";
 import type { ConversationContext } from "./conversation.js";
-import { CodexAppServerClient } from "./codex.js";
+import { CodexAppServerClient, type TurnActivity } from "./codex.js";
 import { analysisPrompt, buildPromptReviewInput, extractJson, parseAnalysisDocument } from "./analysis-core.js";
 
 export { analysisPrompt, buildPromptReviewInput, parseAnalysisDocument } from "./analysis-core.js";
 
 const REPAIR_ATTEMPTS = 2;
 
-export async function analyzeWithCodex(input: CollectedReviewInput, conversation?: ConversationContext, onDelta?: (delta: string) => void, lensInstructions?: string) {
+export interface AnalysisProgress {
+  onActivity?: (activity: TurnActivity) => void;
+  onRepair?: (attempt: number, attempts: number, problem: string) => void;
+}
+
+export async function analyzeWithCodex(input: CollectedReviewInput, conversation?: ConversationContext, progress?: AnalysisProgress, lensInstructions?: string) {
   const prompt = analysisPrompt(input, conversation, lensInstructions);
   return withFreshClientRetry(async (client) => {
     const thread = await client.startTextThread(input.repoPath);
     try {
-      let response = await thread.send(prompt, onDelta);
+      let response = await thread.send(prompt, progress?.onActivity);
       let lastError = "";
       for (let attempt = 0; attempt <= REPAIR_ATTEMPTS; attempt += 1) {
         try {
@@ -21,7 +26,8 @@ export async function analyzeWithCodex(input: CollectedReviewInput, conversation
         } catch (error) {
           lastError = error instanceof Error ? error.message : String(error);
           if (attempt === REPAIR_ATTEMPTS) break;
-          response = await thread.send(`Your prior response failed validation: ${lastError} Return only the corrected JSON document, with every other field kept as it was.`, onDelta);
+          progress?.onRepair?.(attempt + 1, REPAIR_ATTEMPTS, lastError);
+          response = await thread.send(`Your prior response failed validation: ${lastError} Return only the corrected JSON document, with every other field kept as it was.`, progress?.onActivity);
         }
       }
       throw new Error(`Codex produced an analysis that still failed validation after ${REPAIR_ATTEMPTS} repair turns: ${lastError}`);
@@ -29,6 +35,24 @@ export async function analyzeWithCodex(input: CollectedReviewInput, conversation
       await thread.close();
     }
   });
+}
+
+/** One reviewer-facing liveness line, printed on an interval so a long quiet analysis is never mistaken for a hang. */
+export function formatAnalysisHeartbeat(elapsedMs: number, activity: TurnActivity | undefined, sinceActivityMs?: number): string {
+  if (activity === undefined) return `still analyzing (${formatDuration(elapsedMs)}): waiting for the first Codex event`;
+  const draft = activity.draftCharacters > 0 ? `; ${formatCount(activity.draftCharacters)} draft characters` : "";
+  const stale = sinceActivityMs !== undefined && sinceActivityMs >= 60_000 ? `; no new Codex events for ${formatDuration(sinceActivityMs)}` : "";
+  return `still analyzing (${formatDuration(elapsedMs)}): ${activity.label}${draft}${stale}`;
+}
+
+function formatDuration(milliseconds: number): string {
+  const seconds = Math.max(0, Math.round(milliseconds / 1_000));
+  if (seconds < 60) return `${seconds}s`;
+  return `${Math.floor(seconds / 60)}m${String(seconds % 60).padStart(2, "0")}s`;
+}
+
+function formatCount(count: number): string {
+  return count < 1_000 ? String(count) : `${(count / 1_000).toFixed(1)}k`;
 }
 
 const TRANSIENT_CODEX_FAILURE = /stalled|timed out|exited with status|app-server closed|could not run|not running/i;

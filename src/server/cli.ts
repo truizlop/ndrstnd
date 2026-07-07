@@ -2,8 +2,8 @@
 import { spawn } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import process from "node:process";
-import { getCodexAuthStatus } from "./codex.js";
-import { analyzeWithCodex } from "./analyze.js";
+import { getCodexAuthStatus, type TurnActivity } from "./codex.js";
+import { analyzeWithCodex, formatAnalysisHeartbeat, type AnalysisProgress } from "./analyze.js";
 import { importConversation } from "./conversation.js";
 import { GitReader, describeReviewScope } from "./git.js";
 import { startReviewServer } from "./http.js";
@@ -136,13 +136,16 @@ async function runReview(args: string[]): Promise<void> {
     const auth = await getCodexAuthStatus();
     if (auth.state === "signed-out") fail("Codex is not signed in, so ndrstnd cannot analyze this change. Run `ndrstnd auth login` first.");
     if (auth.state === "unreachable") fail(`Codex could not be reached, so ndrstnd cannot analyze this change: ${auth.reason}`);
-    process.stdout.write("Drafting the review narrative with Codex…\n");
+    process.stdout.write("Drafting the review narrative with Codex… This takes minutes on large branches; a heartbeat line prints every 15 seconds while the analysis is alive.\n");
+    const heartbeat = startAnalysisHeartbeat();
     try {
-      const document = await analyzeWithCodex(input, conversation, undefined, lens.instructions);
+      const document = await analyzeWithCodex(input, conversation, heartbeat.progress, lens.instructions);
       revision = store.createRevision(session.id, "codex", "complete", document);
     } catch (error) {
       store.close();
       fail(`Codex analysis failed, so no review artifact was written: ${error instanceof Error ? error.message : String(error)} Nothing was persisted; re-run the same ndrstnd review command to retry.`);
+    } finally {
+      heartbeat.stop();
     }
   }
   process.stdout.write(`merge-base=${input.mergeBase.slice(0, 12)} files=${input.files.length} meaningful-files=${meaningfulFiles} hunks=${input.hunks.length}${conversation === undefined ? "" : ` conversation=${conversation.messages.length}`}\n`);
@@ -164,6 +167,31 @@ async function runReview(args: string[]): Promise<void> {
   process.stdout.write("This self-contained file is in the Git-ignored .ndrstnd directory; delete it when the review is done.\n");
   if (!noOpen) openBrowser(pathToFileURL(artifactPath).href);
   store.close();
+}
+
+/** Prints liveness lines while Codex analyzes so a caller — human or agent — never mistakes a long turn for a hang. */
+function startAnalysisHeartbeat(): { progress: AnalysisProgress; stop: () => void } {
+  // Defined here because the top-level command dispatch runs before module-level consts initialize.
+  const HEARTBEAT_INTERVAL_MS = 15_000;
+  const startedAt = Date.now();
+  let latest: TurnActivity | undefined;
+  let lastEventAt = startedAt;
+  const timer = setInterval(() => {
+    process.stdout.write(`${formatAnalysisHeartbeat(Date.now() - startedAt, latest, Date.now() - lastEventAt)}\n`);
+  }, HEARTBEAT_INTERVAL_MS);
+  timer.unref();
+  return {
+    progress: {
+      onActivity: (activity) => {
+        latest = activity;
+        lastEventAt = Date.now();
+      },
+      onRepair: (attempt, attempts, problem) => {
+        process.stdout.write(`Codex's draft failed validation; requesting repair turn ${attempt} of ${attempts}: ${problem}\n`);
+      },
+    },
+    stop: () => clearInterval(timer),
+  };
 }
 
 function openReviewStore(): ReviewStore {

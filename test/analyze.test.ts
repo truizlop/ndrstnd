@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { INLINE_PATCH_BUDGET, analysisPrompt, buildPromptReviewInput, extractJson, parseAnalysisDocument } from "../src/server/analysis-core.js";
+import { formatAnalysisHeartbeat } from "../src/server/analyze.js";
 import type { CollectedReviewInput } from "../src/server/git.js";
 
 const input: CollectedReviewInput = {
@@ -385,5 +386,14 @@ describe("analysis documents", () => {
 
     expect(manifest.conversation?.messageCount).toBe(2);
     expect(manifest.conversation?.excerptedMessages.at(-1)?.excerpt.length).toBeLessThan(1_600);
+  });
+});
+
+describe("formatAnalysisHeartbeat", () => {
+  it("reports elapsed time, the latest Codex activity, draft growth, and staleness", () => {
+    expect(formatAnalysisHeartbeat(45_000, undefined)).toBe("still analyzing (45s): waiting for the first Codex event");
+    expect(formatAnalysisHeartbeat(125_000, { label: "running `git diff --stat`", notifications: 12, draftCharacters: 0 }, 2_000)).toBe("still analyzing (2m05s): running `git diff --stat`");
+    expect(formatAnalysisHeartbeat(200_000, { label: "drafting the narrative", notifications: 40, draftCharacters: 3_449 }, 1_000)).toBe("still analyzing (3m20s): drafting the narrative; 3.4k draft characters");
+    expect(formatAnalysisHeartbeat(300_000, { label: "reasoning about the branch", notifications: 12, draftCharacters: 120 }, 90_000)).toBe("still analyzing (5m00s): reasoning about the branch; 120 draft characters; no new Codex events for 1m30s");
   });
 });
