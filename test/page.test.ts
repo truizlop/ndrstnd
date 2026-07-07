@@ -405,5 +405,13 @@ it("renders the frozen presentation fixture without Git, analysis, or the review
   expect(page).toContain("Transient failures still bubble up immediately; retry semantics arrive with the policy.");
   expect(page).toContain('<button data-timeline-select="step-01">Builds on · step 01</button>');
   expect(page).toContain("Release bookkeeping");
+  expect(page).toContain("2 low-signal hunks collapsed");
   expect(page).toContain("Test plan</button>");
+});
+
+it("collapses unclassified evidence alongside omitted groups", async () => {
+  const data = { ...frozenReviewData, document: { ...frozenReviewData.document, unclassifiedEvidenceIds: ["lockfile-hunk"] } };
+  const page = await renderArtifact(data);
+  expect(page).toContain("3 low-signal or unclassified hunks collapsed");
+  expect(page).toContain("Unclassified evidence");
 });

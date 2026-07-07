@@ -245,7 +245,14 @@ function renderTokens(tokens: Array<{ content: string; color?: string; fontStyle
 
 function renderOmitted(document: AnalysisDocument, hunks: DiffHunk[]): string {
   const count = document.omittedGroups.reduce((sum, group) => sum + group.evidenceIds.length, 0);
-  return count === 0 ? "" : `<details class="omitted"><summary>${count} low-signal hunks collapsed</summary>${document.omittedGroups.map((group) => `<p><strong>${escapeHtml(group.title)}</strong> · ${escapeHtml(group.reason)}</p>`).join("")}</details>`;
+  const unclassified = document.unclassifiedEvidenceIds.length;
+  if (count + unclassified === 0) return "";
+  const summary = unclassified === 0 ? `${count} low-signal hunks collapsed` : count === 0 ? `${unclassified} unclassified hunks collapsed` : `${count + unclassified} low-signal or unclassified hunks collapsed`;
+  const groups = [
+    ...document.omittedGroups.map((group) => `<p><strong>${escapeHtml(group.title)}</strong> · ${escapeHtml(group.reason)}</p>`),
+    ...(unclassified > 0 ? [`<p><strong>Unclassified evidence</strong> · ${unclassified} hunk${unclassified === 1 ? "" : "s"} the analysis could not attach to a story chapter; see Full diff.</p>`] : []),
+  ];
+  return `<details class="omitted"><summary>${summary}</summary>${groups.join("")}</details>`;
 }
 
 function renderTestPlan(document: AnalysisDocument, hunks: DiffHunk[], filePaths: Map<string, string>, files: ChangedFile[], highlighter: Highlighter): string {

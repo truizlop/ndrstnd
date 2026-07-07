@@ -58,6 +58,13 @@ describe("analysis documents", () => {
     expect(() => parseAnalysisDocument({ summary: "x", chapters: [], steps: [], omittedGroups: [], unclassifiedEvidenceIds: [] }, input)).toThrow("did not account");
   });
 
+  it("rejects low-signal evidence left in unclassified instead of an omitted group", () => {
+    const chapter = { id: "one", title: "Runner behavior", kind: "behavior" as const, synopsis: validSynopsis, confidence: "high" as const, attention: "contained" as const, riskCategories: ["behavior" as const], evidenceIds: ["source-hunk"] };
+    expect(() => parseAnalysisDocument({ summary: validSummary, chapters: [chapter], steps: [sourceStep], omittedGroups: [], unclassifiedEvidenceIds: ["lock-hunk"] }, input)).toThrow("Low-signal evidence was left ungrouped");
+    expect(() => parseAnalysisDocument({ summary: validSummary, chapters: [chapter], steps: [sourceStep], omittedGroups: [], unclassifiedEvidenceIds: [] }, input)).toThrow("Low-signal evidence was left ungrouped");
+    expect(analysisPrompt(input)).toContain("Group every low-signal evidence ID into an omitted group in o");
+  });
+
   it("round-trips a valid step plan through document parsing", () => {
     expect(parseAnalysisDocument({
       summary: validSummary,

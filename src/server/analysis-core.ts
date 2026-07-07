@@ -18,6 +18,14 @@ export function parseAnalysisDocument(value: unknown, input: CollectedReviewInpu
     .map((hunk) => hunk.id);
   const missing = meaningfulEvidence.filter((id) => !referenced.has(id));
   if (missing.length > 0) throw new Error(`Analysis did not account for meaningful evidence: ${missing.join(", ")}. Add each missing ID to a chapter (c), an omitted group (o), or unclassified (u).`);
+  const grouped = new Set<string>();
+  for (const chapter of document.chapters) for (const id of chapter.evidenceIds) grouped.add(id);
+  for (const group of document.omittedGroups) for (const id of group.evidenceIds) grouped.add(id);
+  const strayLowSignal = input.hunks
+    .filter((hunk) => input.files.find((file) => file.id === hunk.fileId)?.signal === "low-signal")
+    .map((hunk) => hunk.id)
+    .filter((id) => !grouped.has(id));
+  if (strayLowSignal.length > 0) throw new Error(`Low-signal evidence was left ungrouped: ${strayLowSignal.join(", ")}. Add each ID to an omitted group in o with a short reason (for example lockfile churn or generated output); u is only for meaningful evidence that defies classification.`);
   validateStepPlan(document, input, meaningfulEvidence);
   validateProseDepth(document);
   return document;
@@ -103,7 +111,7 @@ function validateStepPlan(document: AnalysisDocument, input: CollectedReviewInpu
 
 export function analysisPrompt(input: CollectedReviewInput, conversation?: ConversationContext, lensInstructions?: string): string {
   const reviewInput = buildPromptReviewInput(input, conversation);
-  return `You are ndrstnd, a comprehension assistant. Explain a branch without critiquing it or proposing changes. ${lensInstructions ?? "Prioritize the implementation story and behavior changes."} Return compact minified JSON only with this shape: {s,c:[[id,title,kind,synopsis,before|null,after|null,confidence,attention,riskCategories,evidenceIds]],t:[[id,title,goal,youNowHave,[[concern,resolvedByStepId|null]],dependsOn,forwardRefs,advancesChapterIds,evidenceIds]],o:[[title,reason,evidenceIds]],u:[evidenceId]}. Allowed kind values are exactly feature, decision, behavior, non_functional, risk, test, other. Confidence is high, medium, or low. Attention is low, contained, elevated, high, or critical. Risk categories are formatting, refactor, behavior, performance, security. Use only listed evidence IDs. Every meaningful evidence ID must appear exactly once in c, o, or u, and exactly once in t.
+  return `You are ndrstnd, a comprehension assistant. Explain a branch without critiquing it or proposing changes. ${lensInstructions ?? "Prioritize the implementation story and behavior changes."} Return compact minified JSON only with this shape: {s,c:[[id,title,kind,synopsis,before|null,after|null,confidence,attention,riskCategories,evidenceIds]],t:[[id,title,goal,youNowHave,[[concern,resolvedByStepId|null]],dependsOn,forwardRefs,advancesChapterIds,evidenceIds]],o:[[title,reason,evidenceIds]],u:[evidenceId]}. Allowed kind values are exactly feature, decision, behavior, non_functional, risk, test, other. Confidence is high, medium, or low. Attention is low, contained, elevated, high, or critical. Risk categories are formatting, refactor, behavior, performance, security. Use only listed evidence IDs. Every meaningful evidence ID must appear exactly once in c, o, or u, and exactly once in t. Group every low-signal evidence ID into an omitted group in o with a concise reason such as lockfile churn or generated output; u is a last resort for evidence that truly cannot be classified.
 
 Prose depth is validated and out-of-range fields are rejected, so hit these word counts: summary 35-75 words; each synopsis 20-55 words across two or three sentences explaining what changed, how it works, and why it matters; before and after 10-40 words each describing concrete observable behavior; each step goal 12-40 words stating the intent and mechanism; each youNowHave 12-40 words stating the capability that now exists. Titles stay under 10 words. Name the actual functions, types, and files involved. Never answer with a single vague sentence, and never pad - every sentence must add information a reviewer can act on.
 
