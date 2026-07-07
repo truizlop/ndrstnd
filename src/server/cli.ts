@@ -1,20 +1,24 @@
 #!/usr/bin/env node
 import { spawn } from "node:child_process";
+import { readFile } from "node:fs/promises";
 import process from "node:process";
 import { getCodexAuthStatus } from "./codex.js";
 import { analyzeWithCodex } from "./analyze.js";
 import { importConversation } from "./conversation.js";
 import { GitReader, describeReviewScope } from "./git.js";
+import { startReviewServer } from "./http.js";
 import { ReviewStore } from "./store.js";
 import { installSkill, installedSkillIsStale } from "./skill.js";
 import { writeReviewArtifact } from "./artifact.js";
-import { pathToFileURL } from "node:url";
-import { join } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
+import { dirname, join } from "node:path";
 
 const [command, ...args] = process.argv.slice(2);
 
 if (command === undefined || command === "--help" || command === "-h") {
   printHelp();
+} else if (command === "--version" || command === "-v" || command === "version") {
+  process.stdout.write(`ndrstnd ${await packageVersion()}\n`);
 } else if (command === "auth") {
   await runAuth(args);
 } else if (command === "skill") {
@@ -23,6 +27,11 @@ if (command === undefined || command === "--help" || command === "-h") {
   await runReview(args);
 } else {
   fail(`Unknown command: ${command}`);
+}
+
+async function packageVersion(): Promise<string> {
+  const manifest = JSON.parse(await readFile(join(dirname(fileURLToPath(import.meta.url)), "../../package.json"), "utf8")) as { version?: string };
+  return manifest.version ?? "unknown";
 }
 
 async function runSkill(args: string[]): Promise<void> {
@@ -66,18 +75,47 @@ async function runCodexLogin(): Promise<void> {
   }
 }
 
+/** A typo in a scope flag must fail loudly; silently ignoring it would review the wrong changes. */
+function parseReviewArgs(args: string[]): { targetRef?: string; values: Map<string, string>; flags: Set<string> } {
+  // Defined here because the top-level command dispatch runs before module-level consts initialize.
+  const valueOptions = ["--base", "--repo", "--conversation", "--lens"];
+  const booleanOptions = ["--uncommitted", "--live", "--no-open"];
+  const values = new Map<string, string>();
+  const flags = new Set<string>();
+  let targetRef: string | undefined;
+  for (let index = 0; index < args.length; index += 1) {
+    const argument = args[index];
+    if (valueOptions.includes(argument)) {
+      const value = args[index + 1];
+      if (value === undefined || value.startsWith("-")) fail(`${argument} requires a value.`);
+      values.set(argument, value);
+      index += 1;
+      continue;
+    }
+    if (booleanOptions.includes(argument)) {
+      flags.add(argument);
+      continue;
+    }
+    if (argument.startsWith("-")) fail(`Unknown review option: ${argument}. Known options: ${[...valueOptions, ...booleanOptions].join(", ")}.`);
+    if (targetRef !== undefined) fail(`Unexpected extra argument: ${argument}. Pass at most one branch.`);
+    targetRef = argument;
+  }
+  return { targetRef, values, flags };
+}
+
 async function runReview(args: string[]): Promise<void> {
-  const targetArg = extractTargetRef(args);
-  const uncommitted = args.includes("--uncommitted");
-  const explicitBase = optionValue(args, "--base");
+  const { targetRef: targetArg, values, flags } = parseReviewArgs(args);
+  const uncommitted = flags.has("--uncommitted");
+  const live = flags.has("--live");
+  const explicitBase = values.get("--base");
   if (uncommitted && explicitBase !== undefined) fail("--uncommitted already reviews against HEAD; do not combine it with --base.");
   if (uncommitted && targetArg !== undefined) fail("--uncommitted reviews the checked-out branch; do not pass a branch.");
   const targetRef = targetArg ?? "WORKTREE";
-  const noOpen = args.includes("--no-open");
-  const repoPath = optionValue(args, "--repo") ?? process.cwd();
+  const noOpen = flags.has("--no-open");
+  const repoPath = values.get("--repo") ?? process.cwd();
   const baseRef = uncommitted ? "HEAD" : explicitBase;
-  const lensId = optionValue(args, "--lens") ?? "default";
-  const conversationPath = optionValue(args, "--conversation");
+  const lensId = values.get("--lens") ?? "default";
+  const conversationPath = values.get("--conversation");
   const conversation = conversationPath === undefined ? undefined : await importConversation(conversationPath);
   const input = await new GitReader().collectReviewInput(repoPath, targetRef, baseRef);
   const meaningfulFiles = input.files.filter((file) => file.signal === "meaningful").length;
@@ -108,9 +146,22 @@ async function runReview(args: string[]): Promise<void> {
     }
   }
   process.stdout.write(`merge-base=${input.mergeBase.slice(0, 12)} files=${input.files.length} meaningful-files=${meaningfulFiles} hunks=${input.hunks.length}${conversation === undefined ? "" : ` conversation=${conversation.messages.length}`}\n`);
+  if (live) {
+    const server = await startReviewServer({ session, revision, store });
+    process.stdout.write(`ndrstnd live workspace: ${server.url}\n`);
+    process.stdout.write("Lens re-analysis and evidence-grounded questions stay available while this process runs. Press Ctrl+C to stop.\n");
+    if (!noOpen) openBrowser(server.url);
+    await new Promise<void>((resolve) => {
+      process.once("SIGINT", resolve);
+      process.once("SIGTERM", resolve);
+    });
+    await server.close();
+    store.close();
+    return;
+  }
   const artifactPath = await writeReviewArtifact(session, revision, { directory: join(repoPath, ".ndrstnd") });
   process.stdout.write(`ndrstnd artifact: ${artifactPath}\n`);
-  process.stdout.write("This self-contained file is in the Git-ignored .ndrstnd directory and expires after seven days.\n");
+  process.stdout.write("This self-contained file is in the Git-ignored .ndrstnd directory; delete it when the review is done.\n");
   if (!noOpen) openBrowser(pathToFileURL(artifactPath).href);
   store.close();
 }
@@ -134,47 +185,8 @@ function openBrowser(url: string): void {
   child.unref();
 }
 
-function extractTargetRef(args: string[]): string | undefined {
-  for (let index = 0; index < args.length; index += 1) {
-    const argument = args[index];
-    if (argument === "--no-open") {
-      continue;
-    }
-    if (argument === "--repo") {
-      index += 1;
-      continue;
-    }
-    if (argument === "--conversation") {
-      index += 1;
-      continue;
-    }
-    if (argument === "--lens") {
-      index += 1;
-      continue;
-    }
-    if (argument === "--base") {
-      index += 1;
-      continue;
-    }
-    if (!argument.startsWith("-")) {
-      return argument;
-    }
-  }
-  return undefined;
-}
-
-function optionValue(args: string[], option: string): string | undefined {
-  const index = args.indexOf(option);
-  if (index === -1) return undefined;
-  const value = args[index + 1];
-  if (value === undefined || value.startsWith("-")) {
-    fail(`${option} requires a value.`);
-  }
-  return value;
-}
-
 function printHelp(): void {
-  process.stdout.write(`ndrstnd — understand agent-produced branch changes\n\nUsage:\n  ndrstnd auth <status|login>\n  ndrstnd skill install [--force]\n  ndrstnd review [branch] [--base <branch>] [--uncommitted] [--repo <path>] [--conversation <path>] [--lens <id>] [--no-open]\n\nWithout a branch, ndrstnd reviews the checked-out branch including uncommitted changes.\n--uncommitted reviews only the uncommitted working-tree changes (an alias for --base HEAD).\nndrstnd always writes a self-contained, Git-ignored artifact.\n`);
+  process.stdout.write(`ndrstnd — understand agent-produced branch changes\n\nUsage:\n  ndrstnd auth <status|login>\n  ndrstnd skill install [--force]\n  ndrstnd review [branch] [--base <branch>] [--uncommitted] [--live] [--repo <path>] [--conversation <path>] [--lens <id>] [--no-open]\n  ndrstnd --version\n\nWithout a branch, ndrstnd reviews the checked-out branch including uncommitted changes.\n--uncommitted reviews only the uncommitted working-tree changes (an alias for --base HEAD).\n--live serves an interactive workspace with lens re-analysis and evidence-grounded questions instead of writing the portable artifact.\n`);
 }
 
 function fail(message: string): never {
