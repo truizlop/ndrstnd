@@ -109,7 +109,7 @@ export const frozenReviewData: ReviewPresentationData = {
       },
       {
         id: "retry-policy", title: "Retry transient failures", kind: "decision",
-        synopsis: "A dedicated RetryPolicy retries transient errors up to three times with exponential backoff instead of failing the job on first error.",
+        synopsis: "A dedicated `RetryPolicy` retries transient errors up to three times with exponential backoff instead of failing the job on first error.",
         before: "Any transient infrastructure error failed the job immediately.",
         after: "Transient errors are retried up to three times with 250ms exponential backoff; permanent errors still fail fast.",
         confidence: "medium", attention: "elevated", riskCategories: ["behavior", "performance"], evidenceIds: ["retry-hunk"],
@@ -132,7 +132,7 @@ export const frozenReviewData: ReviewPresentationData = {
         id: "step-01",
         title: "Run jobs through one entry point",
         goal: "Introduce the runner entry point so every job flows through a single run(job) call. The entry point owns cancellation checks and result stamping, which gives the later retry and telemetry work one seam to attach to.",
-        youNowHave: "Callers can run a supplied job through Runner.run and receive a JobResult stamped with the job id. Cancelled jobs fail fast with JobCancelledError instead of executing.",
+        youNowHave: "Callers can run a supplied job through `Runner.run` and receive a `JobResult` stamped with the job id. Cancelled jobs fail fast with `JobCancelledError` instead of executing.",
         deferred: [
           { concern: "Transient failures still bubble up immediately; retry semantics arrive with the policy.", resolvedByStepId: "step-02" },
           { concern: "Retries are not yet observable to operators.", resolvedByStepId: "step-03" },

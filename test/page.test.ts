@@ -416,6 +416,9 @@ it("renders the frozen presentation fixture without Git, analysis, or the review
   expect(page).toContain("npm test");
   expect(page).toContain("observed in the conversation");
   expect(page).toContain("Suite passed");
+  expect(page).toContain('<code class="md-code">RetryPolicy</code>');
+  expect(page).toContain('<code class="md-code">Runner.run</code>');
+  expect(page).not.toContain("`RetryPolicy`");
 });
 
 it("drives the Evidence-zoom focused excerpt from analysis focus ranges with a heuristic fallback", async () => {
