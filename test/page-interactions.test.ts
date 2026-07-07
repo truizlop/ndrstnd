@@ -416,6 +416,32 @@ it("copies an evidence-grounded Codex prompt from the selection menu and confirm
   expect(menu.hidden).toBe(true);
 });
 
+it("shows the selection menu for Full diff selections with the file path", async () => {
+  const window = new Window({ url: "http://127.0.0.1:3000/" });
+  const document = window.document;
+  document.title = "ndrstnd · agent-change";
+  const copies: string[] = [];
+  Object.defineProperty(window.navigator, "clipboard", { configurable: true, value: { writeText: async (value: string) => { copies.push(value); } } });
+  document.body.innerHTML = `<section id="diff"><details class="file full-diff-file" open data-file-id="f"><summary><span class="file-path">src/diffed.ts</span></summary><div class="diff-block" data-diff-hunk="h"><pre class="dcode">const patched = 1;</pre></div></details></section><div id="selection-menu" class="selection-menu" hidden><button data-question="Explain the selected lines.">Explain selection</button></div><div id="toast" hidden></div>`;
+  window.eval(`${artifactClientScript}${portableEnhancements}`);
+
+  const textNode = document.querySelector(".dcode")!.firstChild!;
+  const range = document.createRange();
+  range.setStart(textNode, 0);
+  range.setEnd(textNode, 18);
+  const selection = document.getSelection();
+  selection.removeAllRanges();
+  selection.addRange(range);
+  document.dispatchEvent(new window.Event("selectionchange"));
+
+  const menu = document.querySelector<HTMLElement>("#selection-menu")!;
+  expect(menu.hidden).toBe(false);
+  document.querySelector<HTMLElement>("[data-question]")?.click();
+  await new Promise((resolve) => window.setTimeout(resolve, 0));
+  expect(copies.at(-1)).toContain("selected excerpt from src/diffed.ts");
+  expect(copies.at(-1)).toContain("const patched = 1;");
+});
+
 it("keeps the selection menu hidden until the pointer is released", () => {
   const window = new Window({ url: "http://127.0.0.1:3000/" });
   const document = window.document;
