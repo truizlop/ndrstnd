@@ -401,8 +401,9 @@ it("renders the frozen presentation fixture without Git, analysis, or the review
   expect(page).toContain("Retry transient failures");
   expect(page).toContain("Surface retry telemetry");
   expect(page).toContain("Count retries in telemetry");
-  expect(page).toContain("<code>RetryPolicy</code> is introduced at");
+  expect(page).toContain('<code>RetryPolicy</code> is introduced at <button data-timeline-select="step-02">step 02</button>');
   expect(page).toContain("Transient failures still bubble up immediately; retry semantics arrive with the policy.");
+  expect(page).toContain('<button data-timeline-select="step-01">Builds on · step 01</button>');
   expect(page).toContain("Release bookkeeping");
   expect(page).toContain("Test plan</button>");
 });
