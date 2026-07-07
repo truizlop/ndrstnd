@@ -22,6 +22,9 @@ describe("installSkill", () => {
     expect(skill).toContain("evidence-led ndrstnd workspace");
     expect(skill).toContain("ndrstnd review --uncommitted");
     expect(skill).toContain("Export the conversation unless it contains no intent.");
+    expect(skill).toContain('"help me understand these changes"');
+    expect(skill).toContain("heartbeat");
+    expect(skill).toContain("never kill or restart it mid-analysis");
   });
 
   it("detects when the installed skill drifts from the bundled one", async () => {
