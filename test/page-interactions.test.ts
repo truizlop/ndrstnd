@@ -328,3 +328,95 @@ it("restores and saves portable UI preferences when local storage is available",
   document.querySelector<HTMLElement>(".collapse-inspector")?.click();
   expect(JSON.parse(window.localStorage.getItem("ndrstnd-artifact-ui-preferences-v1") || "{}")).toEqual({ sidebarCollapsed: false, inspectorCollapsed: false, zoom: 2, view: "trailer" });
 });
+
+const selectionFixture = `<article class="evidence"><header><span class="evidence-path">src/app.ts</span></header><pre class="focused-code">const answer = 42;</pre></article><div id="selection-menu" class="selection-menu" hidden><button data-question="Explain the selected lines.">Explain selection</button><button data-action="ask">Ask a question…</button></div><div id="toast" hidden></div>`;
+
+const selectEvidence = (window: Window) => {
+  const document = window.document;
+  const textNode = document.querySelector(".focused-code")!.firstChild!;
+  const range = document.createRange();
+  range.setStart(textNode, 0);
+  range.setEnd(textNode, 18);
+  const selection = document.getSelection();
+  selection.removeAllRanges();
+  selection.addRange(range);
+  document.dispatchEvent(new window.Event("selectionchange"));
+  return selection;
+};
+
+it("copies an evidence-grounded Codex prompt from the selection menu and confirms with a toast", async () => {
+  const window = new Window({ url: "http://127.0.0.1:3000/" });
+  const document = window.document;
+  document.title = "ndrstnd · agent-change";
+  const copies: string[] = [];
+  Object.defineProperty(window.navigator, "clipboard", { configurable: true, value: { writeText: async (value: string) => { copies.push(value); } } });
+  document.body.innerHTML = selectionFixture;
+  window.eval(`${artifactClientScript}${portableEnhancements}`);
+
+  const menu = document.querySelector<HTMLElement>("#selection-menu")!;
+  selectEvidence(window);
+  expect(menu.hidden).toBe(false);
+
+  document.querySelector<HTMLElement>("[data-question]")?.click();
+  await new Promise((resolve) => window.setTimeout(resolve, 0));
+  expect(copies.at(-1)).toBe("Explain the selected lines.\n\nContext: ndrstnd review of agent-change; selected excerpt from src/app.ts.\n\nSelected lines:\nconst answer = 42;");
+  expect(document.querySelector("#toast")?.textContent).toBe("Prompt copied — paste it into Codex to continue.");
+  expect(menu.hidden).toBe(true);
+
+  selectEvidence(window);
+  window.prompt = () => "Why is this constant safe to change?";
+  document.querySelector<HTMLElement>('[data-action="ask"]')?.click();
+  await new Promise((resolve) => window.setTimeout(resolve, 0));
+  expect(copies.at(-1)).toBe("Why is this constant safe to change?\n\nContext: ndrstnd review of agent-change; selected excerpt from src/app.ts.\n\nSelected lines:\nconst answer = 42;");
+  expect(menu.hidden).toBe(true);
+});
+
+it("dismisses the selection menu on scroll and on deselection", () => {
+  const window = new Window({ url: "http://127.0.0.1:3000/" });
+  const document = window.document;
+  document.body.innerHTML = selectionFixture;
+  window.eval(`${artifactClientScript}${portableEnhancements}`);
+
+  const menu = document.querySelector<HTMLElement>("#selection-menu")!;
+  const selection = selectEvidence(window);
+  expect(menu.hidden).toBe(false);
+
+  document.querySelector(".focused-code")!.dispatchEvent(new window.Event("scroll"));
+  expect(menu.hidden).toBe(true);
+
+  document.dispatchEvent(new window.Event("selectionchange"));
+  expect(menu.hidden).toBe(false);
+
+  selection.removeAllRanges();
+  document.dispatchEvent(new window.Event("selectionchange"));
+  expect(menu.hidden).toBe(true);
+});
+
+it("keeps the selection menu actionable while a touch press collapses the selection", async () => {
+  const window = new Window({ url: "http://127.0.0.1:3000/" });
+  const document = window.document;
+  document.title = "ndrstnd · agent-change";
+  const copies: string[] = [];
+  Object.defineProperty(window.navigator, "clipboard", { configurable: true, value: { writeText: async (value: string) => { copies.push(value); } } });
+  document.body.innerHTML = selectionFixture;
+  window.eval(`${artifactClientScript}${portableEnhancements}`);
+
+  const menu = document.querySelector<HTMLElement>("#selection-menu")!;
+  const selection = selectEvidence(window);
+  expect(menu.hidden).toBe(false);
+
+  const press = new window.MouseEvent("mousedown", { cancelable: true, bubbles: true });
+  menu.dispatchEvent(press);
+  expect(press.defaultPrevented).toBe(true);
+
+  menu.dispatchEvent(new window.Event("touchstart"));
+  selection.removeAllRanges();
+  document.dispatchEvent(new window.Event("selectionchange"));
+  expect(menu.hidden).toBe(false);
+
+  document.querySelector<HTMLElement>("[data-question]")?.click();
+  await new Promise((resolve) => window.setTimeout(resolve, 0));
+  expect(copies.at(-1)).toContain("const answer = 42;");
+  expect(menu.hidden).toBe(true);
+  expect(menu.dataset.pressed).toBeUndefined();
+});
