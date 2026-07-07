@@ -416,6 +416,28 @@ it("copies an evidence-grounded Codex prompt from the selection menu and confirm
   expect(menu.hidden).toBe(true);
 });
 
+it("keeps the selection menu hidden until the pointer is released", () => {
+  const window = new Window({ url: "http://127.0.0.1:3000/" });
+  const document = window.document;
+  document.body.innerHTML = selectionFixture;
+  window.eval(`${artifactClientScript}${portableEnhancements}`);
+  const menu = document.querySelector<HTMLElement>("#selection-menu")!;
+
+  document.body.dispatchEvent(new window.Event("pointerdown", { bubbles: true }));
+  const textNode = document.querySelector(".focused-code")!.firstChild!;
+  const range = document.createRange();
+  range.setStart(textNode, 0);
+  range.setEnd(textNode, 18);
+  const selection = document.getSelection();
+  selection.removeAllRanges();
+  selection.addRange(range);
+  document.dispatchEvent(new window.Event("selectionchange"));
+  expect(menu.hidden).toBe(true);
+
+  document.body.dispatchEvent(new window.Event("pointerup", { bubbles: true }));
+  expect(menu.hidden).toBe(false);
+});
+
 it("dismisses the selection menu on scroll and on deselection", () => {
   const window = new Window({ url: "http://127.0.0.1:3000/" });
   const document = window.document;
