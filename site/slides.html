@@ -104,6 +104,10 @@ kbd{display:inline-grid;place-items:center;min-width:23px;height:23px;padding:0 
 .slide.current .hero-mark path:nth-child(2){animation-delay:180ms}
 .slide.current .hero-mark path:nth-child(3){stroke:var(--accent);animation-delay:360ms}
 @keyframes draw{to{stroke-dashoffset:0}}
+.cover{align-items:center}
+.cover-lockup{display:flex;align-items:center;gap:32px}
+.cover-lockup .hero-mark{width:84px;height:92px;margin:0}
+.cover-lockup b{font:600 104px/1 var(--mono);letter-spacing:-.03em;color:var(--ink)}
 .t-title{margin:0 0 26px;max-width:13em;font:600 72px/1.07 var(--serif);letter-spacing:-.02em;text-wrap:balance}
 .t-title em{font-style:italic;color:var(--accent)}
 .t-sub{margin:0 0 40px;max-width:36em;font:400 22px/1.6 var(--sans);color:var(--ink-2)}
@@ -420,6 +424,7 @@ a.cchip:hover{text-decoration:none;background:var(--rail);border-color:var(--fai
 @media(prefers-reduced-motion:reduce){
   *,*::before,*::after{transition:none!important;animation:none!important}
   .rise,.slide.current .rise{opacity:1;transform:none}
+  .slide.current .hero-mark path{stroke-dasharray:none;stroke-dashoffset:0}
 }
 @media print{
   body{overflow:visible;background:#fff}
@@ -427,6 +432,7 @@ a.cchip:hover{text-decoration:none;background:var(--rail);border-color:var(--fai
   .slide{position:relative;left:auto;top:auto;transform:none;margin:0 auto 20px;opacity:1;visibility:visible;page-break-after:always;box-shadow:none}
   .progress,.counter,.deckmark{display:none}
   .rise{opacity:1;transform:none}
+  .slide.current .hero-mark path{stroke-dasharray:none;stroke-dashoffset:0}
 }
 </style>
 </head>
@@ -436,6 +442,14 @@ a.cchip:hover{text-decoration:none;background:var(--rail);border-color:var(--fai
 <span class="counter" id="counter" aria-hidden="true">01 / 01</span>
 
 <main class="deck" id="deck">
+
+<!-- 0 · LOGO COVER -->
+<section class="slide cover" aria-label="ndrstnd">
+  <div class="cover-lockup rise">
+    <svg class="hero-mark" viewBox="0 0 20 22" aria-hidden="true"><path d="M4.4 3.4 10 7.6l5.6-4.2"/><path d="M4.4 8.9 10 13.1l5.6-4.2"/><path d="M4.4 14.4 10 18.6l5.6-4.2"/></svg>
+    <b>ndrstnd</b>
+  </div>
+</section>
 
 <!-- 1 · TITLE -->
 <section class="slide" aria-label="Title">
