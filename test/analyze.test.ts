@@ -65,6 +65,11 @@ describe("analysis documents", () => {
     expect(analysisPrompt(input)).toContain("Group every low-signal evidence ID into an omitted group in o");
   });
 
+  it("tells Codex to ground the narrative in a supplied conversation", () => {
+    expect(analysisPrompt(input)).toContain("Treat it as primary evidence of intent");
+    expect(analysisPrompt(input)).toContain("never copy credentials or secrets");
+  });
+
   it("round-trips a valid step plan through document parsing", () => {
     expect(parseAnalysisDocument({
       summary: validSummary,
