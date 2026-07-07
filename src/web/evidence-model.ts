@@ -25,6 +25,32 @@ export function chapterMetrics(chapter: AnalysisDocument["chapters"][number], hu
   return { additions, deletions, files: new Set(chapterHunks.map((hunk) => hunk.fileId)).size, hunks: chapterHunks.length, addShare, deleteShare: total === 0 ? 0 : 100 - addShare };
 }
 
+/**
+ * Selects the lines the analysis marked as reviewer-critical for one hunk.
+ * Deletion runs adjacent to a selected line stay visible so replaced code
+ * keeps its before-image. Returns undefined when the ranges select nothing,
+ * so callers can fall back to the heuristic selection.
+ */
+export function focusLinesFromRanges(lines: DiffLine[], ranges: Array<{ start: number; end: number }> | undefined): Array<{ line: DiffLine; index: number }> | undefined {
+  if (ranges === undefined || ranges.length === 0) return undefined;
+  const selected = new Set<number>();
+  lines.forEach((line, index) => {
+    if (line.newLine !== undefined && ranges.some((range) => line.newLine! >= range.start && line.newLine! <= range.end)) selected.add(index);
+  });
+  if (selected.size === 0) return undefined;
+  let grew = true;
+  while (grew) {
+    grew = false;
+    lines.forEach((line, index) => {
+      if (line.kind === "deletion" && !selected.has(index) && (selected.has(index - 1) || selected.has(index + 1))) {
+        selected.add(index);
+        grew = true;
+      }
+    });
+  }
+  return [...selected].sort((left, right) => left - right).map((index) => ({ line: lines[index]!, index }));
+}
+
 export function focusedEvidenceLines(lines: DiffLine[]): Array<{ line: DiffLine; index: number }> {
   const changed = lines
     .map((line, index) => ({ line, index, score: evidenceLineScore(line) }))

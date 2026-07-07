@@ -106,10 +106,35 @@ describe("analysis documents", () => {
     const chapter = { id: "one", title: "Runner behavior", kind: "behavior" as const, synopsis: validSynopsis, confidence: "high" as const, attention: "contained" as const, riskCategories: ["behavior" as const], evidenceIds: ["use-hunk", "def-hunk"] };
     const useStep = { ...sourceStep, id: "step-01", title: "Call runner", advancesChapterIds: ["one"], evidenceIds: ["use-hunk"] };
     const defStep = { ...sourceStep, id: "step-02", title: "Define runner", dependsOn: ["step-01"], advancesChapterIds: ["one"], evidenceIds: ["def-hunk"] };
-    const document = { summary: validSummary, chapters: [chapter], steps: [useStep, defStep], omittedGroups: [], unclassifiedEvidenceIds: [] };
+    const document = { summary: validSummary, chapters: [chapter], steps: [useStep, defStep], omittedGroups: [], unclassifiedEvidenceIds: [], focus: { "use-hunk": [{ start: 1, end: 1 }], "def-hunk": [{ start: 1, end: 1 }] } };
 
     expect(() => parseAnalysisDocument(document, orderedInput)).toThrow("violates symbol runJob");
     expect(parseAnalysisDocument({ ...document, steps: [{ ...useStep, forwardRefs: { runJob: "step-02" } }, defStep] }, orderedInput).steps[0].forwardRefs).toEqual({ runJob: "step-02" });
+  });
+
+  it("validates focus ranges and requires focus for chapter evidence", () => {
+    const focusInput: CollectedReviewInput = {
+      ...input,
+      files: [{ id: "source", path: "app.ts", status: "modified", binary: false, signal: "meaningful" }],
+      hunks: [{
+        id: "source-hunk", fileId: "source", oldStart: 8, newStart: 8,
+        lines: [
+          { kind: "context", content: "export class Runner {", oldLine: 8, newLine: 8 },
+          { kind: "deletion", content: "  run() { return null; }", oldLine: 9 },
+          { kind: "addition", content: "  run(job) { return this.execute(job); }", newLine: 9 },
+          { kind: "addition", content: "}", newLine: 10 },
+        ],
+      }],
+    };
+    const chapter = { id: "one", title: "Runner behavior", kind: "behavior" as const, synopsis: validSynopsis, confidence: "high" as const, attention: "contained" as const, riskCategories: ["behavior" as const], evidenceIds: ["source-hunk"] };
+    const document = { summary: validSummary, chapters: [chapter], steps: [sourceStep], omittedGroups: [], unclassifiedEvidenceIds: [] };
+
+    expect(() => parseAnalysisDocument(document, focusInput)).toThrow("Focus is missing for chapter evidence: source-hunk");
+    expect(() => parseAnalysisDocument({ ...document, focus: { "source-hunk": [{ start: 40, end: 50 }] } }, focusInput)).toThrow("selects no lines of that hunk; its new-file lines span 8-10");
+    expect(() => parseAnalysisDocument({ ...document, focus: { "source-hunk": [{ start: 10, end: 9 }] } }, focusInput)).toThrow("inverted");
+    expect(() => parseAnalysisDocument({ ...document, focus: { "source-hunk": [{ start: 9, end: 9 }], "not-real": [{ start: 1, end: 1 }] } }, focusInput)).toThrow("Focus referenced unknown evidence");
+    expect(parseAnalysisDocument({ ...document, focus: { "source-hunk": [{ start: 9, end: 9 }] } }, focusInput).focus).toEqual({ "source-hunk": [{ start: 9, end: 9 }] });
+    expect(analysisPrompt(focusInput)).toContain("f drives the Evidence zoom excerpts");
   });
 
   it("accepts compact Codex output and normalizes it to the presentation document", () => {
@@ -240,7 +265,7 @@ describe("analysis documents", () => {
       unclassifiedEvidenceIds: compactDocument.u,
     };
 
-    expect(analysisPrompt(input)).toContain("{s,c:[[id,title,kind,synopsis,before|null,after|null,confidence,attention,riskCategories,evidenceIds]],t:[[id,title,goal,youNowHave,[[concern,resolvedByStepId|null]],dependsOn,forwardRefs,advancesChapterIds,evidenceIds]],o:[[title,reason,evidenceIds]],u:[evidenceId]}");
+    expect(analysisPrompt(input)).toContain("{s,c:[[id,title,kind,synopsis,before|null,after|null,confidence,attention,riskCategories,evidenceIds]],t:[[id,title,goal,youNowHave,[[concern,resolvedByStepId|null]],dependsOn,forwardRefs,advancesChapterIds,evidenceIds]],o:[[title,reason,evidenceIds]],u:[evidenceId],f:{evidenceId:[[startLine,endLine]]}}");
     expect(JSON.stringify(compactDocument).length).toBeLessThan(JSON.stringify(fullDocument).length * 0.7);
   });
 

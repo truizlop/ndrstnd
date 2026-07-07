@@ -27,8 +27,29 @@ export function parseAnalysisDocument(value: unknown, input: CollectedReviewInpu
     .filter((id) => !grouped.has(id));
   if (strayLowSignal.length > 0) throw new Error(`Low-signal evidence was left ungrouped: ${strayLowSignal.join(", ")}. Add each ID to an omitted group in o with a short reason (for example lockfile churn or generated output); u is only for meaningful evidence that defies classification.`);
   validateStepPlan(document, input, meaningfulEvidence);
+  validateFocus(document, input);
   validateProseDepth(document);
   return document;
+}
+
+function validateFocus(document: AnalysisDocument, input: CollectedReviewInput): void {
+  const hunksById = new Map(input.hunks.map((hunk) => [hunk.id, hunk]));
+  const focus = document.focus ?? {};
+  for (const [evidenceId, ranges] of Object.entries(focus)) {
+    const hunk = hunksById.get(evidenceId);
+    if (hunk === undefined) throw new Error(`Focus referenced unknown evidence: ${evidenceId}. Use only hunk IDs listed in the review input manifest.`);
+    const newLines = hunk.lines.flatMap((line) => (line.newLine === undefined ? [] : [line.newLine]));
+    const span = newLines.length === 0 ? "none" : `${Math.min(...newLines)}-${Math.max(...newLines)}`;
+    for (const range of ranges) {
+      if (range.start > range.end) throw new Error(`Focus range for ${evidenceId} is inverted: [${range.start},${range.end}]. Give [startLine,endLine] with startLine <= endLine.`);
+      if (!newLines.some((line) => line >= range.start && line <= range.end)) throw new Error(`Focus range [${range.start},${range.end}] for ${evidenceId} selects no lines of that hunk; its new-file lines span ${span}. Use new-file line numbers from the patch.`);
+    }
+  }
+  const missingFocus = document.chapters
+    .flatMap((chapter) => chapter.evidenceIds)
+    .filter((id) => focus[id] === undefined)
+    .filter((id) => (hunksById.get(id)?.lines ?? []).some((line) => line.newLine !== undefined));
+  if (missingFocus.length > 0) throw new Error(`Focus is missing for chapter evidence: ${[...new Set(missingFocus)].join(", ")}. Add each ID to f with 1-3 [startLine,endLine] new-file line ranges covering the lines a reviewer must read first.`);
 }
 
 export const PROSE_WORD_RANGES = {
@@ -111,7 +132,7 @@ function validateStepPlan(document: AnalysisDocument, input: CollectedReviewInpu
 
 export function analysisPrompt(input: CollectedReviewInput, conversation?: ConversationContext, lensInstructions?: string): string {
   const reviewInput = buildPromptReviewInput(input, conversation);
-  return `You are ndrstnd, a comprehension assistant. Explain a branch without critiquing it or proposing changes. ${lensInstructions ?? "Prioritize the implementation story and behavior changes."} Return compact minified JSON only with this shape: {s,c:[[id,title,kind,synopsis,before|null,after|null,confidence,attention,riskCategories,evidenceIds]],t:[[id,title,goal,youNowHave,[[concern,resolvedByStepId|null]],dependsOn,forwardRefs,advancesChapterIds,evidenceIds]],o:[[title,reason,evidenceIds]],u:[evidenceId]}. Allowed kind values are exactly feature, decision, behavior, non_functional, risk, test, other. Confidence is high, medium, or low. Attention is low, contained, elevated, high, or critical. Risk categories are formatting, refactor, behavior, performance, security. Use only listed evidence IDs. Every meaningful evidence ID must appear exactly once in c, o, or u, and exactly once in t. Group every low-signal evidence ID into an omitted group in o with a concise reason such as lockfile churn or generated output; u is a last resort for evidence that truly cannot be classified.
+  return `You are ndrstnd, a comprehension assistant. Explain a branch without critiquing it or proposing changes. ${lensInstructions ?? "Prioritize the implementation story and behavior changes."} Return compact minified JSON only with this shape: {s,c:[[id,title,kind,synopsis,before|null,after|null,confidence,attention,riskCategories,evidenceIds]],t:[[id,title,goal,youNowHave,[[concern,resolvedByStepId|null]],dependsOn,forwardRefs,advancesChapterIds,evidenceIds]],o:[[title,reason,evidenceIds]],u:[evidenceId],f:{evidenceId:[[startLine,endLine]]}}. Allowed kind values are exactly feature, decision, behavior, non_functional, risk, test, other. Confidence is high, medium, or low. Attention is low, contained, elevated, high, or critical. Risk categories are formatting, refactor, behavior, performance, security. Use only listed evidence IDs. Every meaningful evidence ID must appear exactly once in c, o, or u, and exactly once in t. Group every low-signal evidence ID into an omitted group in o with a concise reason such as lockfile churn or generated output; u is a last resort for evidence that truly cannot be classified. f drives the Evidence zoom excerpts: for every evidence ID used in c, list 1-3 [startLine,endLine] ranges of new-file line numbers marking the exact lines a reviewer must read first - the load-bearing statements, not whole hunks, imports, or boilerplate. Each range must fall inside that hunk's new-file lines; inspect the patch to choose them precisely.
 
 Prose depth is validated and out-of-range fields are rejected, so hit these word counts: summary 35-75 words; each synopsis 20-55 words across two or three sentences explaining what changed, how it works, and why it matters; before and after 10-40 words each describing concrete observable behavior; each step goal 12-40 words stating the intent and mechanism; each youNowHave 12-40 words stating the capability that now exists. Titles stay under 10 words. Name the actual functions, types, and files involved. Never answer with a single vague sentence, and never pad - every sentence must add information a reviewer can act on.
 
@@ -199,6 +220,7 @@ const CompactAnalysisDocumentSchema = z.object({
   t: z.array(CompactStepSchema),
   o: z.array(z.tuple([z.string().min(1).max(120), z.string().min(1).max(220), z.array(z.string().min(1)).min(1)])),
   u: z.array(z.string().min(1)),
+  f: z.record(z.string().min(1), z.array(z.tuple([z.number().int().min(1), z.number().int().min(1)])).min(1).max(5)).optional(),
 });
 
 function parseWireAnalysisDocument(value: unknown): AnalysisDocument {
@@ -233,6 +255,7 @@ function parseWireAnalysisDocument(value: unknown): AnalysisDocument {
     })),
     omittedGroups: compact.o.map((group) => ({ title: group[0], reason: group[1], evidenceIds: group[2] })),
     unclassifiedEvidenceIds: compact.u,
+    focus: compact.f === undefined ? undefined : Object.fromEntries(Object.entries(compact.f).map(([evidenceId, ranges]) => [evidenceId, ranges.map(([start, end]) => ({ start, end }))])),
   });
 }
 

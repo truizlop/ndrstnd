@@ -1,7 +1,7 @@
 import type { AnalysisDocument } from "../shared/analysis-schema.js";
 import type { ChangedFile, DiffHunk, DiffLine } from "../shared/domain.js";
 import type { ReviewPresentationData } from "./review-data.js";
-import { attentionCounts, categoryCounts, chapterMetrics, focusedEvidenceLines, isSupportingFile, linePrefix, toUnifiedDiff } from "./evidence-model.js";
+import { attentionCounts, categoryCounts, chapterMetrics, focusLinesFromRanges, focusedEvidenceLines, isSupportingFile, linePrefix, toUnifiedDiff } from "./evidence-model.js";
 import { resolveLanguage, syntaxHighlighter } from "./language.js";
 import { buildTestThemes, deriveTestSummary, focusedTestLines, isTestPath, testTypeLabel, type TestThemeModel } from "./test-plan-model.js";
 import { parse as parseDiff } from "diff2html";
@@ -72,7 +72,7 @@ function renderChapters(document: AnalysisDocument, hunks: DiffHunk[], filePaths
     const focusedEvidence = chapter.evidenceIds
       .map((id) => requireHunk(hunks, id))
       .filter((hunk) => !isSupportingFile(filesById.get(hunk.fileId)))
-      .map((hunk) => renderEvidence(hunk, filePaths.get(hunk.fileId) ?? hunk.fileId, highlighter, stepIndexByEvidence.get(hunk.id)))
+      .map((hunk) => renderEvidence(hunk, filePaths.get(hunk.fileId) ?? hunk.fileId, highlighter, stepIndexByEvidence.get(hunk.id), document.focus?.[hunk.id]))
       .filter(Boolean)
       .join("");
     return `<article class="chapter" data-chapter="${escapeHtml(chapter.id)}"><button class="chapter-toggle" aria-expanded="false"><span class="chapter-number attention-${escapeHtml(chapter.attention)}">${String(index + 1).padStart(2, "0")}</span><span class="chapter-copy"><strong>${escapeHtml(chapter.title)}</strong><small>${escapeHtml(chapter.synopsis)}</small>${stepChips ? `<span class="chapter-steps">${stepChips}</span>` : ""}<span class="chapter-tags">${chapter.riskCategories.map((risk) => `<span class="chapter-tag">${categoryIcon(risk)}${escapeHtml(risk)}</span>`).join("")}</span>${renderChapterMapMetrics(metrics)}</span><span class="chevron" aria-hidden="true"><svg viewBox="0 0 12 12"><path d="M2.5 4.25L6 7.75l3.5-3.5"/></svg></span></button><div class="chapter-detail" hidden>${renderSemantic(chapter.before, chapter.after)}${focusedEvidence ? `<div class="evidence-stack">${focusedEvidence}</div>` : ""}</div></article>`;
@@ -108,7 +108,7 @@ function renderTimeline(document: AnalysisDocument, hunks: DiffHunk[], filePaths
     const forwardRefs = Object.entries(step.forwardRefs);
     const refs = forwardRefs.length === 0 ? `<p class="empty-note">Every symbol used here already exists.</p>` : `<ul>${forwardRefs.map(([symbol, targetStepId]) => `<li><code>${escapeHtml(symbol)}</code> is introduced at <button data-timeline-select="${escapeHtml(targetStepId)}">${escapeHtml(stepLabel(targetStepId))}</button></li>`).join("")}</ul>`;
     const buildsOn = step.dependsOn.filter((id) => stepOrdinalById.has(id)).map((id) => `<button data-timeline-select="${escapeHtml(id)}">Builds on · ${escapeHtml(stepLabel(id))}</button>`).join("");
-    const renderItem = (hunk: DiffHunk) => `<div class="timeline-evidence-item${currentEvidence.has(hunk.id) ? " current" : ""}" data-evidence-id="${escapeHtml(hunk.id)}">${renderEvidence(hunk, filePaths.get(hunk.fileId) ?? hunk.fileId, highlighter, stepIndexByEvidence.get(hunk.id) ?? index)}</div>`;
+    const renderItem = (hunk: DiffHunk) => `<div class="timeline-evidence-item${currentEvidence.has(hunk.id) ? " current" : ""}" data-evidence-id="${escapeHtml(hunk.id)}">${renderEvidence(hunk, filePaths.get(hunk.fileId) ?? hunk.fileId, highlighter, stepIndexByEvidence.get(hunk.id) ?? index, document.focus?.[hunk.id])}</div>`;
     const currentItems = cumulativeHunks.filter((hunk) => currentEvidence.has(hunk.id)).map(renderItem).join("");
     const priorHunks = cumulativeHunks.filter((hunk) => !currentEvidence.has(hunk.id));
     const priorItems = priorHunks.length === 0 ? "" : `<p class="timeline-evidence-divider">Already in place from earlier steps</p>${priorHunks.map(renderItem).join("")}`;
@@ -174,8 +174,8 @@ function renderSemantic(before: string | undefined, after: string | undefined): 
   return `<div class="semantic"><div><strong>Before</strong><p>${escapeHtml(before ?? "Not inferred from this patch.")}</p></div><div><strong>After</strong><p>${escapeHtml(after ?? "Not inferred from this patch.")}</p></div></div>`;
 }
 
-function renderEvidence(hunk: DiffHunk, path: string, highlighter: Highlighter, stepIndex?: number): string {
-  const focused = focusedEvidenceLines(hunk.lines);
+function renderEvidence(hunk: DiffHunk, path: string, highlighter: Highlighter, stepIndex?: number, focus?: Array<{ start: number; end: number }>): string {
+  const focused = focusLinesFromRanges(hunk.lines, focus) ?? focusedEvidenceLines(hunk.lines);
   if (focused.length === 0) return "";
   const language = resolveLanguage(path);
   let previousIndex = -1;

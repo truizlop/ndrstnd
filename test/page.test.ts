@@ -409,6 +409,20 @@ it("renders the frozen presentation fixture without Git, analysis, or the review
   expect(page).toContain("Test plan</button>");
 });
 
+it("drives the Evidence-zoom focused excerpt from analysis focus ranges with a heuristic fallback", async () => {
+  const page = await renderArtifact(frozenReviewData);
+  const evidence = /<article class="evidence focused-evidence" data-evidence-id="retry-hunk">([\s\S]*?)<\/article>/.exec(page)![1];
+  const focusedBlock = /<pre class="focused-code">([\s\S]*?)<\/pre>/.exec(evidence)![1];
+  const rawBlock = /<pre class="raw-code">([\s\S]*?)<\/pre>/.exec(evidence)![1];
+  expect(focusedBlock).toContain("maxAttempts");
+  expect(focusedBlock).not.toContain("RetryPolicy");
+  expect(rawBlock).toContain("RetryPolicy");
+
+  const withoutFocus = await renderArtifact({ ...frozenReviewData, document: { ...frozenReviewData.document, focus: undefined } });
+  const fallbackEvidence = /<article class="evidence focused-evidence" data-evidence-id="retry-hunk">([\s\S]*?)<\/article>/.exec(withoutFocus)![1];
+  expect(/<pre class="focused-code">([\s\S]*?)<\/pre>/.exec(fallbackEvidence)![1]).toContain("RetryPolicy");
+});
+
 it("collapses unclassified evidence alongside omitted groups", async () => {
   const data = { ...frozenReviewData, document: { ...frozenReviewData.document, unclassifiedEvidenceIds: ["lockfile-hunk"] } };
   const page = await renderArtifact(data);

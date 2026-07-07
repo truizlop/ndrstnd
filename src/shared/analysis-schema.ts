@@ -31,12 +31,16 @@ export const AnalysisStepSchema = z.object({
   evidenceIds: z.array(z.string().min(1)).min(1),
 });
 
+export const FocusRangeSchema = z.object({ start: z.number().int().min(1), end: z.number().int().min(1) });
+
 export const AnalysisDocumentSchema = z.object({
   summary: z.string().min(1).max(560),
   chapters: z.array(ChapterSchema),
   steps: z.array(AnalysisStepSchema),
   omittedGroups: z.array(z.object({ title: z.string().min(1).max(120), reason: z.string().min(1).max(220), evidenceIds: z.array(z.string().min(1)).min(1) })),
   unclassifiedEvidenceIds: z.array(z.string().min(1)),
+  /** Reviewer-critical new-file line ranges per evidence ID; they drive the focused excerpts at the Evidence zoom. */
+  focus: z.record(z.string().min(1), z.array(FocusRangeSchema).min(1).max(5)).optional(),
 });
 
 export type AnalysisDocument = z.infer<typeof AnalysisDocumentSchema>;
