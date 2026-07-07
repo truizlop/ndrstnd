@@ -354,6 +354,8 @@ describe("renderWorkspace", () => {
       unclassifiedEvidenceIds: [],
     };
     const page = await renderArtifact(createReviewPresentationData(session, { id: "revision", sessionId: "session", source: "codex", status: "complete", document, createdAt: "now" }));
+    expect(page.indexOf("Test plan</button>")).toBeGreaterThan(-1);
+    expect(page.indexOf("Test plan</button>")).toBeLessThan(page.indexOf("Full diff</button>"));
     expect(page).toContain("See how the changed behavior was exercised, from high-level themes to raw test evidence.");
     expect(page).toContain("1 tested behavior");
     expect(page).toContain("1 test file");
