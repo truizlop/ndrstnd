@@ -226,7 +226,7 @@ describe("renderWorkspace", () => {
     expect(page).toContain('<b class="additions">+2</b>');
   });
 
-  it("precomputes Timeline states with cumulative evidence for consecutive steps", async () => {
+  it("ships each timeline hunk once as a template and references it per step", async () => {
     const session: StoredReviewSession = {
       id: "session", repoPath: "/repo", targetRef: "agent-change", baseRef: "main", mergeBase: "abcdef123456", inputHash: "hash", createdAt: "now",
       input: {
@@ -266,15 +266,17 @@ describe("renderWorkspace", () => {
       return page.slice(articleStart, next < 0 ? page.indexOf("</div></div></section>", start) : next);
     };
 
-    expect(state("step-01")).toContain('data-evidence-id="hunk-1"');
-    expect(state("step-01")).not.toContain('data-evidence-id="hunk-2"');
-    expect(state("step-02")).toContain('data-evidence-id="hunk-1"');
-    expect(state("step-02")).toContain('data-evidence-id="hunk-2"');
-    expect(state("step-02")).not.toContain('data-evidence-id="hunk-3"');
-    expect(state("step-03")).toContain('data-evidence-id="hunk-1"');
-    expect(state("step-03")).toContain('data-evidence-id="hunk-2"');
-    expect(state("step-03")).toContain('data-evidence-id="hunk-3"');
-    expect(state("step-03").match(/class="timeline-evidence-item current"/g)).toHaveLength(1);
+    expect(state("step-01")).toContain('data-current-evidence="hunk-1"');
+    expect(state("step-01")).toContain('data-prior-evidence=""');
+    expect(state("step-02")).toContain('data-current-evidence="hunk-2"');
+    expect(state("step-02")).toContain('data-prior-evidence="hunk-1"');
+    expect(state("step-03")).toContain('data-prior-evidence="hunk-1 hunk-2"');
+    for (const id of ["hunk-1", "hunk-2", "hunk-3"]) {
+      expect(page.match(new RegExp(`data-evidence-template="${id}"`, "g"))).toHaveLength(1);
+      expect(state("step-03")).not.toContain(`data-evidence-id="${id}"`);
+    }
+    expect(page.match(/data-evidence-id="hunk-1"/g)).toHaveLength(2);
+    expect(page.match(/data-diff-hunk="hunk-1"/g)).toHaveLength(1);
   });
 
   it("renders Test plan zoom projections from one test information model", async () => {

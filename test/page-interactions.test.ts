@@ -329,6 +329,30 @@ it("restores and saves portable UI preferences when local storage is available",
   expect(JSON.parse(window.localStorage.getItem("ndrstnd-artifact-ui-preferences-v1") || "{}")).toEqual({ sidebarCollapsed: false, inspectorCollapsed: false, zoom: 2, view: "trailer" });
 });
 
+it("materializes the active timeline step from the evidence library and clears inactive steps", () => {
+  const window = new Window();
+  const document = window.document;
+  document.body.innerHTML = `<button data-view="timeline" class="nav-item active"></button><section id="timeline" class="view active"><button class="rail-tick active" data-timeline-select="step-01" data-step-title="one"></button><button class="rail-tick" data-timeline-select="step-02" data-step-title="two"></button><article class="timeline-state active" data-timeline-state="step-01" data-step-index="1"><div class="timeline-evidence" data-current-evidence="h1" data-prior-evidence=""></div><div class="timeline-raw"></div></article><article class="timeline-state" data-timeline-state="step-02" data-step-index="2" hidden><div class="timeline-evidence" data-current-evidence="h2" data-prior-evidence="h1"></div><div class="timeline-raw"></div></article></section><section id="diff"><details class="file full-diff-file" open data-file-id="f"><summary><span class="file-path">src/a.ts</span></summary><div class="diff-block" data-diff-hunk="h1"><pre>one</pre></div><div class="diff-block" data-diff-hunk="h2"><pre>two</pre></div></details></section><div id="evidence-library" hidden><template data-evidence-template="h1"><article class="evidence" data-evidence-id="h1"><pre>ev-one</pre></article></template><template data-evidence-template="h2"><article class="evidence" data-evidence-id="h2"><pre>ev-two</pre></article></template></div><div id="map" hidden></div><div id="selection-menu" hidden></div>`;
+  window.eval(`${artifactClientScript}${portableEnhancements}`);
+
+  const stateOne = document.querySelector('[data-timeline-state="step-01"]')!;
+  expect(stateOne.querySelector('.timeline-evidence-item.current [data-evidence-id="h1"]')).not.toBeNull();
+  expect(stateOne.querySelectorAll(".timeline-raw .diff-block")).toHaveLength(1);
+  expect(stateOne.textContent).not.toContain("Already in place from earlier steps");
+
+  document.querySelector<HTMLElement>('[data-timeline-select="step-02"]')?.click();
+  const stateTwo = document.querySelector('[data-timeline-state="step-02"]')!;
+  expect(stateTwo.querySelectorAll(".timeline-evidence-item")).toHaveLength(2);
+  expect(stateTwo.querySelector('.timeline-evidence-item.current [data-evidence-id="h2"]')).not.toBeNull();
+  expect(stateTwo.textContent).toContain("Already in place from earlier steps");
+  expect(stateTwo.querySelectorAll(".timeline-raw .diff-block")).toHaveLength(2);
+  expect(stateOne.querySelector(".timeline-evidence")!.children).toHaveLength(0);
+  expect(stateOne.querySelector(".timeline-raw")!.children).toHaveLength(0);
+
+  document.querySelector<HTMLElement>('[data-timeline-select="step-01"]')?.click();
+  expect(stateOne.querySelector('[data-evidence-id="h1"]')).not.toBeNull();
+});
+
 const selectionFixture = `<article class="evidence"><header><span class="evidence-path">src/app.ts</span></header><pre class="focused-code">const answer = 42;</pre></article><div id="selection-menu" class="selection-menu" hidden><button data-question="Explain the selected lines.">Explain selection</button><button data-action="ask">Ask a question…</button></div><div id="toast" hidden></div>`;
 
 const selectEvidence = (window: Window) => {

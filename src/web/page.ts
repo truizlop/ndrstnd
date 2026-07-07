@@ -38,9 +38,9 @@ async function renderPage(data: ReviewPresentationData, launchToken: string, art
   const counts = attentionCounts(data.document);
   const filePaths = new Map(data.files.map((file) => [file.id, file.path]));
   const highlighter = await syntaxHighlighter(data.files);
-  return `<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ndrstnd · ${escapeHtml(data.targetRef)}</title><style>${styles}</style></head>
-<body><div class="app-shell">
+  // The body is rendered before the head so the token-class table collects
+  // every syntax color pair the page uses before it is emitted as CSS.
+  const body = `<body><div class="app-shell">
   <aside class="sidebar"><div class="brand"><svg class="brand-mark" viewBox="0 0 20 22" aria-hidden="true"><path d="M4.4 3.4 10 7.6l5.6-4.2"/><path d="M4.4 8.9 10 13.1l5.6-4.2"/><path class="mark-deep" d="M4.4 14.4 10 18.6l5.6-4.2"/></svg><span class="brand-name">ndrstnd</span><button class="collapse-sidebar panel-toggle" aria-label="Collapse navigation" aria-expanded="true">${panelIcon("collapse-left")}</button><button class="mobile-inspector-toggle panel-toggle" aria-label="Show review details" aria-expanded="false">${panelIcon("details")}</button></div><nav aria-label="Review views"><button class="nav-item active" data-view="trailer">${navIcon("story")}Story</button><button class="nav-item" data-view="timeline">${navIcon("timeline")}Timeline</button>${data.document.chapters.some((chapter) => chapter.kind === "test") ? `<button class="nav-item" data-view="tests">${navIcon("tests")}Test plan</button>` : ""}<button class="nav-item" data-view="diff">${navIcon("diff")}Full diff</button></nav></aside>
   <main class="main"><header class="page-header"><div class="masthead"><p class="masthead-overline">Change review</p><h1>${escapeHtml(data.targetRef)}</h1><div class="breadcrumbs"><span>against <strong>${escapeHtml(data.baseRef)}</strong></span><span>merge base <code>${escapeHtml(data.mergeBase.slice(0, 8))}</code></span></div></div></header><div class="view-bar"><span class="view-bar-ref">${escapeHtml(data.targetRef)}</span>${artifact ? "" : `<label class="lens-label">Lens <select id="lens-select" aria-label="Review lens"><option>Loading…</option></select></label>`}<div class="story-zoom-controls"><button data-zoom-step="-1" aria-label="Decrease detail">−</button><div class="zoom" id="zoom-control" role="group" aria-label="Story detail level"><div class="zoom-callout" id="zoom-callout" aria-live="polite"><output id="zoom-label">Summary</output><span id="zoom-description">Story claims and summaries</span></div><button data-zoom="0" aria-label="Map" title="Map"></button><button data-zoom="1" aria-label="Summary" title="Summary" class="active"></button><button data-zoom="2" aria-label="Explanation" title="Explanation"></button><button data-zoom="3" aria-label="Evidence" title="Evidence"></button><button data-zoom="4" aria-label="Raw" title="Raw"></button></div><button data-zoom-step="1" aria-label="Increase detail">+</button></div></div>
   ${artifact ? "" : `<div id="lens-notice" class="notice" hidden><span>Review lens changed. Grouping and risk signals will change.</span><button id="rerun">Re-run analysis</button></div>`}
@@ -51,7 +51,26 @@ async function renderPage(data: ReviewPresentationData, launchToken: string, art
   <footer class="colophon"><svg viewBox="0 0 20 22" aria-hidden="true"><path d="M4.4 3.4 10 7.6l5.6-4.2"/><path d="M4.4 8.9 10 13.1l5.6-4.2"/><path class="mark-deep" d="M4.4 14.4 10 18.6l5.6-4.2"/></svg><span>ndrstnd · created by Tomás Ruiz-López</span></footer>
   </main>
   <aside class="inspector" aria-label="Review details"><header class="inspector-header"><h2>At a glance</h2><button class="collapse-inspector panel-toggle" aria-label="Collapse review details" aria-expanded="true">${panelIcon("collapse-right")}</button></header><div class="inspector-content"><section><h3>This change</h3><div class="stat-row"><span>Story chapters</span><strong>${data.document.chapters.length}</strong></div><div class="stat-row"><span>Build steps</span><strong>${data.document.steps.length}</strong></div><div class="stat-row"><span>Changed files</span><strong>${data.files.length}</strong></div><div class="stat-row"><span>Evidence hunks</span><strong>${data.hunks.length}</strong></div></section><section><h3>Focus areas</h3>${Object.entries(categoryCounts(data.document)).map(([category, count]) => `<div class="stat-row stat-category"><span>${categoryIcon(category)}${escapeHtml(category)}</span><strong>${count}</strong></div>`).join("")}</section><section><h3>Actions</h3><button class="inspector-action" data-action="export">${actionIcon("export")}Export review…</button><button class="inspector-action" data-action="copy-summary" title="Copy a concise prompt for asking Codex about this review">${actionIcon("copy")}Copy Codex prompt</button></section></div></aside>
-</div><div id="selection-menu" class="selection-menu" hidden><button data-question="Explain the selected lines.">Explain selection</button><button data-question="Trace the callers, effects, and dependencies of the selected lines.">Trace effects</button><button data-question="Why is this included in the change?">Why included?</button><button data-action="ask">Ask a question…</button></div><div id="toast" class="toast" hidden></div><script>${artifact ? artifactClientScript : `const ndrstnd=${state};${clientScript}`}${portableEnhancements}</script></body></html>`;
+</div>${renderEvidenceLibrary(data, filePaths, highlighter)}<div id="selection-menu" class="selection-menu" hidden><button data-question="Explain the selected lines.">Explain selection</button><button data-question="Trace the callers, effects, and dependencies of the selected lines.">Trace effects</button><button data-question="Why is this included in the change?">Why included?</button><button data-action="ask">Ask a question…</button></div><div id="toast" class="toast" hidden></div><script>${artifact ? artifactClientScript : `const ndrstnd=${state};${clientScript}`}${portableEnhancements}</script></body></html>`;
+  return `<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ndrstnd · ${escapeHtml(data.targetRef)}</title><style>${styles}${tokenStyleRules()}</style></head>
+${body}`;
+}
+
+/**
+ * Each step-referenced hunk is rendered exactly once here; timeline states
+ * clone from these templates at runtime instead of shipping cumulative copies,
+ * which kept multi-step artifacts at tens of megabytes.
+ */
+function renderEvidenceLibrary(data: ReviewPresentationData, filePaths: Map<string, string>, highlighter: Highlighter): string {
+  const stepIndexByEvidence = new Map<string, number>();
+  for (const [index, step] of data.document.steps.entries()) for (const id of step.evidenceIds) stepIndexByEvidence.set(id, index);
+  if (stepIndexByEvidence.size === 0) return "";
+  const templates = [...stepIndexByEvidence.entries()].map(([id, stepIndex]) => {
+    const hunk = requireHunk(data.hunks, id);
+    return `<template data-evidence-template="${escapeHtml(id)}">${renderEvidence(hunk, filePaths.get(hunk.fileId) ?? hunk.fileId, highlighter, stepIndex, data.document.focus?.[id])}</template>`;
+  }).join("");
+  return `<div id="evidence-library" hidden>${templates}</div>`;
 }
 
 function renderChapters(document: AnalysisDocument, hunks: DiffHunk[], filePaths: Map<string, string>, files: ChangedFile[], highlighter: Highlighter): string {
@@ -98,8 +117,7 @@ function renderTimeline(document: AnalysisDocument, hunks: DiffHunk[], filePaths
   const plan = `<div class="timeline-plan">${document.steps.map((step, index) => `<button class="timeline-plan-step attention-${escapeHtml(attentionFor(step))}" data-timeline-select="${escapeHtml(step.id)}"><span>${ordinal(index)}</span><div><strong>${escapeHtml(step.title)}</strong><p>${escapeHtml(step.goal)}</p></div></button>`).join("")}</div>`;
 
   const states = document.steps.map((step, index) => {
-    const currentEvidence = new Set(step.evidenceIds);
-    const cumulativeHunks = document.steps.slice(0, index + 1).flatMap((candidate) => candidate.evidenceIds.map((id) => requireHunk(hunks, id)));
+    const priorEvidence = document.steps.slice(0, index).flatMap((candidate) => candidate.evidenceIds);
     const churn = churnFor(step.evidenceIds.map((id) => requireHunk(hunks, id)));
     const filesTouched = [...churn.entries()].map(([fileId, counts]) => `<span class="timeline-file"><span>${escapeHtml(filePaths.get(fileId) ?? fileId)}</span><small><b class="additions">+${counts.additions}</b><b class="deletions">−${counts.deletions}</b></small></span>`).join("");
     const chapters = step.advancesChapterIds.map((chapterId) => chaptersById.get(chapterId)).filter((chapter): chapter is NonNullable<typeof chapter> => chapter !== undefined);
@@ -108,13 +126,7 @@ function renderTimeline(document: AnalysisDocument, hunks: DiffHunk[], filePaths
     const forwardRefs = Object.entries(step.forwardRefs);
     const refs = forwardRefs.length === 0 ? `<p class="empty-note">Every symbol used here already exists.</p>` : `<ul>${forwardRefs.map(([symbol, targetStepId]) => `<li><code>${escapeHtml(symbol)}</code> is introduced at <button data-timeline-select="${escapeHtml(targetStepId)}">${escapeHtml(stepLabel(targetStepId))}</button></li>`).join("")}</ul>`;
     const buildsOn = step.dependsOn.filter((id) => stepOrdinalById.has(id)).map((id) => `<button data-timeline-select="${escapeHtml(id)}">Builds on · ${escapeHtml(stepLabel(id))}</button>`).join("");
-    const renderItem = (hunk: DiffHunk) => `<div class="timeline-evidence-item${currentEvidence.has(hunk.id) ? " current" : ""}" data-evidence-id="${escapeHtml(hunk.id)}">${renderEvidence(hunk, filePaths.get(hunk.fileId) ?? hunk.fileId, highlighter, stepIndexByEvidence.get(hunk.id) ?? index, document.focus?.[hunk.id])}</div>`;
-    const currentItems = cumulativeHunks.filter((hunk) => currentEvidence.has(hunk.id)).map(renderItem).join("");
-    const priorHunks = cumulativeHunks.filter((hunk) => !currentEvidence.has(hunk.id));
-    const priorItems = priorHunks.length === 0 ? "" : `<p class="timeline-evidence-divider">Already in place from earlier steps</p>${priorHunks.map(renderItem).join("")}`;
-    const cumulativeFiles = files.filter((file) => cumulativeHunks.some((hunk) => hunk.fileId === file.id));
-    const raw = cumulativeFiles.map((file) => renderFullDiff(file, cumulativeHunks.filter((hunk) => hunk.fileId === file.id), highlighter)).join("");
-    return `<article class="timeline-state${index === 0 ? " active" : ""}" data-timeline-state="${escapeHtml(step.id)}" data-step-index="${index + 1}"${index === 0 ? "" : " hidden"}><header class="timeline-card"><span class="timeline-index attention-${escapeHtml(attentionFor(step))}">${ordinal(index)}</span><div><h2>${escapeHtml(step.title)}</h2><p class="timeline-goal">${escapeHtml(step.goal)}</p>${filesTouched ? `<div class="timeline-files">${filesTouched}</div>` : ""}${chapterLinks || buildsOn ? `<div class="timeline-chapter-links">${chapterLinks}${buildsOn}</div>` : ""}</div></header><div class="timeline-summary"><strong>You now have</strong><p>${escapeHtml(step.youNowHave)}</p></div><div class="timeline-explanation"><section><h3>Deferred for later steps</h3>${deferred}</section><section><h3>Forward references</h3>${refs}</section></div><div class="timeline-evidence">${currentItems}${priorItems}</div><div class="timeline-raw">${raw}</div></article>`;
+    return `<article class="timeline-state${index === 0 ? " active" : ""}" data-timeline-state="${escapeHtml(step.id)}" data-step-index="${index + 1}"${index === 0 ? "" : " hidden"}><header class="timeline-card"><span class="timeline-index attention-${escapeHtml(attentionFor(step))}">${ordinal(index)}</span><div><h2>${escapeHtml(step.title)}</h2><p class="timeline-goal">${escapeHtml(step.goal)}</p>${filesTouched ? `<div class="timeline-files">${filesTouched}</div>` : ""}${chapterLinks || buildsOn ? `<div class="timeline-chapter-links">${chapterLinks}${buildsOn}</div>` : ""}</div></header><div class="timeline-summary"><strong>You now have</strong><p>${escapeHtml(step.youNowHave)}</p></div><div class="timeline-explanation"><section><h3>Deferred for later steps</h3>${deferred}</section><section><h3>Forward references</h3>${refs}</section></div><div class="timeline-evidence" data-current-evidence="${escapeHtml(step.evidenceIds.join(" "))}" data-prior-evidence="${escapeHtml(priorEvidence.join(" "))}"></div><div class="timeline-raw"></div></article>`;
   }).join("");
   return `<div class="timeline">${rail}${plan}<div class="timeline-states">${states}</div></div>`;
 }
@@ -214,12 +226,12 @@ function renderFullDiff(file: ChangedFile, hunks: DiffHunk[], highlighter: Highl
   const parsed = parseDiff(toUnifiedDiff(file, hunks), { drawFileList: false, outputFormat: "line-by-line" })[0];
   if (parsed === undefined) return "";
   const language = resolveLanguage(file.path);
-  return `<details class="file full-diff-file" open><summary><span class="file-path">${escapeHtml(file.path)}</span><small>${escapeHtml(file.signalReason ?? file.status)}</small></summary>${parsed.blocks.map((block) => renderDiffBlock(block, language, highlighter)).join("")}</details>`;
+  return `<details class="file full-diff-file" open data-file-id="${escapeHtml(file.id)}"><summary><span class="file-path">${escapeHtml(file.path)}</span><small>${escapeHtml(file.signalReason ?? file.status)}</small></summary>${parsed.blocks.map((block, index) => renderDiffBlock(block, language, highlighter, hunks[index]?.id)).join("")}</details>`;
 }
 
-function renderDiffBlock(block: DiffBlock, language: BundledLanguage, highlighter: Highlighter): string {
+function renderDiffBlock(block: DiffBlock, language: BundledLanguage, highlighter: Highlighter, hunkId?: string): string {
   const tokenLines = highlighter.codeToTokens(block.lines.map((line) => line.content.slice(1)).join("\n"), { lang: language, themes: syntaxThemes }).tokens;
-  return `<div class="diff-block"><div class="diff-hunk-header">${escapeHtml(block.header)}</div><pre>${block.lines.map((line, index) => renderDiffLine(line, tokenLines[index] ?? [])).join("")}</pre></div>`;
+  return `<div class="diff-block"${hunkId === undefined ? "" : ` data-diff-hunk="${escapeHtml(hunkId)}"`}><div class="diff-hunk-header">${escapeHtml(block.header)}</div><pre>${block.lines.map((line, index) => renderDiffLine(line, tokenLines[index] ?? [])).join("")}</pre></div>`;
 }
 
 function renderDiffLine(line: ParsedDiffLine, tokens: Array<{ content: string; color?: string; fontStyle?: number }>): string {
@@ -234,12 +246,33 @@ function highlightCode(source: string, language: BundledLanguage, highlighter: H
   return renderTokens(highlighter.codeToTokens(source, { lang: language, themes: syntaxThemes }).tokens[0] ?? []);
 }
 
+/**
+ * Syntax colors repeat constantly, so each distinct color pair becomes one CSS
+ * class instead of ~90 bytes of inline styles per token. The registry is
+ * append-only and process-wide; every rendered page emits the full table.
+ */
+const tokenClassRegistry = new Map<string, string>();
+
+function tokenClass(style: string): string {
+  let name = tokenClassRegistry.get(style);
+  if (name === undefined) {
+    name = `c${tokenClassRegistry.size}`;
+    tokenClassRegistry.set(style, name);
+  }
+  return name;
+}
+
+function tokenStyleRules(): string {
+  return [...tokenClassRegistry].map(([style, name]) => `.${name}{${style}}`).join("");
+}
+
 function renderTokens(tokens: Array<{ content: string; color?: string; fontStyle?: number; htmlStyle?: Record<string, string> }>): string {
   return tokens.map((token) => {
     const style = token.htmlStyle === undefined
       ? (token.color === undefined ? "" : `color:${token.color}`)
       : Object.entries(token.htmlStyle).map(([property, value]) => `${property}:${value}`).join(";");
-    return `<span${style === "" ? "" : ` style="${style}"`}${token.fontStyle === 1 ? ' class="token-italic"' : ""}>${escapeHtml(token.content)}</span>`;
+    const classes = [style === "" ? "" : `tk ${tokenClass(style)}`, token.fontStyle === 1 ? "token-italic" : ""].filter(Boolean).join(" ");
+    return `<span${classes === "" ? "" : ` class="${classes}"`}>${escapeHtml(token.content)}</span>`;
   }).join("");
 }
 
@@ -765,7 +798,7 @@ body.story-level-0 #collapse-all,body.story-level-1 #collapse-all{display:none}
 .notice{border-color:#2f3d5e;color:#b9c4dc}
 .notice button{color:#10131a}
 .line code{color:#c9d1d9}
-.line code span[style]{color:var(--shiki-dark,currentColor)!important}
+.line code .tk{color:var(--shiki-dark,currentColor)!important}
 .chapter-churn-bar .additions{background:#3f7f57}
 .chapter-churn-bar .deletions{background:#96584e}
 .inspector-action{background:#232930}
@@ -876,7 +909,29 @@ export const portableEnhancements = `
   setZoom(1);
   const setZoomControlsVisible = (view) => { const hidden = view !== 'trailer' && view !== 'timeline' && view !== 'tests'; const controls = document.querySelector('.story-zoom-controls'); if (controls) controls.hidden = hidden; document.querySelector('.view-bar')?.classList.toggle('view-bar-empty', hidden); updateZoomLabel(Number(document.body.dataset.storyLevel ?? 1)); };
   setZoomControlsVisible(document.querySelector('[data-view].active')?.getAttribute('data-view') || 'trailer');
-  const selectTimelineStep = (stepId) => { document.querySelectorAll('[data-timeline-state]').forEach((state) => { const active = state.getAttribute('data-timeline-state') === stepId; state.classList.toggle('active', active); state.hidden = !active; }); document.querySelectorAll('[data-timeline-select]').forEach((button) => { const active = button.getAttribute('data-timeline-select') === stepId; button.classList.toggle('active', active); if (button.getAttribute('role') === 'tab') button.setAttribute('aria-selected', String(active)); }); const ticks = [...document.querySelectorAll('.rail-tick')]; const index = ticks.findIndex((tick) => tick.getAttribute('data-timeline-select') === stepId); if (index < 0) return; const pad = (value) => String(value).padStart(2, '0'); const stepOutput = byId('rail-step'); if (stepOutput) stepOutput.textContent = pad(index + 1) + ' / ' + pad(ticks.length); const titleOutput = byId('rail-title'); if (titleOutput) titleOutput.textContent = ticks[index].getAttribute('data-step-title') || ''; document.querySelectorAll('[data-timeline-move]').forEach((nav) => { const next = index + Number(nav.getAttribute('data-timeline-move')); nav.toggleAttribute('disabled', next < 0 || next >= ticks.length); }); };
+  const materializeTimelineState = (state) => {
+    if (!state || state.dataset.materialized === 'true') return;
+    const evidence = state.querySelector('.timeline-evidence');
+    if (!evidence || evidence.dataset.currentEvidence === undefined) return;
+    const current = evidence.dataset.currentEvidence.split(' ').filter(Boolean);
+    const prior = (evidence.dataset.priorEvidence || '').split(' ').filter(Boolean);
+    const append = (id, isCurrent) => { const template = document.querySelector('[data-evidence-template="' + id + '"]'); if (!template) return; const item = document.createElement('div'); item.className = 'timeline-evidence-item' + (isCurrent ? ' current' : ''); item.setAttribute('data-evidence-id', id); item.appendChild(template.content.cloneNode(true)); evidence.appendChild(item); };
+    current.forEach((id) => append(id, true));
+    if (prior.length > 0) { const divider = document.createElement('p'); divider.className = 'timeline-evidence-divider'; divider.textContent = 'Already in place from earlier steps'; evidence.appendChild(divider); prior.forEach((id) => append(id, false)); }
+    const raw = state.querySelector('.timeline-raw');
+    if (raw) { const wanted = new Set(current.concat(prior)); document.querySelectorAll('#diff details.full-diff-file').forEach((file) => { const blocks = [...file.querySelectorAll('[data-diff-hunk]')].filter((block) => wanted.has(block.getAttribute('data-diff-hunk'))); if (blocks.length === 0) return; const copy = document.createElement('details'); copy.className = file.className; copy.open = true; const summary = file.querySelector('summary'); if (summary) copy.appendChild(summary.cloneNode(true)); blocks.forEach((block) => copy.appendChild(block.cloneNode(true))); raw.appendChild(copy); }); }
+    state.dataset.materialized = 'true';
+  };
+  const clearTimelineState = (state) => {
+    if (!state || state.dataset.materialized !== 'true') return;
+    const evidence = state.querySelector('.timeline-evidence');
+    if (evidence) evidence.replaceChildren();
+    const raw = state.querySelector('.timeline-raw');
+    if (raw) raw.replaceChildren();
+    state.dataset.materialized = 'false';
+  };
+  materializeTimelineState(document.querySelector('.timeline-state.active'));
+  const selectTimelineStep = (stepId) => { document.querySelectorAll('[data-timeline-state]').forEach((state) => { const active = state.getAttribute('data-timeline-state') === stepId; state.classList.toggle('active', active); state.hidden = !active; if (active) materializeTimelineState(state); else clearTimelineState(state); }); document.querySelectorAll('[data-timeline-select]').forEach((button) => { const active = button.getAttribute('data-timeline-select') === stepId; button.classList.toggle('active', active); if (button.getAttribute('role') === 'tab') button.setAttribute('aria-selected', String(active)); }); const ticks = [...document.querySelectorAll('.rail-tick')]; const index = ticks.findIndex((tick) => tick.getAttribute('data-timeline-select') === stepId); if (index < 0) return; const pad = (value) => String(value).padStart(2, '0'); const stepOutput = byId('rail-step'); if (stepOutput) stepOutput.textContent = pad(index + 1) + ' / ' + pad(ticks.length); const titleOutput = byId('rail-title'); if (titleOutput) titleOutput.textContent = ticks[index].getAttribute('data-step-title') || ''; document.querySelectorAll('[data-timeline-move]').forEach((nav) => { const next = index + Number(nav.getAttribute('data-timeline-move')); nav.toggleAttribute('disabled', next < 0 || next >= ticks.length); }); };
   const moveTimelineStep = (delta) => { const ticks = [...document.querySelectorAll('.rail-tick')]; const index = ticks.findIndex((tick) => tick.classList.contains('active')); const next = ticks[index + delta]; if (next) selectTimelineStep(next.getAttribute('data-timeline-select')); };
   const openStoryChapter = (id) => { document.querySelector('[data-view="trailer"]')?.click(); const chapter = document.querySelector('.chapter[data-chapter="' + id + '"]'); if (chapter) { setZoom(Math.max(2, Number(document.body.dataset.storyLevel ?? 1))); chapter.classList.add('open'); chapter.querySelector('.chapter-detail').hidden = false; chapter.scrollIntoView({ behavior: 'smooth', block: 'center' }); } };
   document.addEventListener('click', (event) => { const target = event.target instanceof Element ? event.target : null; if (!target) return; if (!target.closest('.selection-menu') && !target.closest('.evidence')) byId('selection-menu').hidden = true; const more = target.closest('.evidence-more'); if (more) { more.closest('.evidence')?.classList.toggle('expanded'); return; } const timelineMove = target.closest('[data-timeline-move]'); if (timelineMove) { moveTimelineStep(Number(timelineMove.getAttribute('data-timeline-move'))); return; } const timelineSelect = target.closest('[data-timeline-select]'); if (timelineSelect) { selectTimelineStep(timelineSelect.getAttribute('data-timeline-select')); if (Number(document.body.dataset.storyLevel ?? 1) === 0) setZoom(1); return; } const storyStep = target.closest('[data-story-step]'); if (storyStep) { document.querySelector('[data-view="timeline"]')?.click(); selectTimelineStep(storyStep.getAttribute('data-story-step')); setZoom(Math.max(1, Number(document.body.dataset.storyLevel ?? 1))); document.querySelector('.timeline-rail')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); return; } const storyStepIndex = target.closest('[data-story-step-index]'); if (storyStepIndex) { const index = Number(storyStepIndex.getAttribute('data-story-step-index')); const state = document.querySelector('.timeline-state[data-step-index="' + index + '"]'); document.querySelector('[data-view="timeline"]')?.click(); if (state) selectTimelineStep(state.getAttribute('data-timeline-state')); setZoom(3); document.querySelector('.timeline-rail')?.scrollIntoView({ behavior: 'smooth', block: 'start' }); return; } const collapse = target.closest('.collapse-sidebar'); if (collapse) { document.querySelector('.sidebar')?.classList.toggle('collapsed'); return; } const all = target.closest('#collapse-all'); if (all) { document.querySelectorAll('.chapter').forEach((chapter) => { chapter.classList.remove('open'); chapter.querySelector('.chapter-detail').hidden = true; }); return; } const testJump = target.closest('[data-test-jump]'); if (testJump) { const id = testJump.getAttribute('data-test-jump'); setZoom(3); window.setTimeout(() => { const card = document.querySelector('.test-plan-evidence [data-test-case="' + id + '"]'); if (card) { card.open = true; card.scrollIntoView({ behavior: 'smooth', block: 'center' }); } }, 0); return; } const chapterJump = target.closest('[data-step-chapter]'); if (chapterJump) { openStoryChapter(chapterJump.getAttribute('data-step-chapter')); return; } const view = target.closest('[data-view]')?.getAttribute('data-view'); if (view) setZoomControlsVisible(view); const step = target.closest('[data-zoom-step]'); if (step) { const active = Number(document.querySelector('[data-zoom].active')?.getAttribute('data-zoom') ?? 1); setZoom(active + Number(step.getAttribute('data-zoom-step'))); return; } if (target.closest('.zoom-info')) { document.getElementById('zoom-dialog').showModal(); return; } if (target.closest('[data-close-dialog]')) { document.getElementById('zoom-dialog').close(); return; } const zoom = target.closest('[data-zoom]'); if (zoom) setZoom(Number(zoom.getAttribute('data-zoom'))); });
