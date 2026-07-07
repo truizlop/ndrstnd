@@ -6,7 +6,7 @@ import { analyzeWithCodex } from "./analyze.js";
 import { importConversation } from "./conversation.js";
 import { GitReader, describeReviewScope } from "./git.js";
 import { ReviewStore } from "./store.js";
-import { installSkill } from "./skill.js";
+import { installSkill, installedSkillIsStale } from "./skill.js";
 import { writeReviewArtifact } from "./artifact.js";
 import { pathToFileURL } from "node:url";
 import { join } from "node:path";
@@ -85,6 +85,9 @@ async function runReview(args: string[]): Promise<void> {
   process.stdout.write(`Reviewing ${scope.targetLabel} against ${input.baseRef}${input.includesWorkingTree ? ", including uncommitted changes" : ""} — ${input.files.length} changed file${input.files.length === 1 ? "" : "s"} (${meaningfulFiles} meaningful).\n`);
   if (baseRef === undefined && input.includesWorkingTree && scope.localCommitsIncluded > 0) {
     process.stdout.write(`Warning: the inferred base ${input.baseRef} is ${scope.localCommitsIncluded} commit${scope.localCommitsIncluded === 1 ? "" : "s"} behind ${scope.targetLabel}, so those commits are included. Pass --base to narrow the review, or --uncommitted for only uncommitted changes.\n`);
+  }
+  if (await installedSkillIsStale()) {
+    process.stdout.write("The installed ndrstnd Codex skill is older than this version; run `ndrstnd skill install --force` to refresh it.\n");
   }
   const store = openReviewStore();
   const lens = store.getLens(lensId);
