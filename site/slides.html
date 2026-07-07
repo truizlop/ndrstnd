@@ -409,14 +409,6 @@ kbd{display:inline-grid;place-items:center;min-width:23px;height:23px;padding:0 
 .phone-pill .mticks{width:96px;height:18px}
 .phone-pill b{font:700 9.5px/1 var(--mono);letter-spacing:.12em;color:var(--accent)}
 
-/* ---------- voices (design language) ---------- */
-.voices{display:grid;gap:0;border:1px solid var(--hair);border-radius:14px;background:var(--surface);overflow:hidden}
-.voice{display:grid;grid-template-columns:120px 200px minmax(0,1fr);gap:26px;align-items:center;padding:20px 26px;border-bottom:1px solid var(--hair)}
-.voice:last-child{border-bottom:0}
-.voice .aa{font-size:38px;line-height:1;color:var(--ink)}
-.voice h4{margin:0;font:600 12px/1 var(--mono);letter-spacing:.16em;text-transform:uppercase;color:var(--accent)}
-.voice p{margin:0;font:400 15px/1.55 var(--sans);color:var(--ink-2)}
-
 /* big list bullets */
 .asklist{margin:0;padding:0;list-style:none;display:grid;gap:24px}
 .asklist li{display:grid;grid-template-columns:30px minmax(0,1fr);gap:16px;align-items:start}
@@ -1000,7 +992,7 @@ kbd{display:inline-grid;place-items:center;min-width:23px;height:23px;padding:0 
 <section class="slide divider" aria-label="Appendix">
   <p class="overline rise">Backup slides</p>
   <h2 class="rise" style="--d:60ms;margin:0;font:600 76px/1.1 var(--serif);letter-spacing:-.02em">Appendix<em style="color:var(--accent)">.</em></h2>
-  <p class="s-lede rise" style="--d:120ms">For the questions: architecture, the analysis contract, review scopes, and the design system.</p>
+  <p class="s-lede rise" style="--d:120ms">For the questions: architecture, the analysis contract, review scopes, and context.</p>
 </section>
 
 <!-- 25 · APPENDIX: ARCHITECTURE -->
@@ -1087,23 +1079,6 @@ kbd{display:inline-grid;place-items:center;min-width:23px;height:23px;padding:0 
         <b>default</b><b>security</b><b>performance</b><b>api compatibility</b><b>data migrations</b><b>test coverage</b>
       </div>
     </div>
-  </div>
-</section>
-
-<!-- 29 · APPENDIX: DESIGN LANGUAGE -->
-<section class="slide" aria-label="Appendix: design language">
-  <div class="shead" style="margin-bottom:26px">
-    <p class="overline rise">Appendix · Design language</p>
-    <h2 class="s-head rise" style="--d:60ms;font-size:38px">Three voices, one accent, no gradients.</h2>
-  </div>
-  <div class="voices rise" style="--d:120ms">
-    <div class="voice"><span class="aa" style="font-family:var(--sans);font-weight:600">Aa</span><h4>Sans · UI chrome</h4><p>Controls, labels, prose. The quiet voice that gets out of the way.</p></div>
-    <div class="voice"><span class="aa" style="font-family:var(--mono);font-weight:600">Aa</span><h4>Mono · identifiers</h4><p>File paths, counts, step numbers, readouts. If it's a fact, it's mono.</p></div>
-    <div class="voice"><span class="aa" style="font-family:var(--serif);font-weight:600;font-style:italic">Aa</span><h4>Serif · the story</h4><p>Headlines and claims. The narrative voice, because the story is the product.</p></div>
-  </div>
-  <div class="rise" style="--d:180ms;display:flex;flex-wrap:wrap;align-items:center;gap:18px 40px;margin-top:28px">
-    <div class="dots-row"><span><i style="background:var(--low)"></i>low</span><span><i style="background:var(--contained)"></i>contained</span><span><i style="background:var(--elevated)"></i>elevated</span><span><i style="background:var(--high)"></i>high</span><span><i style="background:var(--critical)"></i>critical</span></div>
-    <p class="footnote" style="margin:0">Paper surfaces · hairline rules · a single cobalt accent, reserved for interaction · thin-stroke icons, never emoji. These slides run on the same stylesheet as the landing page and the artifact.</p>
   </div>
 </section>
 
