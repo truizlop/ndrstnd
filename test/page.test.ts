@@ -398,4 +398,11 @@ it("renders the frozen presentation fixture without Git, analysis, or the review
   expect(page).toContain("Run the supplied job");
   expect(page).toContain("Cover job execution");
   expect(page).toContain('class="chapter-number attention-low"');
+  expect(page).toContain("Retry transient failures");
+  expect(page).toContain("Surface retry telemetry");
+  expect(page).toContain("Count retries in telemetry");
+  expect(page).toContain("<code>RetryPolicy</code> is introduced at");
+  expect(page).toContain("Transient failures still bubble up immediately; retry semantics arrive with the policy.");
+  expect(page).toContain("Release bookkeeping");
+  expect(page).toContain("Test plan</button>");
 });
