@@ -373,8 +373,21 @@ function requireHunk(hunks: DiffHunk[], id: string): DiffHunk {
 
 function escapeHtml(value: string): string { return value.replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char] ?? char); }
 
-/** Analysis prose names symbols in backticks; render them as inline code instead of literal backticks. Escapes first, so only the code markup is introduced. */
-function renderProse(value: string): string { return escapeHtml(value).replace(/`([^`\n]+)`/g, '<code class="md-code">$1</code>'); }
+/**
+ * Analysis prose uses inline Markdown: backticked symbols, bold, and italic.
+ * Code spans are split out first so emphasis never rewrites their contents,
+ * and every part is HTML-escaped before any markup is introduced.
+ */
+function renderProse(value: string): string {
+  return value.split(/(`[^`\n]+`)/).map((part) => {
+    if (part.length > 2 && part.startsWith("`") && part.endsWith("`")) return `<code class="md-code">${escapeHtml(part.slice(1, -1))}</code>`;
+    return escapeHtml(part)
+      .replace(/\*\*(\S(?:[^*\n]*\S)?)\*\*/g, "<strong>$1</strong>")
+      .replace(/__(\S(?:[^_\n]*\S)?)__/g, "<strong>$1</strong>")
+      .replace(/(^|[^\w*])\*(\S(?:[^*\n]*\S)?)\*(?![\w*])/g, "$1<em>$2</em>")
+      .replace(/(^|[^\w_])_(\S(?:[^_\n]*\S)?)_(?![\w_])/g, "$1<em>$2</em>");
+  }).join("");
+}
 
 /**
  * The ndrstnd galley system. One stylesheet, three typographic voices:

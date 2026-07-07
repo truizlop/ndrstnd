@@ -435,6 +435,17 @@ it("drives the Evidence-zoom focused excerpt from analysis focus ranges with a h
   expect(/<pre class="focused-code">([\s\S]*?)<\/pre>/.exec(fallbackEvidence)![1]).toContain("RetryPolicy");
 });
 
+it("renders bold and italic emphasis in analysis prose without touching code spans", async () => {
+  const summary = "The runner **now** retries _transient_ failures via `retry_loop(_:)` with *backoff*. __Nothing__ else changed, and snake_case identifiers stay intact.";
+  const page = await renderArtifact({ ...frozenReviewData, document: { ...frozenReviewData.document, summary } });
+  expect(page).toContain("<strong>now</strong>");
+  expect(page).toContain("<em>transient</em>");
+  expect(page).toContain("<em>backoff</em>");
+  expect(page).toContain("<strong>Nothing</strong>");
+  expect(page).toContain('<code class="md-code">retry_loop(_:)</code>');
+  expect(page).toContain("snake_case identifiers stay intact");
+});
+
 it("collapses unclassified evidence alongside omitted groups", async () => {
   const data = { ...frozenReviewData, document: { ...frozenReviewData.document, unclassifiedEvidenceIds: ["lockfile-hunk"] } };
   const page = await renderArtifact(data);
