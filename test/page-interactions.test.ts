@@ -409,10 +409,10 @@ it("copies an evidence-grounded Codex prompt from the selection menu and confirm
   expect(menu.hidden).toBe(true);
 
   selectEvidence(window);
-  window.prompt = () => "Why is this constant safe to change?";
   document.querySelector<HTMLElement>('[data-action="ask"]')?.click();
   await new Promise((resolve) => window.setTimeout(resolve, 0));
-  expect(copies.at(-1)).toBe("Why is this constant safe to change?\n\nContext: ndrstnd review of agent-change; selected excerpt from src/app.ts.\n\nSelected lines:\nconst answer = 42;");
+  expect(copies.at(-1)).toBe("Context: ndrstnd review of agent-change; selected excerpt from src/app.ts.\n\nSelected lines:\nconst answer = 42;\n\nMy question: ");
+  expect(document.querySelector("#toast")?.textContent).toBe("Selection copied — paste it into Codex and add your question.");
   expect(menu.hidden).toBe(true);
 });
 
