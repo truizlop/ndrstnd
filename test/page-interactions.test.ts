@@ -289,6 +289,7 @@ it("shows the Codex prompt manually when clipboard copy is denied", async () => 
 
 it("collapses each desktop rail and opens the review details as a mobile sheet", () => {
   const window = new Window();
+  Object.defineProperty(window, "innerWidth", { configurable: true, value: 1440 });
   const document = window.document;
   document.body.innerHTML = `<div class="app-shell"><aside class="sidebar"><button class="collapse-sidebar" aria-expanded="true"></button></aside><button class="mobile-inspector-toggle" aria-expanded="false"></button><aside class="inspector"><button class="collapse-inspector" aria-expanded="true"></button></aside></div><div id="map" hidden></div><div id="zoom-control"><div id="zoom-callout"><output id="zoom-label"></output><span id="zoom-description"></span></div><button data-zoom="0"></button><button data-zoom="1"></button><button data-zoom="2"></button><button data-zoom="3"></button><button data-zoom="4"></button></div><div id="selection-menu" hidden></div>`;
   window.eval(`${artifactClientScript}${portableEnhancements}`);
@@ -311,6 +312,7 @@ it("collapses each desktop rail and opens the review details as a mobile sheet",
 
 it("restores and saves portable UI preferences when local storage is available", () => {
   const window = new Window({ url: "http://127.0.0.1:3000/" });
+  Object.defineProperty(window, "innerWidth", { configurable: true, value: 1440 });
   const document = window.document;
   window.localStorage.setItem("ndrstnd-artifact-ui-preferences-v1", JSON.stringify({ sidebarCollapsed: true, inspectorCollapsed: true, zoom: 3, view: "timeline" }));
   document.body.innerHTML = `<div class="app-shell"><aside class="sidebar"><button class="collapse-sidebar" aria-expanded="true"></button></aside><button class="mobile-inspector-toggle" aria-expanded="false"></button><aside class="inspector"><button class="collapse-inspector" aria-expanded="true"></button></aside></div><button data-view="trailer" class="nav-item active"></button><button data-view="timeline" class="nav-item"></button><section id="trailer" class="view active"></section><section id="timeline" class="view"></section><div id="map" hidden></div><div class="story-zoom-controls"><div id="zoom-control"><div id="zoom-callout"><output id="zoom-label"></output><span id="zoom-description"></span></div><button data-zoom="0"></button><button data-zoom="1"></button><button data-zoom="2"></button><button data-zoom="3"></button><button data-zoom="4"></button></div></div><div id="selection-menu" hidden></div>`;

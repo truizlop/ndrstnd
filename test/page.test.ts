@@ -20,6 +20,7 @@ describe("renderWorkspace", () => {
 
   it("has a touch-first mobile layout without page-level horizontal overflow", () => {
     expect(styles).toContain("@media(max-width:760px)");
+    expect(styles).toContain("@media(max-width:1080px)");
     expect(styles).toContain("grid-auto-flow:column;grid-auto-columns:1fr");
     expect(styles).toContain("min-height:44px");
     expect(styles).toContain("overflow-x:auto");
