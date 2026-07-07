@@ -4,7 +4,7 @@ import process from "node:process";
 import { getCodexAuthStatus } from "./codex.js";
 import { analyzeWithCodex } from "./analyze.js";
 import { importConversation } from "./conversation.js";
-import { GitReader } from "./git.js";
+import { GitReader, describeReviewScope } from "./git.js";
 import { ReviewStore } from "./store.js";
 import { installSkill } from "./skill.js";
 import { writeReviewArtifact } from "./artifact.js";
@@ -67,14 +67,25 @@ async function runCodexLogin(): Promise<void> {
 }
 
 async function runReview(args: string[]): Promise<void> {
-  const targetRef = extractTargetRef(args) ?? "WORKTREE";
+  const targetArg = extractTargetRef(args);
+  const uncommitted = args.includes("--uncommitted");
+  const explicitBase = optionValue(args, "--base");
+  if (uncommitted && explicitBase !== undefined) fail("--uncommitted already reviews against HEAD; do not combine it with --base.");
+  if (uncommitted && targetArg !== undefined) fail("--uncommitted reviews the checked-out branch; do not pass a branch.");
+  const targetRef = targetArg ?? "WORKTREE";
   const noOpen = args.includes("--no-open");
   const repoPath = optionValue(args, "--repo") ?? process.cwd();
-  const baseRef = optionValue(args, "--base");
+  const baseRef = uncommitted ? "HEAD" : explicitBase;
   const lensId = optionValue(args, "--lens") ?? "default";
   const conversationPath = optionValue(args, "--conversation");
   const conversation = conversationPath === undefined ? undefined : await importConversation(conversationPath);
   const input = await new GitReader().collectReviewInput(repoPath, targetRef, baseRef);
+  const meaningfulFiles = input.files.filter((file) => file.signal === "meaningful").length;
+  const scope = await describeReviewScope(repoPath, input);
+  process.stdout.write(`Reviewing ${scope.targetLabel} against ${input.baseRef}${input.includesWorkingTree ? ", including uncommitted changes" : ""} — ${input.files.length} changed file${input.files.length === 1 ? "" : "s"} (${meaningfulFiles} meaningful).\n`);
+  if (baseRef === undefined && input.includesWorkingTree && scope.localCommitsIncluded > 0) {
+    process.stdout.write(`Warning: the inferred base ${input.baseRef} is ${scope.localCommitsIncluded} commit${scope.localCommitsIncluded === 1 ? "" : "s"} behind ${scope.targetLabel}, so those commits are included. Pass --base to narrow the review, or --uncommitted for only uncommitted changes.\n`);
+  }
   const store = openReviewStore();
   const lens = store.getLens(lensId);
   if (lens === undefined) fail(`Unknown review lens: ${lensId}`);
@@ -93,7 +104,6 @@ async function runReview(args: string[]): Promise<void> {
       fail(`Codex analysis failed, so no review artifact was written: ${error instanceof Error ? error.message : String(error)} Nothing was persisted; re-run the same ndrstnd review command to retry.`);
     }
   }
-  const meaningfulFiles = input.files.filter((file) => file.signal === "meaningful").length;
   process.stdout.write(`merge-base=${input.mergeBase.slice(0, 12)} files=${input.files.length} meaningful-files=${meaningfulFiles} hunks=${input.hunks.length}${conversation === undefined ? "" : ` conversation=${conversation.messages.length}`}\n`);
   const artifactPath = await writeReviewArtifact(session, revision, { directory: join(repoPath, ".ndrstnd") });
   process.stdout.write(`ndrstnd artifact: ${artifactPath}\n`);
@@ -161,7 +171,7 @@ function optionValue(args: string[], option: string): string | undefined {
 }
 
 function printHelp(): void {
-  process.stdout.write(`ndrstnd — understand agent-produced branch changes\n\nUsage:\n  ndrstnd auth <status|login>\n  ndrstnd skill install [--force]\n  ndrstnd review <branch> [--base <branch>] [--repo <path>] [--conversation <path>] [--lens <id>] [--no-open]\n\nndrstnd always writes a self-contained, Git-ignored artifact.\n`);
+  process.stdout.write(`ndrstnd — understand agent-produced branch changes\n\nUsage:\n  ndrstnd auth <status|login>\n  ndrstnd skill install [--force]\n  ndrstnd review [branch] [--base <branch>] [--uncommitted] [--repo <path>] [--conversation <path>] [--lens <id>] [--no-open]\n\nWithout a branch, ndrstnd reviews the checked-out branch including uncommitted changes.\n--uncommitted reviews only the uncommitted working-tree changes (an alias for --base HEAD).\nndrstnd always writes a self-contained, Git-ignored artifact.\n`);
 }
 
 function fail(message: string): never {

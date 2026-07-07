@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { afterEach, describe, expect, it } from "vitest";
-import { GitReader } from "../src/server/git.js";
+import { GitReader, describeReviewScope } from "../src/server/git.js";
 
 const run = promisify(execFile);
 
@@ -104,6 +104,30 @@ describe("GitReader", () => {
     expect(input.baseRef).toBe("main");
     expect(input.includesWorkingTree).toBe(true);
     expect(input.files.map((file) => file.path)).toEqual(["worktree.txt"]);
+  });
+
+  it("describes the scope with the local commits an inferred base pulls into a worktree review", async () => {
+    repository = await mkdtemp(join(tmpdir(), "ndrstnd-git-"));
+    await git(repository, ["init", "-b", "main"]);
+    await git(repository, ["config", "user.email", "ndrstnd@example.test"]);
+    await git(repository, ["config", "user.name", "ndrstnd Test"]);
+    await writeFile(join(repository, "base.txt"), "base\n");
+    await git(repository, ["add", "."]);
+    await git(repository, ["commit", "-m", "base"]);
+    await git(repository, ["switch", "-c", "agent-change"]);
+    await git(repository, ["branch", "--set-upstream-to", "main"]);
+    await writeFile(join(repository, "committed.txt"), "committed\n");
+    await git(repository, ["add", "."]);
+    await git(repository, ["commit", "-m", "local commit"]);
+    await writeFile(join(repository, "dirty.txt"), "dirty\n");
+
+    const reader = new GitReader();
+    const inferred = await reader.collectReviewInput(repository, "WORKTREE");
+    expect(await describeReviewScope(repository, inferred)).toEqual({ targetLabel: "agent-change", localCommitsIncluded: 1 });
+
+    const uncommittedOnly = await reader.collectReviewInput(repository, "WORKTREE", "HEAD");
+    expect(await describeReviewScope(repository, uncommittedOnly)).toEqual({ targetLabel: "agent-change", localCommitsIncluded: 0 });
+    expect(uncommittedOnly.files.map((file) => file.path)).toEqual(["dirty.txt"]);
   });
 
   it("reviews an initial uncommitted repository against the empty tree", async () => {

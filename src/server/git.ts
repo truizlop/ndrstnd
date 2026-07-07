@@ -48,6 +48,19 @@ export class GitReader implements GitRepositoryReader {
   }
 }
 
+export interface ReviewScope {
+  targetLabel: string;
+  localCommitsIncluded: number;
+}
+
+/** Describes what a collected review covers so the CLI can confirm the scope before the expensive analysis. */
+export async function describeReviewScope(repoPath: string, input: CollectedReviewInput): Promise<ReviewScope> {
+  const targetLabel = input.targetRef === "WORKTREE" ? await resolveWorktreeTargetRef(repoPath) : input.targetRef;
+  if (input.includesWorkingTree !== true || input.baseRef === "empty") return { targetLabel, localCommitsIncluded: 0 };
+  const count = await gitOptional(repoPath, ["rev-list", "--count", `${input.baseRef}..HEAD`]);
+  return { targetLabel, localCommitsIncluded: Number(count?.trim() ?? "0") };
+}
+
 async function collectUntrackedPatch(repoPath: string, files: ChangedFile[]): Promise<{ files: ChangedFile[]; patch: string }> {
   const untracked = (await git(repoPath, ["ls-files", "--others", "--exclude-standard", "-z"])).split("\0").filter(Boolean);
   const patches: string[] = [];
