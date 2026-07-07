@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { analysisPrompt, buildPromptReviewInput, extractJson, parseAnalysisDocument } from "../src/server/analysis-core.js";
+import { INLINE_PATCH_BUDGET, analysisPrompt, buildPromptReviewInput, extractJson, parseAnalysisDocument } from "../src/server/analysis-core.js";
 import type { CollectedReviewInput } from "../src/server/git.js";
 
 const input: CollectedReviewInput = {
@@ -229,6 +229,54 @@ describe("analysis documents", () => {
       omittedGroups: [{ title: "Low-signal changes", reason: "Lockfile evidence is grouped.", evidenceIds: ["lock-hunk"] }],
       unclassifiedEvidenceIds: [],
     }, input)).toThrow();
+  });
+
+  it("inlines full hunk patch text for meaningful files so Codex skips git round trips", () => {
+    const smallInput: CollectedReviewInput = {
+      ...input,
+      hunks: [
+        {
+          id: "source-hunk", fileId: "source", oldStart: 8, newStart: 8,
+          lines: [
+            { kind: "context", content: "export class Runner {", oldLine: 8, newLine: 8 },
+            { kind: "deletion", content: "  run() { return null; }", oldLine: 9 },
+            { kind: "addition", content: "  run(job) { return this.execute(job); }", newLine: 9 },
+          ],
+        },
+        { id: "lock-hunk", fileId: "lock", oldStart: 1, newStart: 1, lines: [{ kind: "addition", content: '"version": "2.0.0",', newLine: 1 }] },
+      ],
+    };
+
+    const manifest = buildPromptReviewInput(smallInput);
+
+    expect(manifest.files[0].hunks[0].patch).toBe("@@ -8,2 +8,2 @@\n export class Runner {\n-  run() { return null; }\n+  run(job) { return this.execute(job); }");
+    expect(manifest.files[1].hunks[0].patch).toBeUndefined();
+    expect(analysisPrompt(smallInput)).toContain("Hunks that carry a patch field include their complete diff text inline");
+  });
+
+  it("stops inlining patch text at the budget so huge branches stay reference-first", () => {
+    const largeInput: CollectedReviewInput = {
+      ...input,
+      files: [{ id: "source", path: "src/large.ts", status: "modified", binary: false, signal: "meaningful" }],
+      hunks: Array.from({ length: 24 }, (_, hunkIndex) => ({
+        id: `hunk-${hunkIndex}`,
+        fileId: "source",
+        oldStart: hunkIndex * 40 + 1,
+        newStart: hunkIndex * 40 + 1,
+        lines: Array.from({ length: 40 }, (_, lineIndex) => ({
+          kind: "addition" as const,
+          content: `const generatedValue${hunkIndex}_${lineIndex} = "${"full patch content ".repeat(8)}";`,
+          newLine: hunkIndex * 40 + lineIndex + 1,
+        })),
+      })),
+    };
+
+    const hunks = buildPromptReviewInput(largeInput).files[0].hunks;
+    const inlined = hunks.filter((hunk) => hunk.patch !== undefined);
+
+    expect(inlined.length).toBeGreaterThan(0);
+    expect(inlined.length).toBeLessThan(hunks.length);
+    expect(inlined.reduce((total, hunk) => total + (hunk.patch?.length ?? 0), 0)).toBeLessThanOrEqual(INLINE_PATCH_BUDGET);
   });
 
   it("builds a compact reference-first prompt instead of embedding the full patch", () => {

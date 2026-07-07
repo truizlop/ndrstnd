@@ -161,18 +161,35 @@ Timeline steps are a rational reconstruction of how to build this branch. They a
 
 When the review input includes conversation, it is the dialogue between the user and the coding agent that produced this branch. Treat it as primary evidence of intent: explain why changes were made, which alternatives were considered or rejected, and which incidents, requirements, or downstream consumers motivated them, weaving those stated reasons into the summary, chapter synopses, before/after, step goals, and deferred concerns instead of guessing intent from the code alone. Attribute reasons faithfully - never invent motives the conversation does not support, and never copy credentials or secrets from it. When conversation is absent, ground every claim in the diff and repository alone.
 
-You are running in the reviewed repository with a read-only sandbox. The review input below is a compact manifest, not the full patch. Use its file paths, hunk IDs, line anchors, and suggested git commands to inspect only the code you need for a high-quality comprehension story. Prefer grouping related evidence IDs by behavior or decision instead of mirroring path order.
+You are running in the reviewed repository with a read-only sandbox. The review input below is a compact manifest. Hunks that carry a patch field include their complete diff text inline - never re-fetch those with git. For hunks without inline patch text, or when you need surrounding code, use the file paths, hunk IDs, line anchors, and suggested git commands to inspect only what you still need for a high-quality comprehension story. Prefer grouping related evidence IDs by behavior or decision instead of mirroring path order.
 
 Review input:
 ${JSON.stringify(reviewInput)}`;
 }
 
+/**
+ * Inline patch text spares Codex a git round trip per hunk — the dominant cost
+ * on small and medium branches, where every inspection command is a full model
+ * turn. The budget keeps huge branches on reference-first inspection so the
+ * prompt stays bounded.
+ */
+export const INLINE_PATCH_BUDGET = 40_000;
+
 export function buildPromptReviewInput(input: CollectedReviewInput, conversation?: ConversationContext) {
   const filesById = new Map(input.files.map((file) => [file.id, file]));
   const hunksByFile = new Map<string, Array<ReturnType<typeof compactHunk>>>();
+  let inlinePatchBudget = INLINE_PATCH_BUDGET;
   for (const hunk of input.hunks) {
     const file = filesById.get(hunk.fileId);
-    const compact = compactHunk(hunk, file?.path);
+    let patch: string | undefined;
+    if (file?.signal === "meaningful" && !file.binary && hunk.lines.length > 0) {
+      const text = hunkPatchText(hunk);
+      if (text.length <= inlinePatchBudget) {
+        inlinePatchBudget -= text.length;
+        patch = text;
+      }
+    }
+    const compact = compactHunk(hunk, file?.path, patch);
     const list = hunksByFile.get(hunk.fileId) ?? [];
     list.push(compact);
     hunksByFile.set(hunk.fileId, list);
@@ -188,7 +205,7 @@ export function buildPromptReviewInput(input: CollectedReviewInput, conversation
       summaryCommand: `git diff --stat --find-renames --find-copies ${diffRange(input)}`,
       patchCommand: `git diff --no-ext-diff --unified=80 --find-renames --find-copies ${diffRange(input)} -- <path>`,
       currentFileCommand: "sed -n '<start>,<end>p' <path>",
-      note: "For untracked working-tree files, inspect the current file directly and use the manifest hunk anchors as evidence IDs.",
+      note: "Hunks with a patch field carry their complete diff inline; run the patch command only for hunks without one or when surrounding code matters. For untracked working-tree files, inspect the current file directly and use the manifest hunk anchors as evidence IDs.",
     },
     files: input.files.map((file) => ({
       id: file.id,
@@ -284,12 +301,19 @@ function parseWireAnalysisDocument(value: unknown): AnalysisDocument {
   });
 }
 
-function compactHunk(hunk: CollectedReviewInput["hunks"][number], path: string | undefined) {
+function hunkPatchText(hunk: CollectedReviewInput["hunks"][number]): string {
+  const markers = { context: " ", addition: "+", deletion: "-" } as const;
+  const oldCount = hunk.lines.filter((line) => line.kind !== "addition").length;
+  const newCount = hunk.lines.filter((line) => line.kind !== "deletion").length;
+  return [`@@ -${hunk.oldStart},${oldCount} +${hunk.newStart},${newCount} @@`, ...hunk.lines.map((line) => `${markers[line.kind]}${line.content}`)].join("\n");
+}
+
+function compactHunk(hunk: CollectedReviewInput["hunks"][number], path: string | undefined, patch?: string) {
   const additions = hunk.lines.filter((line) => line.kind === "addition");
   const deletions = hunk.lines.filter((line) => line.kind === "deletion");
   const context = hunk.lines.length - additions.length - deletions.length;
-  // Samples only anchor hunk IDs to recognizable content; Codex inspects the
-  // real patch for detail, so two short previews per hunk are enough.
+  // Samples only anchor hunk IDs to recognizable content; Codex reads the inline
+  // patch or inspects the real one for detail, so two short previews per hunk are enough.
   const sampleLines = deletions.length > 0 && additions.length > 0 ? [deletions[0], additions[0]] : [...deletions, ...additions].slice(0, 2);
   const changedLineSamples = sampleLines.map((line) => ({
     kind: line.kind,
@@ -307,6 +331,7 @@ function compactHunk(hunk: CollectedReviewInput["hunks"][number], path: string |
     additions: additions.length,
     deletions: deletions.length,
     context,
+    patch,
     changedLineSamples,
   };
 }
