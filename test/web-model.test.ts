@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { AnalysisDocument } from "../src/shared/analysis-schema.js";
 import type { ChangedFile, DiffHunk } from "../src/shared/domain.js";
-import { attentionCounts, categoryCounts, chapterMetrics, focusedEvidenceLines, isSupportingFile, linePrefix, toUnifiedDiff } from "../src/web/evidence-model.js";
+import { attentionCounts, categoryCounts, chapterMetrics, evidenceLineScore, focusedEvidenceLines, isRoutineLine, isSupportingFile, linePrefix, toUnifiedDiff } from "../src/web/evidence-model.js";
 import { resolveLanguage } from "../src/web/language.js";
 import { buildTestThemes, deriveTestSummary, focusedTestLines, inferTestType, isTestPath, testTypeLabel } from "../src/web/test-plan-model.js";
 
@@ -18,6 +18,35 @@ describe("web evidence model", () => {
     ];
 
     expect(focusedEvidenceLines(lines).map(({ index }) => index)).toEqual([3, 4]);
+  });
+
+  it("scores load-bearing lines across languages and demotes import churn", () => {
+    const python: DiffHunk["lines"] = [
+      { kind: "addition", content: "import os", newLine: 1 },
+      { kind: "addition", content: "from retries import backoff", newLine: 2 },
+      { kind: "addition", content: "def run_job(job):", newLine: 4 },
+      { kind: "addition", content: "    if job.cancelled:", newLine: 5 },
+      { kind: "addition", content: "        raise JobCancelled(job.id)", newLine: 6 },
+      { kind: "addition", content: "    return backoff(job.perform)", newLine: 7 },
+    ];
+    expect(focusedEvidenceLines(python).map(({ index }) => index)).toEqual([2, 3, 4, 5]);
+
+    expect(evidenceLineScore({ kind: "addition", content: "func (r *Runner) Run(job Job) error {", newLine: 1 })).toBeGreaterThan(10);
+    expect(evidenceLineScore({ kind: "addition", content: "    raise ValueError(reason)", newLine: 1 })).toBeGreaterThan(10);
+    expect(evidenceLineScore({ kind: "addition", content: "use std::time::Duration;", newLine: 1 })).toBe(1);
+    expect(evidenceLineScore({ kind: "addition", content: "#include <vector>", newLine: 1 })).toBe(1);
+    expect(isRoutineLine("end")).toBe(true);
+    expect(isRoutineLine("done")).toBe(true);
+    expect(isRoutineLine("ready = False")).toBe(true);
+  });
+
+  it("falls back to the first changed lines when a hunk is import or boilerplate churn", () => {
+    const lines: DiffHunk["lines"] = [
+      { kind: "deletion", content: "import { old } from \"./old.js\";", oldLine: 1 },
+      { kind: "addition", content: "import { replacement } from \"./replacement.js\";", newLine: 1 },
+      { kind: "context", content: "export function unchanged() {}", oldLine: 2, newLine: 2 },
+    ];
+    expect(focusedEvidenceLines(lines).map(({ index }) => index)).toEqual([0, 1, 2]);
   });
 
   it("computes chapter metrics and counts without rendering HTML", () => {

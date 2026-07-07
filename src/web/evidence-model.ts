@@ -52,12 +52,15 @@ export function focusLinesFromRanges(lines: DiffLine[], ranges: Array<{ start: n
 }
 
 export function focusedEvidenceLines(lines: DiffLine[]): Array<{ line: DiffLine; index: number }> {
-  const changed = lines
+  let changed = lines
     .map((line, index) => ({ line, index, score: evidenceLineScore(line) }))
-    .filter(({ line, score }) => line.kind !== "context" && score > 0)
+    .filter(({ line, score }) => line.kind !== "context" && score > 1)
     .sort((left, right) => right.score - left.score || left.index - right.index)
     .slice(0, 10)
     .sort((left, right) => left.index - right.index);
+  // A hunk whose changed lines are all routine or import churn still deserves
+  // a focused excerpt; fall back to its first changed lines rather than nothing.
+  if (changed.length === 0) changed = lines.map((line, index) => ({ line, index, score: 1 })).filter(({ line }) => line.kind !== "context").slice(0, 6);
   if (changed.length === 0) return [];
 
   const selected = new Set(changed.map(({ index }) => index));
@@ -70,23 +73,36 @@ export function focusedEvidenceLines(lines: DiffLine[]): Array<{ line: DiffLine;
   return [...selected].sort((left, right) => left - right).map((index) => ({ line: lines[index]!, index }));
 }
 
+/** Definition-introducing words across mainstream languages (TS/JS, Python, Go, Rust, Ruby, Swift, Kotlin, Java, C#, Elixir, PHP...). */
+const DEFINITION_WORDS = new Set(["function", "func", "fn", "fun", "def", "defp", "defmodule", "defmacro", "sub", "proc", "class", "struct", "enum", "union", "interface", "trait", "impl", "protocol", "extension", "module", "record", "typedef", "macro", "constructor", "init", "lambda"]);
+/** Control-flow and effect words that usually carry the behavioral meaning of a change. */
+const FLOW_WORDS = new Set(["return", "throw", "throws", "raise", "panic", "yield", "await", "defer", "break", "continue", "if", "elif", "elsif", "unless", "switch", "case", "match", "when", "guard", "for", "foreach", "while", "loop", "try", "catch", "except", "finally", "rescue", "ensure", "assert", "expect"]);
+const IMPORT_LINE = /^(?:import\s|from\s+\S+\s+import\s|require\s*\(|require\s+['"]|include\s|#include\b|#import\b|using\s|use\s|package\s|namespace\s|extern\s+crate\s)/;
+const COMMENT_LINE = /^(?:\/\/|\/\*|\*(?:\s|\/|$)|#(?!include|import|define|if|ifdef|ifndef|else|elif|endif|pragma|!)|--(?:\s|$)|;;)/;
+const BLOCK_CLOSE = /^(?:end|fi|esac|done|endif|endfor|endwhile|endfunction|endmodule|endclass)[.;,]?$/i;
+
 export function evidenceLineScore(line: DiffLine): number {
   if (line.kind === "context" || isRoutineLine(line.content)) return 0;
   const source = line.content.trim();
+  if (IMPORT_LINE.test(source)) return 1;
+  const words = source.toLowerCase().match(/[a-z_$][\w$]*/g) ?? [];
+  if (COMMENT_LINE.test(source)) return /\b(?:TODO|FIXME|HACK|NOTE|WARNING|BUG|XXX)\b/.test(source) ? 4 : 2;
   let score = 10;
-  if (/\b(?:export|function|class|interface|type|return|throw|await|if|switch|for|while|catch)\b/.test(source)) score += 8;
-  if (/=>|\w+\s*\(/.test(source)) score += 4;
-  if (/\b(?:TODO|FIXME|NOTE)\b/.test(source)) score += 2;
-  return score;
+  if (words.some((word) => DEFINITION_WORDS.has(word))) score += 8;
+  if (words.some((word) => FLOW_WORDS.has(word))) score += 6;
+  if (/=>|->|:=|[A-Za-z_$][\w$]*\s*\(|[=!<>]=/.test(source)) score += 4;
+  return score + Math.min(3, Math.floor(words.length / 5));
 }
 
 export function isRoutineLine(source: string): boolean {
   const line = source.trim();
   return line.length === 0
-    || /^[{}[\]();,]+$/.test(line)
+    || /^[{}[\]()`;,]+;?$/.test(line)
+    || BLOCK_CLOSE.test(line)
+    || /^(?:else|then|do|try|finally|begin)\s*[{:]?$/i.test(line)
+    || /^['"`]{3}$/.test(line)
     || /^(?:get|set)\s+[A-Za-z_$][\w$]*\s*\(/.test(line)
-    || /^(?:constructor|init)\s*\([^)]*\)\s*\{\s*\}$/.test(line)
-    || /^(?:(?:public|private|protected|readonly|static|declare|abstract|override)\s+)*(?:[A-Za-z_$][\w$]*[!?]?\s*(?::[^=;]+)?\s*=\s*(?:undefined|null|true|false|0|""|''|\[\]|\{\})\s*;?)$/.test(line);
+    || /^(?:[A-Za-z_$][\w$]*\s+){0,3}[A-Za-z_$][\w$.]*[!?]?\s*(?::\s*[\w<>[\], .?|]+)?\s*:?=\s*(?:false|true|null|nil|none|undefined|0|0\.0|""|''|\[\]|\{\}|\(\))\s*[;,]?$/i.test(line);
 }
 
 export function isSupportingFile(file: ChangedFile | undefined): boolean {

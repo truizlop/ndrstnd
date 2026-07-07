@@ -137,6 +137,25 @@ describe("analysis documents", () => {
     expect(analysisPrompt(focusInput)).toContain("f drives the Evidence zoom excerpts");
   });
 
+  it("salvages valid focus and tolerates missing focus on the final repair attempt", () => {
+    const focusInput: CollectedReviewInput = {
+      ...input,
+      files: [{ id: "source", path: "app.ts", status: "modified", binary: false, signal: "meaningful" }],
+      hunks: [{
+        id: "source-hunk", fileId: "source", oldStart: 8, newStart: 8,
+        lines: [{ kind: "addition", content: "run(job) { return this.execute(job); }", newLine: 9 }],
+      }],
+    };
+    const chapter = { id: "one", title: "Runner behavior", kind: "behavior" as const, synopsis: validSynopsis, confidence: "high" as const, attention: "contained" as const, riskCategories: ["behavior" as const], evidenceIds: ["source-hunk"] };
+    const document = { summary: validSummary, chapters: [chapter], steps: [sourceStep], omittedGroups: [], unclassifiedEvidenceIds: [] };
+
+    expect(parseAnalysisDocument(document, focusInput, { focus: "salvage" }).focus).toEqual({});
+    expect(parseAnalysisDocument({
+      ...document,
+      focus: { "source-hunk": [{ start: 40, end: 50 }, { start: 9, end: 9 }], "not-real": [{ start: 1, end: 1 }] },
+    }, focusInput, { focus: "salvage" }).focus).toEqual({ "source-hunk": [{ start: 9, end: 9 }] });
+  });
+
   it("accepts compact Codex output and normalizes it to the presentation document", () => {
     expect(parseAnalysisDocument({
       s: validSummary,

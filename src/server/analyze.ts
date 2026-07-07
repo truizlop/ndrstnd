@@ -15,7 +15,7 @@ export async function analyzeWithCodex(input: CollectedReviewInput, conversation
     let lastError = "";
     for (let attempt = 0; attempt <= REPAIR_ATTEMPTS; attempt += 1) {
       try {
-        return parseAnalysisDocument(JSON.parse(extractJson(response)), input);
+        return parseAnalysisDocument(JSON.parse(extractJson(response)), input, { focus: attempt === REPAIR_ATTEMPTS ? "salvage" : "require" });
       } catch (error) {
         lastError = error instanceof Error ? error.message : String(error);
         if (attempt === REPAIR_ATTEMPTS) break;

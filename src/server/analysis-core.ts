@@ -5,7 +5,7 @@ import type { CollectedReviewInput } from "./git.js";
 import type { ConversationContext } from "./conversation.js";
 import { deriveEvidenceOrder } from "./evidence-ordering.js";
 
-export function parseAnalysisDocument(value: unknown, input: CollectedReviewInput): AnalysisDocument {
+export function parseAnalysisDocument(value: unknown, input: CollectedReviewInput, options?: { focus?: "require" | "salvage" }): AnalysisDocument {
   const document = parseWireAnalysisDocument(value);
   const knownEvidence = new Set(input.hunks.map((hunk) => hunk.id));
   const referenced = new Set<string>();
@@ -27,23 +27,44 @@ export function parseAnalysisDocument(value: unknown, input: CollectedReviewInpu
     .filter((id) => !grouped.has(id));
   if (strayLowSignal.length > 0) throw new Error(`Low-signal evidence was left ungrouped: ${strayLowSignal.join(", ")}. Add each ID to an omitted group in o with a short reason (for example lockfile churn or generated output); u is only for meaningful evidence that defies classification.`);
   validateStepPlan(document, input, meaningfulEvidence);
-  validateFocus(document, input);
+  validateFocus(document, input, options?.focus ?? "require");
   validateProseDepth(document);
   return document;
 }
 
-function validateFocus(document: AnalysisDocument, input: CollectedReviewInput): void {
+/**
+ * "require" rejects missing or invalid focus so the repair loop demands it;
+ * "salvage" (the final attempt) keeps whatever focus is valid and lets the
+ * renderer fall back to heuristics, so a review never fails over focus alone.
+ */
+function validateFocus(document: AnalysisDocument, input: CollectedReviewInput, mode: "require" | "salvage"): void {
   const hunksById = new Map(input.hunks.map((hunk) => [hunk.id, hunk]));
   const focus = document.focus ?? {};
+  const valid: NonNullable<AnalysisDocument["focus"]> = {};
   for (const [evidenceId, ranges] of Object.entries(focus)) {
     const hunk = hunksById.get(evidenceId);
-    if (hunk === undefined) throw new Error(`Focus referenced unknown evidence: ${evidenceId}. Use only hunk IDs listed in the review input manifest.`);
+    if (hunk === undefined) {
+      if (mode === "require") throw new Error(`Focus referenced unknown evidence: ${evidenceId}. Use only hunk IDs listed in the review input manifest.`);
+      continue;
+    }
     const newLines = hunk.lines.flatMap((line) => (line.newLine === undefined ? [] : [line.newLine]));
     const span = newLines.length === 0 ? "none" : `${Math.min(...newLines)}-${Math.max(...newLines)}`;
-    for (const range of ranges) {
-      if (range.start > range.end) throw new Error(`Focus range for ${evidenceId} is inverted: [${range.start},${range.end}]. Give [startLine,endLine] with startLine <= endLine.`);
-      if (!newLines.some((line) => line >= range.start && line <= range.end)) throw new Error(`Focus range [${range.start},${range.end}] for ${evidenceId} selects no lines of that hunk; its new-file lines span ${span}. Use new-file line numbers from the patch.`);
-    }
+    const validRanges = ranges.filter((range) => {
+      if (range.start > range.end) {
+        if (mode === "require") throw new Error(`Focus range for ${evidenceId} is inverted: [${range.start},${range.end}]. Give [startLine,endLine] with startLine <= endLine.`);
+        return false;
+      }
+      if (!newLines.some((line) => line >= range.start && line <= range.end)) {
+        if (mode === "require") throw new Error(`Focus range [${range.start},${range.end}] for ${evidenceId} selects no lines of that hunk; its new-file lines span ${span}. Use new-file line numbers from the patch.`);
+        return false;
+      }
+      return true;
+    });
+    if (validRanges.length > 0) valid[evidenceId] = validRanges;
+  }
+  if (mode === "salvage") {
+    document.focus = valid;
+    return;
   }
   const missingFocus = document.chapters
     .flatMap((chapter) => chapter.evidenceIds)
