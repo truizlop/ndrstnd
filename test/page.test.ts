@@ -132,11 +132,11 @@ describe("renderWorkspace", () => {
     expect(focusedExcerpt).toContain('class="line omission"');
     expect(focusedExcerpt.match(/<pre class="focused-code">[\s\S]*?<\/pre>/)?.[0]).not.toContain("private ready = false;");
     expect(focusedExcerpt.match(/<pre class="focused-code">[\s\S]*?<\/pre>/)?.[0]).not.toContain("get status() { return this.ready; }");
-    expect(focusedExcerpt.match(/<pre class="raw-code">[\s\S]*?<\/pre>/)?.[0]).toContain("private ready");
-    expect(focusedExcerpt.match(/<pre class="raw-code">[\s\S]*?<\/pre>/)?.[0]).toContain("false");
-    expect(focusedExcerpt.match(/<pre class="raw-code">[\s\S]*?<\/pre>/)?.[0]).toContain("status");
-    expect(focusedExcerpt.match(/<pre class="raw-code">[\s\S]*?<\/pre>/)?.[0]).toContain("this");
-    expect(focusedExcerpt.match(/<pre class="raw-code">[\s\S]*?<\/pre>/)?.[0]).toContain(".ready");
+    // The raw variant ships once in the Full diff and is cloned at runtime.
+    expect(focusedExcerpt).not.toContain('<pre class="raw-code">');
+    const rawSource = page.match(/<div class="diff-block" data-diff-hunk="source-hunk">[\s\S]*?<\/pre>/)?.[0] ?? "";
+    expect(rawSource).toContain(">ready<");
+    expect(rawSource).toContain(">status<");
     expect(focusedExcerpt.match(/<article class="evidence focused-evidence"[\s\S]*?<\/article>/)?.[0]).toMatchSnapshot();
     expect(page).toContain("Other files changed");
     expect(page).toContain(".gitignore");
@@ -275,8 +275,9 @@ describe("renderWorkspace", () => {
       expect(page.match(new RegExp(`data-evidence-template="${id}"`, "g"))).toHaveLength(1);
       expect(state("step-03")).not.toContain(`data-evidence-id="${id}"`);
     }
-    expect(page.match(/data-evidence-id="hunk-1"/g)).toHaveLength(2);
+    expect(page.match(/data-evidence-id="hunk-1"/g)).toHaveLength(1);
     expect(page.match(/data-diff-hunk="hunk-1"/g)).toHaveLength(1);
+    expect(page).toContain('data-evidence-list="hunk-1 hunk-2 hunk-3"');
   });
 
   it("renders Test plan zoom projections from one test information model", async () => {
@@ -415,10 +416,10 @@ it("drives the Evidence-zoom focused excerpt from analysis focus ranges with a h
   const page = await renderArtifact(frozenReviewData);
   const evidence = /<article class="evidence focused-evidence" data-evidence-id="retry-hunk">([\s\S]*?)<\/article>/.exec(page)![1];
   const focusedBlock = /<pre class="focused-code">([\s\S]*?)<\/pre>/.exec(evidence)![1];
-  const rawBlock = /<pre class="raw-code">([\s\S]*?)<\/pre>/.exec(evidence)![1];
   expect(focusedBlock).toContain("maxAttempts");
   expect(focusedBlock).not.toContain("RetryPolicy");
-  expect(rawBlock).toContain("RetryPolicy");
+  expect(evidence).not.toContain('<pre class="raw-code">');
+  expect(/<div class="diff-block" data-diff-hunk="retry-hunk">([\s\S]*?)<\/pre>/.exec(page)![1]).toContain("RetryPolicy");
 
   const withoutFocus = await renderArtifact({ ...frozenReviewData, document: { ...frozenReviewData.document, focus: undefined } });
   const fallbackEvidence = /<article class="evidence focused-evidence" data-evidence-id="retry-hunk">([\s\S]*?)<\/article>/.exec(withoutFocus)![1];

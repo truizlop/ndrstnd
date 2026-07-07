@@ -329,6 +329,25 @@ it("restores and saves portable UI preferences when local storage is available",
   expect(JSON.parse(window.localStorage.getItem("ndrstnd-artifact-ui-preferences-v1") || "{}")).toEqual({ sidebarCollapsed: false, inspectorCollapsed: false, zoom: 2, view: "trailer" });
 });
 
+it("materializes chapter evidence from the library and clones raw excerpts from the full diff", () => {
+  const window = new Window();
+  const document = window.document;
+  document.body.innerHTML = `<button data-view="trailer" class="nav-item active"></button><section id="trailer" class="view active"><article class="chapter"><button class="chapter-toggle" aria-expanded="false"></button><div class="chapter-detail" hidden><div class="evidence-stack" data-evidence-list="h1"></div></div></article></section><section id="diff"><details class="file full-diff-file" open data-file-id="f"><summary><span class="file-path">src/a.ts</span></summary><div class="diff-block" data-diff-hunk="h1"><div class="diff-hunk-header">@@</div><pre><span class="line context">raw-line</span></pre></div></details></section><div id="evidence-library" hidden><template data-evidence-template="h1"><article class="evidence focused-evidence" data-evidence-id="h1"><pre class="focused-code">focused-line</pre></article></template></div><div id="map" hidden></div><div class="story-zoom-controls"><div id="zoom-control"><div id="zoom-callout"><output id="zoom-label"></output><span id="zoom-description"></span></div><button data-zoom="0"></button><button data-zoom="1"></button><button data-zoom="2"></button><button data-zoom="3"></button><button data-zoom="4"></button></div></div><div id="selection-menu" hidden></div>`;
+  window.eval(`${artifactClientScript}${portableEnhancements}`);
+
+  const stack = document.querySelector(".evidence-stack")!;
+  expect(stack.children).toHaveLength(0);
+
+  document.querySelector<HTMLElement>('[data-zoom="3"]')?.click();
+  expect(stack.querySelector('[data-evidence-id="h1"]')).not.toBeNull();
+  expect(stack.querySelector(".raw-code")).toBeNull();
+
+  document.querySelector<HTMLElement>('[data-zoom="4"]')?.click();
+  const raw = stack.querySelector(".raw-code");
+  expect(raw).not.toBeNull();
+  expect(raw?.textContent).toContain("raw-line");
+});
+
 it("materializes the active timeline step from the evidence library and clears inactive steps", () => {
   const window = new Window();
   const document = window.document;
