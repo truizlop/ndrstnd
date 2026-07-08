@@ -114,7 +114,6 @@ function renderTimeline(document: AnalysisDocument, hunks: DiffHunk[], filePaths
   const plan = `<div class="timeline-plan">${document.steps.map((step, index) => `<button class="timeline-plan-step attention-${escapeHtml(attentionFor(step))}" data-timeline-select="${escapeHtml(step.id)}"><span>${ordinal(index)}</span><div><strong>${renderProse(step.title)}</strong><p>${renderProse(step.goal)}</p></div></button>`).join("")}</div>`;
 
   const states = document.steps.map((step, index) => {
-    const priorEvidence = document.steps.slice(0, index).flatMap((candidate) => candidate.evidenceIds);
     const churn = churnFor(step.evidenceIds.map((id) => requireHunk(hunks, id)));
     const filesTouched = [...churn.entries()].map(([fileId, counts]) => `<span class="timeline-file"><span>${escapeHtml(filePaths.get(fileId) ?? fileId)}</span><small><b class="additions">+${counts.additions}</b><b class="deletions">−${counts.deletions}</b></small></span>`).join("");
     const chapters = step.advancesChapterIds.map((chapterId) => chaptersById.get(chapterId)).filter((chapter): chapter is NonNullable<typeof chapter> => chapter !== undefined);
@@ -123,7 +122,7 @@ function renderTimeline(document: AnalysisDocument, hunks: DiffHunk[], filePaths
     const forwardRefs = Object.entries(step.forwardRefs);
     const refs = forwardRefs.length === 0 ? `<p class="empty-note">Every symbol used here already exists.</p>` : `<ul>${forwardRefs.map(([symbol, targetStepId]) => `<li><code>${escapeHtml(symbol)}</code> is introduced at <button data-timeline-select="${escapeHtml(targetStepId)}">${escapeHtml(stepLabel(targetStepId))}</button></li>`).join("")}</ul>`;
     const buildsOn = step.dependsOn.filter((id) => stepOrdinalById.has(id)).map((id) => `<button data-timeline-select="${escapeHtml(id)}">Builds on · ${escapeHtml(stepLabel(id))}</button>`).join("");
-    return `<article class="timeline-state${index === 0 ? " active" : ""}" data-timeline-state="${escapeHtml(step.id)}" data-step-index="${index + 1}"${index === 0 ? "" : " hidden"}><header class="timeline-card"><span class="timeline-index attention-${escapeHtml(attentionFor(step))}">${ordinal(index)}</span><div><h2>${renderProse(step.title)}</h2><p class="timeline-goal">${renderProse(step.goal)}</p>${filesTouched ? `<div class="timeline-files">${filesTouched}</div>` : ""}${chapterLinks || buildsOn ? `<div class="timeline-chapter-links">${chapterLinks}${buildsOn}</div>` : ""}</div></header><div class="timeline-summary"><strong>You now have</strong><p>${renderProse(step.youNowHave)}</p></div><div class="timeline-explanation"><section><h3>Deferred for later steps</h3>${deferred}</section><section><h3>Forward references</h3>${refs}</section></div><div class="timeline-evidence" data-current-evidence="${escapeHtml(step.evidenceIds.join(" "))}" data-prior-evidence="${escapeHtml(priorEvidence.join(" "))}"></div><div class="timeline-raw"></div></article>`;
+    return `<article class="timeline-state${index === 0 ? " active" : ""}" data-timeline-state="${escapeHtml(step.id)}" data-step-index="${index + 1}"${index === 0 ? "" : " hidden"}><header class="timeline-card"><span class="timeline-index attention-${escapeHtml(attentionFor(step))}">${ordinal(index)}</span><div><h2>${renderProse(step.title)}</h2><p class="timeline-goal">${renderProse(step.goal)}</p>${filesTouched ? `<div class="timeline-files">${filesTouched}</div>` : ""}${chapterLinks || buildsOn ? `<div class="timeline-chapter-links">${chapterLinks}${buildsOn}</div>` : ""}</div></header><div class="timeline-summary"><strong>You now have</strong><p>${renderProse(step.youNowHave)}</p></div><div class="timeline-explanation"><section><h3>Deferred for later steps</h3>${deferred}</section><section><h3>Forward references</h3>${refs}</section></div><div class="timeline-evidence" data-current-evidence="${escapeHtml(step.evidenceIds.join(" "))}"></div><div class="timeline-raw"></div></article>`;
   }).join("");
   return `<div class="timeline">${rail}${plan}<div class="timeline-states">${states}</div></div>`;
 }
@@ -220,11 +219,15 @@ function renderOtherFilesChanged(files: ChangedFile[], hunks: DiffHunk[]): strin
   return `<section class="other-files" aria-label="Other files changed"><h2>Other files changed</h2><ul>${rows.map((row) => `<li><span>${escapeHtml(row.path)}</span><small><b class="additions">+${row.additions}</b><b class="deletions">−${row.deletions}</b></small></li>`).join("")}</ul></section>`;
 }
 
+/** Files past this many changed lines start collapsed in Full diff so huge branches lay out lazily instead of at first paint. */
+const FULL_DIFF_OPEN_LINE_LIMIT = 400;
+
 function renderFullDiff(file: ChangedFile, hunks: DiffHunk[], highlighter: Highlighter): string {
   const parsed = parseDiff(toUnifiedDiff(file, hunks), { drawFileList: false, outputFormat: "line-by-line" })[0];
   if (parsed === undefined) return "";
   const language = resolveLanguage(file.path);
-  return `<details class="file full-diff-file" open data-file-id="${escapeHtml(file.id)}"><summary><span class="file-path">${escapeHtml(file.path)}</span><small>${escapeHtml(file.signalReason ?? file.status)}</small></summary>${parsed.blocks.map((block, index) => renderDiffBlock(block, language, highlighter, hunks[index]?.id)).join("")}</details>`;
+  const lineCount = hunks.reduce((sum, hunk) => sum + hunk.lines.length, 0);
+  return `<details class="file full-diff-file"${lineCount <= FULL_DIFF_OPEN_LINE_LIMIT ? " open" : ""} data-file-id="${escapeHtml(file.id)}"><summary><span class="file-path">${escapeHtml(file.path)}</span><small>${escapeHtml(file.signalReason ?? file.status)}</small></summary>${parsed.blocks.map((block, index) => renderDiffBlock(block, language, highlighter, hunks[index]?.id)).join("")}</details>`;
 }
 
 function renderDiffBlock(block: DiffBlock, language: BundledLanguage, highlighter: Highlighter, hunkId?: string): string {
@@ -936,7 +939,9 @@ export const portableEnhancements = `
     const evidence = state.querySelector('.timeline-evidence');
     if (!evidence || evidence.dataset.currentEvidence === undefined) return;
     const current = evidence.dataset.currentEvidence.split(' ').filter(Boolean);
-    const prior = (evidence.dataset.priorEvidence || '').split(' ').filter(Boolean);
+    // Prior evidence is the union of earlier steps' own evidence; deriving it here keeps the attributes O(hunks) instead of O(steps x hunks).
+    const states = [...document.querySelectorAll('.timeline-state')];
+    const prior = states.slice(0, states.indexOf(state)).flatMap((previous) => { const container = previous.querySelector('.timeline-evidence'); return container && container.dataset.currentEvidence ? container.dataset.currentEvidence.split(' ') : []; }).filter(Boolean);
     const append = (id, isCurrent) => { const template = document.querySelector('[data-evidence-template="' + cssAttr(id) + '"]'); if (!template) return; const item = document.createElement('div'); item.className = 'timeline-evidence-item' + (isCurrent ? ' current' : ''); item.setAttribute('data-evidence-id', id); item.appendChild(template.content.cloneNode(true)); evidence.appendChild(item); };
     current.forEach((id) => append(id, true));
     if (prior.length > 0) { const divider = document.createElement('p'); divider.className = 'timeline-evidence-divider'; divider.textContent = 'Already in place from earlier steps'; evidence.appendChild(divider); prior.forEach((id) => append(id, false)); }

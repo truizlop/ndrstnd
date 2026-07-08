@@ -281,10 +281,10 @@ describe("renderArtifact", () => {
     };
 
     expect(state("step-01")).toContain('data-current-evidence="hunk-1"');
-    expect(state("step-01")).toContain('data-prior-evidence=""');
     expect(state("step-02")).toContain('data-current-evidence="hunk-2"');
-    expect(state("step-02")).toContain('data-prior-evidence="hunk-1"');
-    expect(state("step-03")).toContain('data-prior-evidence="hunk-1 hunk-2"');
+    expect(state("step-03")).toContain('data-current-evidence="hunk-3"');
+    // Prior evidence is derived at runtime from earlier steps, never shipped as O(steps x hunks) attributes.
+    expect(page).not.toContain("data-prior-evidence");
     for (const id of ["hunk-1", "hunk-2", "hunk-3"]) {
       expect(page.match(new RegExp(`data-evidence-template="${id}"`, "g"))).toHaveLength(1);
       expect(state("step-03")).not.toContain(`data-evidence-id="${id}"`);
@@ -292,6 +292,28 @@ describe("renderArtifact", () => {
     expect(page.match(/data-evidence-id="hunk-1"/g)).toHaveLength(1);
     expect(page.match(/data-diff-hunk="hunk-1"/g)).toHaveLength(1);
     expect(page).toContain('data-evidence-list="hunk-1 hunk-2 hunk-3"');
+  });
+
+  it("collapses very large files in Full diff so huge branches lay out lazily", async () => {
+    const bigLines = Array.from({ length: 500 }, (_, index) => ({ kind: "addition" as const, content: `const value${index} = ${index};`, newLine: index + 1 }));
+    const session: StoredReviewSession = {
+      id: "session", repoPath: "/repo", targetRef: "agent-change", baseRef: "main", mergeBase: "abcdef123456", inputHash: "hash", createdAt: "now",
+      input: {
+        repoPath: "/repo", targetRef: "agent-change", baseRef: "main", mergeBase: "abcdef123456",
+        files: [
+          { id: "big", path: "src/generated-lookup.ts", status: "added", binary: false, signal: "meaningful" },
+          { id: "small", path: "src/app.ts", status: "modified", binary: false, signal: "meaningful" },
+        ],
+        hunks: [
+          { id: "big-hunk", fileId: "big", oldStart: 1, newStart: 1, lines: bigLines },
+          { id: "small-hunk", fileId: "small", oldStart: 1, newStart: 1, lines: [{ kind: "addition", content: "export const small = true;", newLine: 1 }] },
+        ],
+      },
+    };
+    const page = await renderArtifact(createReviewPresentationData(session, { id: "revision", sessionId: "session", source: "codex", status: "complete", document: buildTestAnalysis(session.input), createdAt: "now" }));
+
+    expect(page).toContain('<details class="file full-diff-file" data-file-id="big">');
+    expect(page).toContain('<details class="file full-diff-file" open data-file-id="small">');
   });
 
   it("renders Test plan zoom projections from one test information model", async () => {
