@@ -138,6 +138,14 @@ export class ClaudeCodeClient implements AgentClient {
         onActivity?.({ label, notifications: events, draftCharacters: draft.length });
       };
 
+      const parseLine = (line: string) => {
+        if (line === "") return;
+        try {
+          handleEvent(JSON.parse(line) as Record<string, unknown>);
+        } catch {
+          // Ignore non-JSON noise on stdout.
+        }
+      };
       child.stdout.on("data", (chunk: Buffer) => {
         stdoutBuffer += chunk.toString("utf8");
         for (;;) {
@@ -145,12 +153,7 @@ export class ClaudeCodeClient implements AgentClient {
           if (newline === -1) return;
           const line = stdoutBuffer.slice(0, newline).trim();
           stdoutBuffer = stdoutBuffer.slice(newline + 1);
-          if (line === "") continue;
-          try {
-            handleEvent(JSON.parse(line) as Record<string, unknown>);
-          } catch {
-            // Ignore non-JSON noise on stdout.
-          }
+          parseLine(line);
         }
       });
       child.stderr.on("data", (chunk: Buffer) => {
@@ -158,6 +161,9 @@ export class ClaudeCodeClient implements AgentClient {
       });
       child.once("error", (error) => failWith(new Error(`Claude Code could not run: ${error.message}${stderrHint(stderrTail)}`)));
       child.once("close", (code) => {
+        // A final event is not guaranteed a trailing newline; drain it before judging the outcome.
+        parseLine(stdoutBuffer.trim());
+        stdoutBuffer = "";
         const outcome = result;
         if (outcome !== undefined && outcome.isError) return failWith(new Error(`Claude Code analysis turn failed: ${outcome.text !== "" ? outcome.text : outcome.detail}.${stderrHint(stderrTail)}`));
         if (outcome === undefined) return failWith(new Error(`Claude Code exited with status ${code ?? "unknown"} before reporting a result.${stderrHint(stderrTail)}`));

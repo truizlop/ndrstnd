@@ -137,6 +137,16 @@ describe("ClaudeCodeClient", () => {
     await expect(runSingleTurn(client, "Explain this branch.")).rejects.toThrow("exited with status 1 before reporting a result. Claude Code reported: native module mismatch");
   });
 
+  it("parses a final result line that arrives without a trailing newline", async () => {
+    const client = new ClaudeCodeClient();
+    stubbedClient(client, (child) => {
+      child.stdout.write(JSON.stringify({ type: "result", subtype: "success", is_error: false, result: "unterminated ok", session_id: "session-123" }));
+      child.emit("close", 0);
+    });
+
+    await expect(runSingleTurn(client, "Explain this branch.")).resolves.toBe("unterminated ok");
+  });
+
   it("reports the exit status when a dying process breaks the prompt pipe", async () => {
     const client = new ClaudeCodeClient();
     stubbedClient(client, (child) => {
