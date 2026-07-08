@@ -134,14 +134,21 @@ export class CodexAppServerClient implements AgentClient {
 
   private async start(): Promise<void> {
     if (this.process !== undefined) return;
-    const process = spawn("codex", ["app-server"], { stdio: "pipe" });
+    const process = this.spawnCodex();
     this.process = process;
     process.stdout.on("data", (chunk: Buffer) => this.handleOutput(chunk.toString("utf8")));
     process.stderr.on("data", (chunk: Buffer) => {
       this.stderrTail = `${this.stderrTail}${chunk.toString("utf8")}`.slice(-4_000);
     });
+    // Without this listener a write to a dead app-server raises an unhandled stream error and kills the whole CLI.
+    process.stdin.on("error", (error: Error) => this.fail(new Error(`Codex app-server stopped accepting input: ${error.message}${this.stderrHint()}`)));
     process.once("error", (error) => this.fail(new Error(`Codex app-server could not run: ${error.message}${this.stderrHint()}`)));
     process.once("exit", (code) => this.fail(new Error(`Codex app-server exited with status ${code ?? "unknown"}.${this.stderrHint()}`)));
+  }
+
+  /** Kept as an instance method so tests can substitute a scripted child process. */
+  private spawnCodex(): ChildProcessWithoutNullStreams {
+    return spawn("codex", ["app-server"], { stdio: "pipe" });
   }
 
   private sendRequest(method: string, params: Record<string, unknown>): Promise<unknown> {

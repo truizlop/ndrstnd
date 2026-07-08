@@ -130,6 +130,16 @@ describe("ClaudeCodeClient", () => {
     await expect(runSingleTurn(client, "Explain this branch.")).rejects.toThrow("exited with status 1 before reporting a result. Claude Code reported: native module mismatch");
   });
 
+  it("reports the exit status when a dying process breaks the prompt pipe", async () => {
+    const client = new ClaudeCodeClient();
+    stubbedClient(client, (child) => {
+      child.stdin.emit("error", new Error("write EPIPE"));
+      child.emit("close", 1);
+    });
+
+    await expect(runSingleTurn(client, "Explain this branch.")).rejects.toThrow("exited with status 1 before reporting a result");
+  });
+
   it("times out on inactivity with progress diagnostics and the stderr tail", async () => {
     const client = new ClaudeCodeClient(20);
     stubbedClient(client, (child) => {

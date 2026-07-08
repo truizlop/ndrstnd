@@ -1,5 +1,17 @@
+import { EventEmitter } from "node:events";
+import { PassThrough } from "node:stream";
 import { describe, expect, it, vi } from "vitest";
 import { CodexAppServerClient, describeThreadNotification, getCodexAuthStatus, type TurnActivity } from "../src/server/codex.js";
+
+class FakeCodexProcess extends EventEmitter {
+  stdout = new PassThrough();
+  stderr = new PassThrough();
+  stdin = new PassThrough();
+
+  kill(): boolean {
+    return true;
+  }
+}
 
 describe("getCodexAuthStatus", () => {
   it("returns a non-secret status shape", async () => {
@@ -89,6 +101,18 @@ describe("CodexAppServerClient", () => {
     expect(describeThreadNotification("item/started", { item: { type: "reasoning" } })).toBe("reasoning about the branch");
     expect(describeThreadNotification("item/started", { item: { type: "agentMessage" } })).toBe("drafting the narrative");
     expect(describeThreadNotification("thread/tokenUsage/updated", {})).toBeUndefined();
+  });
+
+  it("surfaces a broken app-server input pipe as a failed request instead of crashing", async () => {
+    const client = new CodexAppServerClient();
+    const child = new FakeCodexProcess();
+    (client as unknown as { spawnCodex: () => FakeCodexProcess }).spawnCodex = () => child;
+
+    const request = client.request("account/read", {});
+    queueMicrotask(() => child.stdin.emit("error", new Error("write EPIPE")));
+
+    await expect(request).rejects.toThrow("Codex app-server stopped accepting input: write EPIPE");
+    client.close();
   });
 
   it("times out on inactivity with progress diagnostics and the stderr tail", async () => {

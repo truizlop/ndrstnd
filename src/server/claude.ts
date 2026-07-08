@@ -164,6 +164,8 @@ export class ClaudeCodeClient implements AgentClient {
         settle(() => resolve({ text: outcome.text !== "" ? outcome.text : draft, sessionId }));
       });
       armTimeout();
+      // A process dying before it drains the prompt EPIPEs stdin; the close handler already reports that failure, so the stream error must not crash the CLI.
+      child.stdin.on("error", () => undefined);
       child.stdin.end(prompt);
     });
   }
