@@ -19,15 +19,43 @@ const keywords = new Set([
 export function deriveEvidenceOrder(hunks: readonly DiffHunk[], files: readonly ChangedFile[]): EvidenceOrder {
   const filesById = new Map(files.map((file) => [file.id, file]));
   const meaningful = hunks.filter((hunk) => filesById.get(hunk.fileId)?.signal === "meaningful");
-  const constraints = dedupeConstraints([
-    ...symbolConstraints(meaningful),
-    ...layerConstraints(meaningful, filesById),
-    ...testConstraints(meaningful, filesById),
-  ]);
+  const constraints = dedupeConstraints(symbolConstraints(meaningful));
   return {
     constraints,
-    orderedEvidenceIds: topologicalEvidenceOrder(meaningful, constraints, filesById),
+    orderedEvidenceIds: layeredEvidenceOrder(meaningful, constraints, filesById),
   };
+}
+
+/**
+ * Layer and test precedence used to be materialized as one constraint object per cross-layer hunk
+ * pair, O(n^2) on large branches; emitting layers in ascending order enforces the same precedence
+ * with only the symbol constraints materialized.
+ */
+function layeredEvidenceOrder(hunks: readonly DiffHunk[], constraints: readonly EvidenceOrderConstraint[], filesById: ReadonlyMap<string, ChangedFile>): string[] {
+  const rank = new Map(hunks.map((hunk, index) => [hunk.id, evidenceRank(hunk, filesById, index)]));
+  const layerOf = (id: string) => rank.get(id)?.layer;
+  // A symbol defined in a later layer than its use contradicts layer precedence; keep the plain rank order, exactly like a constraint cycle.
+  const conflicting = constraints.some((constraint) => {
+    const beforeLayer = layerOf(constraint.beforeEvidenceId);
+    const afterLayer = layerOf(constraint.afterEvidenceId);
+    return beforeLayer !== undefined && afterLayer !== undefined && beforeLayer > afterLayer;
+  });
+  if (conflicting) return hunks.map((hunk) => hunk.id).sort((a, b) => compareRank(rank.get(a), rank.get(b)));
+
+  const byLayer = new Map<number, DiffHunk[]>();
+  for (const hunk of hunks) {
+    const layer = layerOf(hunk.id) ?? 2;
+    const list = byLayer.get(layer) ?? [];
+    list.push(hunk);
+    byLayer.set(layer, list);
+  }
+  return [...byLayer.entries()]
+    .sort(([a], [b]) => a - b)
+    .flatMap(([layer, layerHunks]) => topologicalEvidenceOrder(
+      layerHunks,
+      constraints.filter((constraint) => layerOf(constraint.beforeEvidenceId) === layer && layerOf(constraint.afterEvidenceId) === layer),
+      filesById,
+    ));
 }
 
 export function topologicalEvidenceOrder(hunks: readonly DiffHunk[], constraints: readonly EvidenceOrderConstraint[], filesById: ReadonlyMap<string, ChangedFile>): string[] {
@@ -81,32 +109,6 @@ function symbolConstraints(hunks: readonly DiffHunk[]): EvidenceOrderConstraint[
       for (const definerId of bySymbol.get(symbol) ?? []) {
         if (definerId !== hunkId) constraints.push({ beforeEvidenceId: definerId, afterEvidenceId: hunkId, reason: "symbol", symbol });
       }
-    }
-  }
-  return constraints;
-}
-
-function layerConstraints(hunks: readonly DiffHunk[], filesById: ReadonlyMap<string, ChangedFile>): EvidenceOrderConstraint[] {
-  const constraints: EvidenceOrderConstraint[] = [];
-  for (const before of hunks) {
-    for (const after of hunks) {
-      if (before.id === after.id) continue;
-      const beforeLayer = layerFor(filesById.get(before.fileId)?.path ?? "");
-      const afterLayer = layerFor(filesById.get(after.fileId)?.path ?? "");
-      if (beforeLayer < afterLayer) constraints.push({ beforeEvidenceId: before.id, afterEvidenceId: after.id, reason: "layer" });
-    }
-  }
-  return constraints;
-}
-
-function testConstraints(hunks: readonly DiffHunk[], filesById: ReadonlyMap<string, ChangedFile>): EvidenceOrderConstraint[] {
-  const constraints: EvidenceOrderConstraint[] = [];
-  for (const implementation of hunks) {
-    const implementationPath = filesById.get(implementation.fileId)?.path ?? "";
-    if (isTestPath(implementationPath)) continue;
-    for (const test of hunks) {
-      const testPath = filesById.get(test.fileId)?.path ?? "";
-      if (implementation.id !== test.id && isTestPath(testPath)) constraints.push({ beforeEvidenceId: implementation.id, afterEvidenceId: test.id, reason: "test" });
     }
   }
   return constraints;

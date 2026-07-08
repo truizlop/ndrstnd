@@ -30,6 +30,25 @@ describe("evidence ordering", () => {
     expect(deriveEvidenceOrder(hunks, files).orderedEvidenceIds).toEqual(["shared", "server", "web"]);
   });
 
+  it("orders thousands of hunks without materializing pairwise constraints", () => {
+    const files: ChangedFile[] = [];
+    const hunks: DiffHunk[] = [];
+    for (let index = 0; index < 2_000; index += 1) {
+      files.push({ id: `impl-${index}`, path: `src/server/module-${String(index).padStart(4, "0")}.ts`, status: "modified", binary: false, signal: "meaningful" });
+      files.push({ id: `test-${index}`, path: `test/module-${String(index).padStart(4, "0")}.test.ts`, status: "modified", binary: false, signal: "meaningful" });
+      hunks.push({ id: `impl-hunk-${index}`, fileId: `impl-${index}`, oldStart: 1, newStart: 1, lines: [{ kind: "addition", content: `const value${index} = ${index};`, newLine: 1 }] });
+      hunks.push({ id: `test-hunk-${index}`, fileId: `test-${index}`, oldStart: 1, newStart: 1, lines: [{ kind: "addition", content: `expectValue(${index});`, newLine: 1 }] });
+    }
+
+    const order = deriveEvidenceOrder(hunks, files);
+
+    expect(order.orderedEvidenceIds).toHaveLength(4_000);
+    expect(order.constraints.every((constraint) => constraint.reason === "symbol")).toBe(true);
+    const firstTestIndex = order.orderedEvidenceIds.findIndex((id) => id.startsWith("test-hunk-"));
+    const lastImplIndex = order.orderedEvidenceIds.map((id, index) => id.startsWith("impl-hunk-") ? index : -1).reduce((a, b) => Math.max(a, b), -1);
+    expect(lastImplIndex).toBeLessThan(firstTestIndex);
+  });
+
   it("places tests after implementation hunks", () => {
     const files: ChangedFile[] = [
       { id: "test", path: "test/runner.test.ts", status: "modified", binary: false, signal: "meaningful" },
