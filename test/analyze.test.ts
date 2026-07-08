@@ -310,11 +310,11 @@ describe("analysis documents", () => {
     expect(prompt.length).toBeLessThan(legacyReviewInput.length / 2);
   });
 
-  it("uses worktree-inclusive inspection commands when dirty changes are part of the review", () => {
+  it("uses worktree-inclusive inspection commands against the merge-base when dirty changes are part of the review", () => {
     const manifest = buildPromptReviewInput({ ...input, includesWorkingTree: true });
 
-    expect(manifest.inspection.summaryCommand).toBe("git diff --stat --find-renames --find-copies main");
-    expect(manifest.inspection.patchCommand).toBe("git diff --no-ext-diff --unified=80 --find-renames --find-copies main -- <path>");
+    expect(manifest.inspection.summaryCommand).toBe("git diff --stat --find-renames --find-copies base");
+    expect(manifest.inspection.patchCommand).toBe("git diff --no-ext-diff --unified=80 --find-renames --find-copies base -- <path>");
   });
 
   it("asks for compact output that is materially smaller than the full document shape", () => {

@@ -359,8 +359,8 @@ function compactText(text: string, limit: number): string {
 }
 
 function diffRange(input: CollectedReviewInput): string {
-  if (input.includesWorkingTree) return input.baseRef === "empty" ? input.mergeBase : input.baseRef;
-  return `${input.mergeBase}...${input.targetRef}`;
+  if (input.includesWorkingTree) return input.mergeBase;
+  return `${input.mergeBase} ${input.targetRef}`;
 }
 
 export function extractJson(text: string): string {

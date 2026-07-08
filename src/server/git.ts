@@ -34,10 +34,11 @@ export class GitReader implements GitRepositoryReader {
     const includeWorkingTree = workingTreeTarget || (head !== undefined && head.trim() === target);
     if (target === undefined && baseRef !== EMPTY_TREE) throw new Error("A repository without commits needs `--base empty` for a working-tree review.");
     const mergeBase = baseRef === EMPTY_TREE ? EMPTY_TREE : (await git(repoPath, ["merge-base", baseRef, target ?? baseRef])).trim();
-    const comparison = includeWorkingTree ? baseRef : `${mergeBase}...${targetRef}`;
-    const nameStatus = await git(repoPath, ["diff", "--name-status", "-z", "--find-renames", "--find-copies", comparison]);
+    // Diffing the merge-base rather than the base tip keeps upstream commits landed after the fork point out of the review.
+    const comparison = includeWorkingTree ? [mergeBase] : [mergeBase, targetRef];
+    const nameStatus = await git(repoPath, ["diff", "--name-status", "-z", "--find-renames", "--find-copies", ...comparison]);
     const trackedFiles = parseNameStatus(nameStatus);
-    const patch = await git(repoPath, ["diff", "--no-ext-diff", "--unified=3", "--find-renames", "--find-copies", "--binary", comparison]);
+    const patch = await git(repoPath, ["diff", "--no-ext-diff", "--unified=3", "--find-renames", "--find-copies", "--binary", ...comparison]);
     const untracked = includeWorkingTree ? await collectUntrackedPatch(repoPath, trackedFiles) : { files: [], patch: "" };
     const files = [...trackedFiles, ...untracked.files];
     const parsedPatch = parsePatch(`${patch}\n${untracked.patch}`, files);

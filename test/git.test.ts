@@ -113,6 +113,51 @@ describe("GitReader", () => {
     expect(additions).toEqual(expect.arrayContaining(["committed unicode", "committed spaced", "untracked unicode"]));
   });
 
+  it("keeps upstream commits landed after the fork point out of a working-tree review", async () => {
+    repository = await mkdtemp(join(tmpdir(), "ndrstnd-git-"));
+    await git(repository, ["init", "-b", "main"]);
+    await git(repository, ["config", "user.email", "ndrstnd@example.test"]);
+    await git(repository, ["config", "user.name", "ndrstnd Test"]);
+    await writeFile(join(repository, "shared.txt"), "shared\n");
+    await git(repository, ["add", "."]);
+    await git(repository, ["commit", "-m", "base"]);
+    await git(repository, ["switch", "-c", "agent-change"]);
+    await writeFile(join(repository, "branch.txt"), "branch work\n");
+    await git(repository, ["add", "."]);
+    await git(repository, ["commit", "-m", "branch work"]);
+    await git(repository, ["switch", "main"]);
+    await writeFile(join(repository, "upstream.txt"), "landed after the fork\n");
+    await git(repository, ["add", "."]);
+    await git(repository, ["commit", "-m", "upstream drift"]);
+    await git(repository, ["switch", "agent-change"]);
+
+    const input = await new GitReader().collectReviewInput(repository, "agent-change", "main");
+
+    expect(input.includesWorkingTree).toBe(true);
+    expect(input.files.map((file) => file.path)).toEqual(["branch.txt"]);
+  });
+
+  it("reviews a non-checked-out target against the empty tree", async () => {
+    repository = await mkdtemp(join(tmpdir(), "ndrstnd-git-"));
+    await git(repository, ["init", "-b", "main"]);
+    await git(repository, ["config", "user.email", "ndrstnd@example.test"]);
+    await git(repository, ["config", "user.name", "ndrstnd Test"]);
+    await writeFile(join(repository, "first.ts"), "export const first = true;\n");
+    await git(repository, ["add", "."]);
+    await git(repository, ["commit", "-m", "base"]);
+    await git(repository, ["switch", "-c", "feature"]);
+    await writeFile(join(repository, "feature.ts"), "export const feature = true;\n");
+    await git(repository, ["add", "."]);
+    await git(repository, ["commit", "-m", "feature"]);
+    await git(repository, ["switch", "main"]);
+
+    const input = await new GitReader().collectReviewInput(repository, "feature", "empty");
+
+    expect(input.baseRef).toBe("empty");
+    expect(input.files.map((file) => file.path).sort()).toEqual(["feature.ts", "first.ts"]);
+    expect(input.files).toMatchObject([expect.objectContaining({ status: "added" }), expect.objectContaining({ status: "added" })]);
+  });
+
   it("reports a pure rename as a rename rather than a binary change", async () => {
     repository = await mkdtemp(join(tmpdir(), "ndrstnd-git-"));
     await git(repository, ["init", "-b", "main"]);
