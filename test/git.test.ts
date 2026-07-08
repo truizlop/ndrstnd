@@ -212,11 +212,33 @@ describe("GitReader", () => {
     await git(repository, ["branch", "--set-upstream-to", "main"]);
     await writeFile(join(repository, "worktree.txt"), "dirty\n");
 
-    const input = await new GitReader().collectReviewInput(repository, "WORKTREE");
+    const input = await new GitReader().collectReviewInput(repository);
 
     expect(input.baseRef).toBe("main");
+    expect(input.targetRef).toBe("agent-change");
     expect(input.includesWorkingTree).toBe(true);
     expect(input.files.map((file) => file.path)).toEqual(["worktree.txt"]);
+  });
+
+  it("reviews a branch literally named WORKTREE as a branch", async () => {
+    repository = await mkdtemp(join(tmpdir(), "ndrstnd-git-"));
+    await git(repository, ["init", "-b", "main"]);
+    await git(repository, ["config", "user.email", "ndrstnd@example.test"]);
+    await git(repository, ["config", "user.name", "ndrstnd Test"]);
+    await writeFile(join(repository, "base.txt"), "base\n");
+    await git(repository, ["add", "."]);
+    await git(repository, ["commit", "-m", "base"]);
+    await git(repository, ["switch", "-c", "WORKTREE"]);
+    await writeFile(join(repository, "change.txt"), "change\n");
+    await git(repository, ["add", "."]);
+    await git(repository, ["commit", "-m", "change"]);
+    await git(repository, ["switch", "main"]);
+
+    const input = await new GitReader().collectReviewInput(repository, "WORKTREE");
+
+    expect(input.targetRef).toBe("WORKTREE");
+    expect(input.includesWorkingTree).toBe(false);
+    expect(input.files.map((file) => file.path)).toEqual(["change.txt"]);
   });
 
   it("describes the scope with the local commits an inferred base pulls into a worktree review", async () => {
@@ -235,10 +257,10 @@ describe("GitReader", () => {
     await writeFile(join(repository, "dirty.txt"), "dirty\n");
 
     const reader = new GitReader();
-    const inferred = await reader.collectReviewInput(repository, "WORKTREE");
+    const inferred = await reader.collectReviewInput(repository);
     expect(await describeReviewScope(repository, inferred)).toEqual({ targetLabel: "agent-change", localCommitsIncluded: 1 });
 
-    const uncommittedOnly = await reader.collectReviewInput(repository, "WORKTREE", "HEAD");
+    const uncommittedOnly = await reader.collectReviewInput(repository, undefined, "HEAD");
     expect(await describeReviewScope(repository, uncommittedOnly)).toEqual({ targetLabel: "agent-change", localCommitsIncluded: 0 });
     expect(uncommittedOnly.files.map((file) => file.path)).toEqual(["dirty.txt"]);
   });
@@ -258,7 +280,7 @@ describe("GitReader", () => {
     await ensureArtifactDirectoryIgnored(repository);
     await ensureArtifactDirectoryIgnored(repository);
 
-    const input = await new GitReader().collectReviewInput(repository, "WORKTREE", "HEAD");
+    const input = await new GitReader().collectReviewInput(repository, undefined, "HEAD");
     expect(input.files.map((file) => file.path)).toEqual(["dirty.txt"]);
     const exclude = await readFile(join(repository, ".git", "info", "exclude"), "utf8");
     expect(exclude.match(/\.ndrstnd\//g)).toHaveLength(1);
@@ -269,7 +291,7 @@ describe("GitReader", () => {
     await git(repository, ["init", "-b", "main"]);
     await writeFile(join(repository, "first.ts"), "export const first = true;\n");
 
-    const input = await new GitReader().collectReviewInput(repository, "WORKTREE", "empty");
+    const input = await new GitReader().collectReviewInput(repository, undefined, "empty");
 
     expect(input.baseRef).toBe("empty");
     expect(input.includesWorkingTree).toBe(true);

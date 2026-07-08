@@ -129,7 +129,6 @@ async function runReview(args: string[]): Promise<void> {
   const explicitBase = values.get("--base");
   if (uncommitted && explicitBase !== undefined) fail("--uncommitted already reviews against HEAD; do not combine it with --base.");
   if (uncommitted && targetArg !== undefined) fail("--uncommitted reviews the checked-out branch; do not pass a branch.");
-  const targetRef = targetArg ?? "WORKTREE";
   const noOpen = flags.has("--no-open");
   const repoPath = await canonicalRepoPath(values.get("--repo"));
   const baseRef = uncommitted ? "HEAD" : explicitBase;
@@ -139,7 +138,7 @@ async function runReview(args: string[]): Promise<void> {
   try {
     const conversation = conversationPath === undefined ? undefined : await importConversation(conversationPath);
     await ensureArtifactDirectoryIgnored(repoPath);
-    const input = await new GitReader().collectReviewInput(repoPath, targetRef, baseRef);
+    const input = await new GitReader().collectReviewInput(repoPath, targetArg, baseRef);
     const meaningfulFiles = input.files.filter((file) => file.signal === "meaningful").length;
     const scope = await describeReviewScope(repoPath, input);
     process.stdout.write(`Reviewing ${scope.targetLabel} against ${input.baseRef}${input.includesWorkingTree ? ", including uncommitted changes" : ""}: ${input.files.length} changed file${input.files.length === 1 ? "" : "s"} (${meaningfulFiles} meaningful).\n`);

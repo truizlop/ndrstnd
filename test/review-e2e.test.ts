@@ -26,7 +26,7 @@ describe("review artifact e2e", () => {
     await writeFile(join(repository, "app.ts"), "export const enabled = true;\n");
     await writeFile(join(repository, "app.test.ts"), "test('enables the app', () => expect(enabled).toBe(true));\n");
 
-    const input = await new GitReader().collectReviewInput(repository, "WORKTREE", "empty");
+    const input = await new GitReader().collectReviewInput(repository, undefined, "empty");
     const store = new ReviewStore(join(workspace, "store.sqlite"));
     try {
       const session = store.getOrCreateSession(input);

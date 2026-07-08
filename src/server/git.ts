@@ -19,25 +19,26 @@ export interface CollectedReviewInput {
 }
 
 export interface GitRepositoryReader {
-  collectReviewInput(repoPath: string, targetRef: string, explicitBaseRef?: string): Promise<CollectedReviewInput>;
+  collectReviewInput(repoPath: string, targetRef?: string, explicitBaseRef?: string): Promise<CollectedReviewInput>;
 }
 
 export class GitReader implements GitRepositoryReader {
-  async collectReviewInput(repoPath: string, targetRef: string, explicitBaseRef?: string): Promise<CollectedReviewInput> {
+  /** Without a targetRef the working tree is reviewed, so any branch name, including one literally called WORKTREE, stays reviewable. */
+  async collectReviewInput(repoPath: string, targetRef?: string, explicitBaseRef?: string): Promise<CollectedReviewInput> {
     await git(repoPath, ["rev-parse", "--show-toplevel"]);
-    const workingTreeTarget = targetRef === "WORKTREE";
-    if (!workingTreeTarget) await git(repoPath, ["rev-parse", "--verify", targetRef]);
+    const workingTreeTarget = targetRef === undefined;
+    if (targetRef !== undefined) await git(repoPath, ["rev-parse", "--verify", targetRef]);
 
-    const baseTargetRef = workingTreeTarget ? await resolveWorktreeTargetRef(repoPath) : targetRef;
-    const baseRef = explicitBaseRef === "empty" ? EMPTY_TREE : explicitBaseRef ?? await resolveBaseRef(repoPath, baseTargetRef);
+    const targetLabel = targetRef ?? await resolveWorktreeTargetRef(repoPath);
+    const baseRef = explicitBaseRef === "empty" ? EMPTY_TREE : explicitBaseRef ?? await resolveBaseRef(repoPath, targetLabel);
     if (baseRef !== EMPTY_TREE) await git(repoPath, ["rev-parse", "--verify", baseRef]);
     const head = await gitOptional(repoPath, ["rev-parse", "HEAD"]);
-    const target = workingTreeTarget ? head?.trim() : (await git(repoPath, ["rev-parse", targetRef])).trim();
+    const target = targetRef === undefined ? head?.trim() : (await git(repoPath, ["rev-parse", targetRef])).trim();
     const includeWorkingTree = workingTreeTarget || (head !== undefined && head.trim() === target);
     if (target === undefined && baseRef !== EMPTY_TREE) throw new Error("A repository without commits needs `--base empty` for a working-tree review.");
     const mergeBase = baseRef === EMPTY_TREE ? EMPTY_TREE : (await git(repoPath, ["merge-base", baseRef, target ?? baseRef])).trim();
     // Diffing the merge-base rather than the base tip keeps upstream commits landed after the fork point out of the review.
-    const comparison = includeWorkingTree ? [mergeBase] : [mergeBase, targetRef];
+    const comparison = targetRef === undefined || includeWorkingTree ? [mergeBase] : [mergeBase, targetRef];
     const nameStatus = await git(repoPath, ["diff", "--name-status", "-z", "--find-renames", "--find-copies", ...comparison]);
     const trackedFiles = parseNameStatus(nameStatus);
     // Without --binary git prints a one-line "Binary files ... differ" marker, which is all parsePatch needs; the full binary payload would only risk overflowing maxBuffer.
@@ -48,7 +49,7 @@ export class GitReader implements GitRepositoryReader {
     const hunks = parsedPatch.hunks;
     const finalizedFiles = finalizeFiles(files, hunks, parsedPatch.binaryFileIds);
 
-    return { repoPath, targetRef, baseRef: explicitBaseRef === "empty" ? "empty" : baseRef, mergeBase, includesWorkingTree: includeWorkingTree, files: finalizedFiles, hunks };
+    return { repoPath, targetRef: targetLabel, baseRef: explicitBaseRef === "empty" ? "empty" : baseRef, mergeBase, includesWorkingTree: includeWorkingTree, files: finalizedFiles, hunks };
   }
 }
 
@@ -74,7 +75,7 @@ export interface ReviewScope {
 
 /** Describes what a collected review covers so the CLI can confirm the scope before the expensive analysis. */
 export async function describeReviewScope(repoPath: string, input: CollectedReviewInput): Promise<ReviewScope> {
-  const targetLabel = input.targetRef === "WORKTREE" ? await resolveWorktreeTargetRef(repoPath) : input.targetRef;
+  const targetLabel = input.targetRef;
   if (input.includesWorkingTree !== true || input.baseRef === "empty") return { targetLabel, localCommitsIncluded: 0 };
   const count = await gitOptional(repoPath, ["rev-list", "--count", `${input.baseRef}..HEAD`]);
   return { targetLabel, localCommitsIncluded: Number(count?.trim() ?? "0") };
