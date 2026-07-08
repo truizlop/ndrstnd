@@ -137,6 +137,22 @@ it("jumps between Timeline steps and Story chapters in the portable artifact", (
   expect(document.querySelector<HTMLElement>(".chapter-detail")?.hidden).toBe(false);
 });
 
+it("opens a Story chapter whose id contains selector metacharacters", () => {
+  const window = new Window();
+  const document = window.document;
+  const hostileId = 'quote"back\\slash';
+  document.body.innerHTML = `<button data-view="trailer" class="nav-item active"></button><button data-view="timeline" class="nav-item"></button><section id="trailer" class="view active"><article class="chapter"><button class="chapter-toggle"></button><div class="chapter-detail" hidden></div></article></section><section id="timeline" class="view"><button data-step-chapter=""></button></section><div id="map" hidden></div><div class="story-zoom-controls"><div id="zoom-control"><div id="zoom-callout"><output id="zoom-label"></output><span id="zoom-description"></span></div><button data-zoom="0"></button><button data-zoom="1"></button><button data-zoom="2"></button><button data-zoom="3"></button><button data-zoom="4"></button></div></div><div id="selection-menu" hidden></div>`;
+  document.querySelector(".chapter")?.setAttribute("data-chapter", hostileId);
+  document.querySelector("[data-step-chapter]")?.setAttribute("data-step-chapter", hostileId);
+  window.eval(`${artifactClientScript}${portableEnhancements}`);
+
+  document.querySelector<HTMLElement>("[data-step-chapter]")?.click();
+
+  expect(document.querySelector("#trailer")?.classList.contains("active")).toBe(true);
+  expect(document.querySelector(".chapter")?.classList.contains("open")).toBe(true);
+  expect(document.querySelector<HTMLElement>(".chapter-detail")?.hidden).toBe(false);
+});
+
 it("restores the Test plan with zoom controls visible", () => {
   const window = new Window({ url: "http://127.0.0.1:3000/" });
   const document = window.document;
