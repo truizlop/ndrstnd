@@ -3,7 +3,7 @@ import type { AnalysisDocument } from "../src/shared/analysis-schema.js";
 import type { ChangedFile, DiffHunk } from "../src/shared/domain.js";
 import { attentionCounts, categoryCounts, chapterMetrics, evidenceLineScore, focusedEvidenceLines, isRoutineLine, isSupportingFile, linePrefix, toUnifiedDiff } from "../src/web/evidence-model.js";
 import { resolveLanguage } from "../src/web/language.js";
-import { buildTestThemes, deriveTestSummary, focusedTestLines, inferTestType, isTestPath, testTypeLabel } from "../src/web/test-plan-model.js";
+import { buildTestCases, buildTestThemes, deriveTestSummary, focusedTestLines, inferTestType, isTestPath, testTypeLabel } from "../src/web/test-plan-model.js";
 
 describe("web evidence model", () => {
   it("selects meaningful changed lines with nearby non-routine context", () => {
@@ -132,6 +132,44 @@ describe("web test plan model", () => {
     ]);
     expect(deriveTestSummary(themes)).toBe("Testing focused on Worktree handling. Most test activity was implemented in test/git.test.ts.");
     expect(testTypeLabel(themes[0]!.cases)).toBe("Unit");
+  });
+
+  it("keeps a test chapter's cases in one theme even when several claims share its risk categories", () => {
+    const document: AnalysisDocument = {
+      summary: "Two behavior claims share one test chapter.",
+      chapters: [
+        { id: "claim-a", title: "First behavior", kind: "behavior", synopsis: "First claim.", confidence: "high", attention: "contained", riskCategories: ["behavior"], evidenceIds: ["source-a"] },
+        { id: "claim-b", title: "Second behavior", kind: "behavior", synopsis: "Second claim.", confidence: "high", attention: "contained", riskCategories: ["behavior"], evidenceIds: ["source-b"] },
+        { id: "tests", title: "Exercise both", kind: "test", synopsis: "One test chapter.", confidence: "high", attention: "low", riskCategories: ["behavior"], evidenceIds: ["test"] },
+      ],
+      steps: [],
+      omittedGroups: [],
+      unclassifiedEvidenceIds: [],
+    };
+    const hunks: DiffHunk[] = [
+      { id: "test", fileId: "test-file", oldStart: 1, newStart: 1, lines: [{ kind: "addition", content: "test(\"covers the shared behavior\", () => {});", newLine: 1 }] },
+    ];
+
+    const themes = buildTestThemes(document, hunks, new Map([["test-file", "test/shared.test.ts"]]));
+
+    expect(themes.flatMap((theme) => theme.cases.map((testCase) => testCase.name))).toEqual(["covers the shared behavior"]);
+    expect(themes).toHaveLength(1);
+  });
+
+  it("does not fabricate case names from identifiers that merely end in it or test", () => {
+    const chapter: AnalysisDocument["chapters"][number] = { id: "tests", title: "Tests", kind: "test", synopsis: "Covers submit flow.", confidence: "high", attention: "low", riskCategories: ["behavior"], evidenceIds: ["hunk"] };
+    const hunks: DiffHunk[] = [{
+      id: "hunk", fileId: "test-file", oldStart: 1, newStart: 1,
+      lines: [
+        { kind: "addition", content: "await submit(\"form-a\");", newLine: 1 },
+        { kind: "addition", content: "rateLimit('burst');", newLine: 2 },
+        { kind: "addition", content: "it(\"submits the form\", () => {});", newLine: 3 },
+      ],
+    }];
+
+    const cases = buildTestCases(chapter, hunks, new Map([["test-file", "test/submit.test.ts"]]));
+
+    expect(cases.map((testCase) => testCase.name)).toEqual(["submits the form"]);
   });
 
   it("infers test metadata and focused test lines without rendering", () => {

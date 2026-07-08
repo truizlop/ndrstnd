@@ -25,9 +25,16 @@ export function buildTestThemes(document: AnalysisDocument, hunks: DiffHunk[], f
   const casesByChapter = new Map(testChapters.map((chapter) => [chapter.id, buildTestCases(chapter, hunks, filePaths)]));
   const fallbackClaims = storyClaims.length > 0 ? storyClaims : testChapters;
   if (fallbackClaims.length === 0) return [];
-  return fallbackClaims.map((claim, index) => {
-    const matchingTests = storyClaims.length === 1 ? testChapters : testChapters.filter((testChapter) => sharesAny(testChapter.riskCategories, claim.riskCategories));
-    const selectedTests = matchingTests.length > 0 ? matchingTests : (index === 0 ? testChapters : []);
+  // Each test chapter feeds exactly one theme so case counts and jump targets never duplicate across claims.
+  const assignedTests = new Map<string, AnalysisDocument["chapters"]>(fallbackClaims.map((claim) => [claim.id, []]));
+  for (const testChapter of testChapters) {
+    const owner = storyClaims.length === 0
+      ? testChapter
+      : storyClaims.find((claim) => sharesAny(testChapter.riskCategories, claim.riskCategories)) ?? storyClaims[0]!;
+    assignedTests.get(owner.id)?.push(testChapter);
+  }
+  return fallbackClaims.map((claim) => {
+    const selectedTests = assignedTests.get(claim.id) ?? [];
     const cases = selectedTests.flatMap((chapter) => casesByChapter.get(chapter.id) ?? []);
     return { id: claim.id, title: claim.title, synopsis: claim.synopsis, storyClaims: storyClaims.includes(claim) ? [claim] : [], testChapters: selectedTests, cases };
   }).filter((theme, index, all) => theme.cases.length > 0 || all.length === 1);
@@ -42,7 +49,8 @@ export function buildTestCases(chapter: AnalysisDocument["chapters"][number], hu
     const filePath = filePaths.get(hunk.fileId) ?? hunk.fileId;
     const names = hunk.lines
       .filter((line) => line.kind === "addition")
-      .map((line) => line.content.match(/(?:it|test|describe)\s*\(\s*["'`]([^"'`]+)/)?.[1])
+      // The lookbehind keeps identifiers that merely end in it/test/describe, like submit( or rateLimit(, from fabricating case names.
+      .map((line) => line.content.match(/(?<![\w$.])(?:it|test|describe)\s*\(\s*["'`]([^"'`]+)/)?.[1])
       .filter((name): name is string => name !== undefined);
     return (names.length > 0 ? names : [`Verify ${basename(filePath)}`]).map((name, index) => ({ id: `${hunk.id}-${index}`, name, filePath, hunk, chapter }));
   });
