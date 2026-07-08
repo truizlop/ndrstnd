@@ -31,6 +31,26 @@ describe("ndrstnd CLI", () => {
     expect(result.stderr).toContain("Unknown review option: --nope");
   });
 
+  it("prints help for subcommand --help instead of failing", async () => {
+    const review = await runCli(["review", "--help"]);
+    expect(review.code).toBe(0);
+    expect(review.stdout).toContain("Usage:");
+
+    const auth = await runCli(["auth", "--help"]);
+    expect(auth.code).toBe(0);
+    expect(auth.stdout).toContain("Usage:");
+  });
+
+  it("rejects unknown auth and skill options loudly", async () => {
+    const auth = await runCli(["auth", "login", "--agnet", "codex"]);
+    expect(auth.code).toBe(1);
+    expect(auth.stderr).toContain("Unknown auth option: --agnet");
+
+    const skill = await runCli(["skill", "install", "--forse"]);
+    expect(skill.code).toBe(1);
+    expect(skill.stderr).toContain("Unknown skill option: --forse");
+  });
+
   it("reports a missing repository path as a one-line error without a stack trace", async () => {
     const result = await runCli(["review", "--no-open", "--repo", "/does/not/exist"]);
     expect(result.code).toBe(1);

@@ -33,19 +33,47 @@ async function packageVersion(): Promise<string> {
   return manifest.version ?? "unknown";
 }
 
-/** Reads a trailing `--agent <id>` option shared by the auth and skill commands. */
-function parseAgentOption(args: string[]): ReviewAgentId | undefined {
-  const index = args.indexOf("--agent");
-  if (index === -1) return undefined;
-  const value = args[index + 1];
-  if (value === undefined || value.startsWith("-")) fail("--agent requires a value.");
+/** A typo in any flag must fail loudly; silently ignoring it would run the wrong review, agent, or install. */
+function parseCommandArgs(command: string, args: string[], valueOptions: string[], booleanOptions: string[], maxPositional: number): { positional: string[]; values: Map<string, string>; flags: Set<string> } {
+  const values = new Map<string, string>();
+  const flags = new Set<string>();
+  const positional: string[] = [];
+  for (let index = 0; index < args.length; index += 1) {
+    const argument = args[index];
+    if (valueOptions.includes(argument)) {
+      const value = args[index + 1];
+      if (value === undefined || value.startsWith("-")) fail(`${argument} requires a value.`);
+      values.set(argument, value);
+      index += 1;
+      continue;
+    }
+    if (booleanOptions.includes(argument)) {
+      flags.add(argument);
+      continue;
+    }
+    if (argument.startsWith("-")) fail(`Unknown ${command} option: ${argument}. Known options: ${[...valueOptions, ...booleanOptions].join(", ")}.`);
+    if (positional.length >= maxPositional) fail(`Unexpected extra ${command} argument: ${argument}.`);
+    positional.push(argument);
+  }
+  return { positional, values, flags };
+}
+
+function wantsHelp(args: string[]): boolean {
+  return args.includes("--help") || args.includes("-h");
+}
+
+function agentOptionFrom(values: Map<string, string>): ReviewAgentId | undefined {
+  const value = values.get("--agent");
+  if (value === undefined) return undefined;
   if (!reviewAgents.some((agent) => agent.id === value)) fail(`Unknown analysis agent: ${value}. Supported agents: ${reviewAgents.map((agent) => agent.id).join(", ")}.`);
   return value as ReviewAgentId;
 }
 
 async function runSkill(args: string[]): Promise<void> {
-  if (args[0] !== "install") fail("Usage: ndrstnd skill install [--force] [--agent <codex|claude>]");
-  const installations = await installSkill(args.includes("--force"), parseAgentOption(args)).catch((error: unknown) => fail(error instanceof Error ? error.message : String(error)));
+  if (wantsHelp(args)) return printHelp();
+  const { positional, values, flags } = parseCommandArgs("skill", args, ["--agent"], ["--force"], 1);
+  if (positional[0] !== "install") fail("Usage: ndrstnd skill install [--force] [--agent <codex|claude>]");
+  const installations = await installSkill(flags.has("--force"), agentOptionFrom(values)).catch((error: unknown) => fail(error instanceof Error ? error.message : String(error)));
   for (const installation of installations) {
     if (installation.status === "installed") process.stdout.write(`Installed the ndrstnd skill for ${installation.agent.name} at ${installation.destination}.\n`);
     else process.stdout.write(`Skipped ${installation.agent.name}: ${installation.reason}.\n`);
@@ -56,8 +84,10 @@ async function runSkill(args: string[]): Promise<void> {
 }
 
 async function runAuth(args: string[]): Promise<void> {
-  const action = args[0] ?? "status";
-  const agentId = parseAgentOption(args);
+  if (wantsHelp(args)) return printHelp();
+  const { positional, values } = parseCommandArgs("auth", args, ["--agent"], [], 1);
+  const action = positional[0] ?? "status";
+  const agentId = agentOptionFrom(values);
   if (action === "status") {
     const agents = agentId === undefined ? reviewAgents : reviewAgents.filter((agent) => agent.id === agentId);
     for (const agent of agents) {
@@ -95,36 +125,10 @@ async function runAgentLogin(agent: ReviewAgent): Promise<void> {
   }
 }
 
-/** A typo in a scope flag must fail loudly; silently ignoring it would review the wrong changes. */
-function parseReviewArgs(args: string[]): { targetRef?: string; values: Map<string, string>; flags: Set<string> } {
-  // Defined here because the top-level command dispatch runs before module-level consts initialize.
-  const valueOptions = ["--base", "--repo", "--conversation", "--agent"];
-  const booleanOptions = ["--uncommitted", "--no-open", "--fresh"];
-  const values = new Map<string, string>();
-  const flags = new Set<string>();
-  let targetRef: string | undefined;
-  for (let index = 0; index < args.length; index += 1) {
-    const argument = args[index];
-    if (valueOptions.includes(argument)) {
-      const value = args[index + 1];
-      if (value === undefined || value.startsWith("-")) fail(`${argument} requires a value.`);
-      values.set(argument, value);
-      index += 1;
-      continue;
-    }
-    if (booleanOptions.includes(argument)) {
-      flags.add(argument);
-      continue;
-    }
-    if (argument.startsWith("-")) fail(`Unknown review option: ${argument}. Known options: ${[...valueOptions, ...booleanOptions].join(", ")}.`);
-    if (targetRef !== undefined) fail(`Unexpected extra argument: ${argument}. Pass at most one branch.`);
-    targetRef = argument;
-  }
-  return { targetRef, values, flags };
-}
-
 async function runReview(args: string[]): Promise<void> {
-  const { targetRef: targetArg, values, flags } = parseReviewArgs(args);
+  if (wantsHelp(args)) return printHelp();
+  const { positional, values, flags } = parseCommandArgs("review", args, ["--base", "--repo", "--conversation", "--agent"], ["--uncommitted", "--no-open", "--fresh"], 1);
+  const targetArg = positional[0];
   const uncommitted = flags.has("--uncommitted");
   const explicitBase = values.get("--base");
   if (uncommitted && explicitBase !== undefined) fail("--uncommitted already reviews against HEAD; do not combine it with --base.");
