@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { INLINE_PATCH_BUDGET, analysisPrompt, buildPromptReviewInput, extractJson, parseAnalysisDocument } from "../src/server/analysis-core.js";
+import { INLINE_PATCH_BUDGET, PROSE_WORD_RANGES, analysisPrompt, buildPromptReviewInput, extractJson, parseAnalysisDocument } from "../src/server/analysis-core.js";
 import { formatAnalysisHeartbeat } from "../src/server/analyze.js";
 import type { CollectedReviewInput } from "../src/server/git.js";
 
@@ -64,6 +64,12 @@ describe("analysis documents", () => {
     expect(() => parseAnalysisDocument({ summary: validSummary, chapters: [chapter], steps: [sourceStep], omittedGroups: [], unclassifiedEvidenceIds: ["lock-hunk"] }, input)).toThrow("Low-signal evidence was left ungrouped");
     expect(() => parseAnalysisDocument({ summary: validSummary, chapters: [chapter], steps: [sourceStep], omittedGroups: [], unclassifiedEvidenceIds: [] }, input)).toThrow("Low-signal evidence was left ungrouped");
     expect(analysisPrompt(input)).toContain("Group every low-signal evidence ID into an omitted group in o");
+  });
+
+  it("states the same prose word ranges the validator enforces", () => {
+    const prompt = analysisPrompt(input);
+    expect(prompt).toContain(`summary ${PROSE_WORD_RANGES.summary.min}-${PROSE_WORD_RANGES.summary.max} words`);
+    expect(prompt).toContain(`before and after ${PROSE_WORD_RANGES.beforeAfter.min}-${PROSE_WORD_RANGES.beforeAfter.max} words`);
   });
 
   it("tells Codex to ground the narrative in a supplied conversation", () => {
