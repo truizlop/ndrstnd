@@ -930,7 +930,7 @@ export const artifactClientScript = `
     const chapterButton = target.closest('.chapter-toggle');
     if (chapterButton) { if (currentStoryLevel() <= 1) return; const chapter = chapterButton.closest('.chapter'); openChapter(chapter, !chapter.classList.contains('open')); return; }
     const askButton = target.closest('[data-question], [data-action="ask"]');
-    if (askButton) { const menu = byId('selection-menu'); menu.hidden = true; delete menu.dataset.pressed; if (!selectedText) return; const question = askButton.getAttribute('data-question'); if (question) copyPrompt(selectionPrompt(question), 'Prompt copied — paste it into ' + agentName + ' to continue.'); else copyPrompt(selectionPrompt(), 'Selection copied — paste it into ' + agentName + ' and add your question.'); return; }
+    if (askButton) { const menu = byId('selection-menu'); menu.hidden = true; delete menu.dataset.pressed; if (!selectedText) return; const question = askButton.getAttribute('data-question'); if (question) copyPrompt(selectionPrompt(question), 'Prompt copied. Paste it into ' + agentName + ' to continue.'); else copyPrompt(selectionPrompt(), 'Selection copied. Paste it into ' + agentName + ' and add your question.'); return; }
     const action = target.closest('[data-action]')?.getAttribute('data-action');
     if (action === 'export') { downloadReview(); toast('Review exported as an HTML file.'); return; }
     if (action === 'copy-summary') { copyPrompt(summaryPrompt(), 'Summary prompt copied for ' + agentName + '.'); return; }

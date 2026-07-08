@@ -9,7 +9,7 @@ ndrstnd is a local comprehension workspace for large, agent-produced branch chan
     ndrstnd skill install
     ndrstnd review feature/my-change --base main --repo /path/to/repository
 
-The command prints the review scope (base, changed files, whether uncommitted changes are included), drafts the narrative with your analysis agent — printing a heartbeat line every 15 seconds naming what the agent is doing, so a long analysis is never mistaken for a hang — then writes and opens a self-contained HTML review artifact. Artifacts live under the reviewed repository’s Git-ignored `.ndrstnd/` directory, are private to the local working copy, and are meant to be short-lived; delete them when the review is done.
+The command prints the review scope (base, changed files, whether uncommitted changes are included), drafts the narrative with your analysis agent (printing a heartbeat line every 15 seconds naming what the agent is doing, so a long analysis is never mistaken for a hang), then writes and opens a self-contained HTML review artifact. Artifacts live under the reviewed repository’s Git-ignored `.ndrstnd/` directory, are private to the local working copy, and are meant to be short-lived; delete them when the review is done.
 
 ndrstnd analyzes with Codex or Claude Code and uses the agent’s existing authenticated session. It never stores a token itself.
 
@@ -20,7 +20,7 @@ Every command accepts `--agent codex` or `--agent claude`:
     ndrstnd auth login --agent claude
     ndrstnd review feature/my-change --base main --agent claude
 
-Without `--agent`, ndrstnd honors the `NDRSTND_AGENT` environment variable; then, when the command runs inside a Codex or Claude Code session — as it does when the installed skill triggers it — it uses that hosting agent; otherwise it falls back to the first installed CLI, preferring Codex. `ndrstnd auth status` reports both agents, and `ndrstnd skill install` installs the skill for every agent that is set up on the machine.
+Without `--agent`, ndrstnd honors the `NDRSTND_AGENT` environment variable; then, when the command runs inside a Codex or Claude Code session (as it does when the installed skill triggers it), it uses that hosting agent; otherwise it falls back to the first installed CLI, preferring Codex. `ndrstnd auth status` reports both agents, and `ndrstnd skill install` installs the skill for every agent that is set up on the machine.
 
 ## Choosing the scope
 
@@ -33,7 +33,7 @@ Pick the invocation so the diff equals exactly the work being reviewed:
 
 Without a branch, ndrstnd reviews the checked-out branch including staged, unstaged, and untracked changes. When an inferred base would pull extra local commits into the review, ndrstnd warns before analyzing.
 
-Add `--conversation path/to/ndrstnd-conversation-v1.json` to ground the narrative in the dialogue that produced the branch — motives, rejected alternatives, constraints, and any observed test runs feed the Story and the Test plan. Add `--live` to serve an interactive workspace with lens re-analysis and evidence-grounded questions instead of writing the portable artifact.
+Add `--conversation path/to/ndrstnd-conversation-v1.json` to ground the narrative in the dialogue that produced the branch: motives, rejected alternatives, constraints, and any observed test runs feed the Story and the Test plan. Add `--live` to serve an interactive workspace with lens re-analysis and evidence-grounded questions instead of writing the portable artifact.
 
 ## Scope
 

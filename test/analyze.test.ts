@@ -361,7 +361,7 @@ describe("analysis documents", () => {
   it("extracts the JSON document from narrated or fenced responses", () => {
     expect(extractJson('{"s":"ok"}')).toBe('{"s":"ok"}');
     expect(extractJson('I will inspect the repo first.\n\n```json\n{"s":"ok"}\n```\nDone.')).toBe('{"s":"ok"}');
-    expect(extractJson('I inspected the branch and here is the document: {"s":"ok"} — let me know.')).toBe('{"s":"ok"}');
+    expect(extractJson('I inspected the branch and here is the document: {"s":"ok"} - let me know.')).toBe('{"s":"ok"}');
     expect(extractJson("no json here")).toBe("no json here");
   });
 

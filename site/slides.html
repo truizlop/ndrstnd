@@ -847,7 +847,7 @@ a.cchip:hover{text-decoration:none;background:var(--rail);border-color:var(--fai
   </div>
   <div class="duo" style="align-items:start">
     <ul class="cx-points rise" style="--d:120ms">
-      <li><span class="n">1</span><div><b>Skill-aware</b><p>Install the skill once, and Codex or Claude Code ends its coding tasks by preparing an ndrstnd workspace for the human instead of a wall of diff — analyzed by the same agent that asked.</p></div></li>
+      <li><span class="n">1</span><div><b>Skill-aware</b><p>Install the skill once, and Codex or Claude Code ends its coding tasks by preparing an ndrstnd workspace for the human instead of a wall of diff, analyzed by the same agent that asked.</p></div></li>
       <li><span class="n">2</span><div><b>Conversation-informed</b><p>Pass <code>--conversation</code> and the implementation dialogue becomes part of the story: the decisions, not just the diff.</p></div></li>
       <li><span class="n">3</span><div><b>Zero token custody</b><p>ndrstnd rides your agent's existing authenticated session. It never stores a credential of its own.</p></div></li>
     </ul>
@@ -885,7 +885,7 @@ a.cchip:hover{text-decoration:none;background:var(--rail);border-color:var(--fai
     <span class="parrow"><svg viewBox="0 0 16 16"><path d="M2.5 8h11M9.5 4l4 4-4 4"/></svg></span>
     <div class="pstage"><i>02</i><h4>Classify</h4><p>Parse and index every hunk; separate meaningful changes from lockfiles, generated, and vendored code.</p></div>
     <span class="parrow"><svg viewBox="0 0 16 16"><path d="M2.5 8h11M9.5 4l4 4-4 4"/></svg></span>
-    <div class="pstage"><i>03</i><h4>Analyze</h4><p>Ask your agent — Codex or Claude Code — for the narrative: chapters, timeline, test plan. Every claim is bound to real hunks and validated against a schema.</p></div>
+    <div class="pstage"><i>03</i><h4>Analyze</h4><p>Ask your agent, Codex or Claude Code, for the narrative: chapters, timeline, test plan. Every claim is bound to real hunks and validated against a schema.</p></div>
     <span class="parrow"><svg viewBox="0 0 16 16"><path d="M2.5 8h11M9.5 4l4 4-4 4"/></svg></span>
     <div class="pstage"><i>04</i><h4>Render</h4><p>Bake models, syntax highlighting, and UI into <strong>one self-contained HTML artifact</strong>.</p></div>
     <span class="parrow"><svg viewBox="0 0 16 16"><path d="M2.5 8h11M9.5 4l4 4-4 4"/></svg></span>
@@ -904,7 +904,7 @@ a.cchip:hover{text-decoration:none;background:var(--rail);border-color:var(--fai
     <div class="dcard rise" style="--d:100ms"><span class="n">1</span><div><b>Artifact, not app</b><p>A review is a static HTML file, not a running server. Nothing to install for readers, nothing to keep alive, nothing that phones home.</p></div></div>
     <div class="dcard rise" style="--d:150ms"><span class="n">2</span><div><b>Never fabricate</b><p>The analysis validates against a strict schema, with one repair turn. If it still fails, ndrstnd writes nothing and tells you. It never invents a story it can't back.</p></div></div>
     <div class="dcard rise" style="--d:200ms"><span class="n">3</span><div><b>Evidence-linked by construction</b><p>Claims that can't point at real hunks don't ship. Every sentence in the story is a link to the code that proves it.</p></div></div>
-    <div class="dcard rise" style="--d:250ms"><span class="n">4</span><div><b>Zero token custody</b><p>ndrstnd reuses your agent's authenticated session — Codex or Claude Code — and never stores a credential of its own. Auth stays someone else's well-solved problem.</p></div></div>
+    <div class="dcard rise" style="--d:250ms"><span class="n">4</span><div><b>Zero token custody</b><p>ndrstnd reuses your agent's authenticated session, Codex or Claude Code, and never stores a credential of its own. Auth stays someone else's well-solved problem.</p></div></div>
   </div>
 </section>
 
@@ -1025,7 +1025,7 @@ a.cchip:hover{text-decoration:none;background:var(--rail);border-color:var(--fai
   <div class="modgrid rise" style="--d:120ms">
     <div class="mod"><code>server/cli.ts</code><p>Command surface: <b>auth</b>, <b>skill install</b>, <b>review</b> with scope flags. Scope confirmation and inferred-base warnings live here.</p></div>
     <div class="mod"><code>server/git.ts · git-model.ts</code><p>Runs Git, finds the merge-base, parses hunks, and classifies files as meaningful vs. low-signal (lockfiles, generated, vendored, binary).</p></div>
-    <div class="mod"><code>server/analysis-core.ts · analyze.ts</code><p>Builds the prompts, calls the selected agent — Codex or Claude Code — validates the narrative against the schema, and runs the single repair turn.</p></div>
+    <div class="mod"><code>server/analysis-core.ts · analyze.ts</code><p>Builds the prompts, calls the selected agent (Codex or Claude Code), validates the narrative against the schema, and runs the single repair turn.</p></div>
     <div class="mod"><code>web/page.ts + models</code><p>Renders the artifact: evidence and test-plan presentation models, language heuristics, and the whole UI baked into one HTML file.</p></div>
     <div class="mod"><code>skill-assets/ndrstnd</code><p>The agent skill, installed for Codex and Claude Code: teaches the agent to choose a review scope, default to a conversation export, and hand back the artifact link.</p></div>
     <div class="mod"><code>test/</code><p>Unit and DOM tests over the models and rendering; the artifact is asserted against real generated pages.</p></div>

@@ -142,7 +142,7 @@ async function runReview(args: string[]): Promise<void> {
   const input = await new GitReader().collectReviewInput(repoPath, targetRef, baseRef);
   const meaningfulFiles = input.files.filter((file) => file.signal === "meaningful").length;
   const scope = await describeReviewScope(repoPath, input);
-  process.stdout.write(`Reviewing ${scope.targetLabel} against ${input.baseRef}${input.includesWorkingTree ? ", including uncommitted changes" : ""} — ${input.files.length} changed file${input.files.length === 1 ? "" : "s"} (${meaningfulFiles} meaningful).\n`);
+  process.stdout.write(`Reviewing ${scope.targetLabel} against ${input.baseRef}${input.includesWorkingTree ? ", including uncommitted changes" : ""}: ${input.files.length} changed file${input.files.length === 1 ? "" : "s"} (${meaningfulFiles} meaningful).\n`);
   if (baseRef === undefined && input.includesWorkingTree && scope.localCommitsIncluded > 0) {
     process.stdout.write(`Warning: the inferred base ${input.baseRef} is ${scope.localCommitsIncluded} commit${scope.localCommitsIncluded === 1 ? "" : "s"} behind ${scope.targetLabel}, so those commits are included. Pass --base to narrow the review, or --uncommitted for only uncommitted changes.\n`);
   }
@@ -191,7 +191,7 @@ async function runReview(args: string[]): Promise<void> {
   store.close();
 }
 
-/** Prints liveness lines while the agent analyzes so a caller — human or agent — never mistakes a long turn for a hang. */
+/** Prints liveness lines while the agent analyzes so a caller (human or agent) never mistakes a long turn for a hang. */
 function startAnalysisHeartbeat(agent: ReviewAgent): { progress: AnalysisProgress; stop: () => void } {
   // Defined here because the top-level command dispatch runs before module-level consts initialize.
   const HEARTBEAT_INTERVAL_MS = 15_000;
@@ -236,7 +236,7 @@ function openBrowser(url: string): void {
 }
 
 function printHelp(): void {
-  process.stdout.write(`ndrstnd — understand agent-produced branch changes\n\nUsage:\n  ndrstnd auth <status|login> [--agent <codex|claude>]\n  ndrstnd skill install [--force] [--agent <codex|claude>]\n  ndrstnd review [branch] [--base <branch>] [--uncommitted] [--live] [--repo <path>] [--conversation <path>] [--lens <id>] [--agent <codex|claude>] [--no-open]\n  ndrstnd --version\n\nWithout a branch, ndrstnd reviews the checked-out branch including uncommitted changes.\n--uncommitted reviews only the uncommitted working-tree changes (an alias for --base HEAD).\n--live serves an interactive workspace with lens re-analysis and evidence-grounded questions instead of writing the portable artifact.\n--agent picks the analysis agent; without it ndrstnd uses NDRSTND_AGENT, then the Codex or Claude Code session it runs inside, then the first installed CLI, preferring Codex.\n`);
+  process.stdout.write(`ndrstnd: understand agent-produced branch changes\n\nUsage:\n  ndrstnd auth <status|login> [--agent <codex|claude>]\n  ndrstnd skill install [--force] [--agent <codex|claude>]\n  ndrstnd review [branch] [--base <branch>] [--uncommitted] [--live] [--repo <path>] [--conversation <path>] [--lens <id>] [--agent <codex|claude>] [--no-open]\n  ndrstnd --version\n\nWithout a branch, ndrstnd reviews the checked-out branch including uncommitted changes.\n--uncommitted reviews only the uncommitted working-tree changes (an alias for --base HEAD).\n--live serves an interactive workspace with lens re-analysis and evidence-grounded questions instead of writing the portable artifact.\n--agent picks the analysis agent; without it ndrstnd uses NDRSTND_AGENT, then the Codex or Claude Code session it runs inside, then the first installed CLI, preferring Codex.\n`);
 }
 
 function fail(message: string): never {

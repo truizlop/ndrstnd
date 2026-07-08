@@ -407,14 +407,14 @@ it("copies an evidence-grounded agent prompt from the selection menu and confirm
   document.querySelector<HTMLElement>("[data-question]")?.click();
   await new Promise((resolve) => window.setTimeout(resolve, 0));
   expect(copies.at(-1)).toBe("Explain the selected lines.\n\nContext: ndrstnd review of agent-change; selected excerpt from src/app.ts.\n\nSelected lines:\nconst answer = 42;");
-  expect(document.querySelector("#toast")?.textContent).toBe("Prompt copied — paste it into Codex to continue.");
+  expect(document.querySelector("#toast")?.textContent).toBe("Prompt copied. Paste it into Codex to continue.");
   expect(menu.hidden).toBe(true);
 
   selectEvidence(window);
   document.querySelector<HTMLElement>('[data-action="ask"]')?.click();
   await new Promise((resolve) => window.setTimeout(resolve, 0));
   expect(copies.at(-1)).toBe("Context: ndrstnd review of agent-change; selected excerpt from src/app.ts.\n\nSelected lines:\nconst answer = 42;\n\nMy question: ");
-  expect(document.querySelector("#toast")?.textContent).toBe("Selection copied — paste it into Codex and add your question.");
+  expect(document.querySelector("#toast")?.textContent).toBe("Selection copied. Paste it into Codex and add your question.");
   expect(menu.hidden).toBe(true);
 });
 

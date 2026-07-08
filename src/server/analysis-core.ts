@@ -168,7 +168,7 @@ ${JSON.stringify(reviewInput)}`;
 }
 
 /**
- * Inline patch text spares the analysis agent a git round trip per hunk — the dominant cost
+ * Inline patch text spares the analysis agent a git round trip per hunk, the dominant cost
  * on small and medium branches, where every inspection command is a full model
  * turn. The budget keeps huge branches on reference-first inspection so the
  * prompt stays bounded.
