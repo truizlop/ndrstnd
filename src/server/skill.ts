@@ -1,4 +1,4 @@
-import { cp, mkdir, readFile, stat } from "node:fs/promises";
+import { cp, mkdir, readFile, readdir, rm, stat } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { reviewAgents, reviewAgentById, type ReviewAgent, type ReviewAgentId } from "./agent.js";
@@ -11,20 +11,35 @@ function installedSkillDirectory(agent: ReviewAgent): string {
   return join(agent.homeDirectory(), "skills", "ndrstnd");
 }
 
-/** True when any installed skill's SKILL.md differs from the bundled one, meaning that agent follows outdated instructions. */
+/** True when any installed skill differs from the bundled one in any file, meaning that agent follows outdated instructions or assets. */
 export async function installedSkillIsStale(): Promise<boolean> {
   for (const agent of reviewAgents) {
+    const destination = installedSkillDirectory(agent);
+    if (!(await exists(destination))) continue;
     try {
-      const [bundled, installed] = await Promise.all([
-        readFile(join(bundledSkillDirectory(), "SKILL.md"), "utf8"),
-        readFile(join(installedSkillDirectory(agent), "SKILL.md"), "utf8"),
-      ]);
-      if (bundled !== installed) return true;
+      const [bundled, installed] = await Promise.all([skillFiles(bundledSkillDirectory()), skillFiles(destination)]);
+      if (bundled.size !== installed.size) return true;
+      for (const [path, content] of bundled) {
+        if (installed.get(path) !== content) return true;
+      }
     } catch {
-      // A missing installation is not stale.
+      // An unreadable installation is reported at install time, not on every review.
     }
   }
   return false;
+}
+
+async function skillFiles(root: string): Promise<Map<string, string>> {
+  const files = new Map<string, string>();
+  const walk = async (relative: string): Promise<void> => {
+    for (const entry of await readdir(join(root, relative), { withFileTypes: true })) {
+      const childRelative = join(relative, entry.name);
+      if (entry.isDirectory()) await walk(childRelative);
+      else files.set(childRelative, await readFile(join(root, childRelative), "utf8"));
+    }
+  };
+  await walk(".");
+  return files;
 }
 
 export interface SkillInstallation {
@@ -52,6 +67,8 @@ export async function installSkill(force = false, agentId?: ReviewAgentId): Prom
       continue;
     }
     await mkdir(dirname(destination), { recursive: true });
+    // A merge-copy would leave files a newer release removed; replace the installation wholesale.
+    await rm(destination, { recursive: true, force: true });
     await cp(source, destination, { recursive: true, force: true });
     installations.push({ agent, destination, status: "installed" });
   }

@@ -85,4 +85,24 @@ describe("installSkill", () => {
     await writeFile(join(claudeInstallation!.destination, "SKILL.md"), "outdated instructions");
     expect(await installedSkillIsStale()).toBe(true);
   });
+
+  it("detects staleness in skill files beyond SKILL.md", async () => {
+    const installations = await installSkill();
+    const codexInstallation = installations.find((installation) => installation.agent.id === "codex");
+    await writeFile(join(codexInstallation!.destination, "agents", "openai.yaml"), "outdated: true\n");
+    expect(await installedSkillIsStale()).toBe(true);
+  });
+
+  it("removes files a newer release dropped when force reinstalling", async () => {
+    const installations = await installSkill();
+    const codexInstallation = installations.find((installation) => installation.agent.id === "codex");
+    const orphan = join(codexInstallation!.destination, "agents", "removed-in-next-release.yaml");
+    await writeFile(orphan, "orphaned\n");
+    expect(await installedSkillIsStale()).toBe(true);
+
+    await installSkill(true);
+
+    await expect(readFile(orphan, "utf8")).rejects.toThrow();
+    expect(await installedSkillIsStale()).toBe(false);
+  });
 });
