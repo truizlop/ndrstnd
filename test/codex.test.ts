@@ -103,6 +103,20 @@ describe("CodexAppServerClient", () => {
     expect(describeThreadNotification("thread/tokenUsage/updated", {})).toBeUndefined();
   });
 
+  it("cleans up a turn whose start request fails, leaving no stray timer or unhandled rejection", async () => {
+    const client = new CodexAppServerClient(20);
+    const internal = client as unknown as ClientInternal;
+    internal.request = vi.fn(async (method: string) => {
+      if (method === "thread/start") return { thread: { id: "analysis-thread" } };
+      if (method === "turn/start") throw new Error("app-server rejected turn/start");
+      return {};
+    });
+
+    await expect(runSingleTurn(client, "Explain this branch.")).rejects.toThrow("app-server rejected turn/start");
+    // Let the 20ms inactivity window elapse; a leaked timer would reject the abandoned turn promise unhandled and fail the run.
+    await new Promise((resolve) => setTimeout(resolve, 60));
+  });
+
   it("surfaces a broken app-server input pipe as a failed request instead of crashing", async () => {
     const client = new CodexAppServerClient();
     const child = new FakeCodexProcess();

@@ -81,6 +81,7 @@ export class CodexAppServerClient implements AgentClient {
 
   private async runThreadTurn(threadId: string, cwd: string, prompt: string, onActivity?: (activity: TurnActivity) => void): Promise<string> {
     let text = "";
+    let cancelTurn: ((error: Error) => void) | undefined;
     const completed = new Promise<void>((resolve, reject) => {
       // Inspecting a large branch takes many quiet-but-active tool turns, so time
       // out on inactivity across any thread notification rather than total duration.
@@ -125,9 +126,17 @@ export class CodexAppServerClient implements AgentClient {
       armTimeout();
       this.notificationListeners.add(listener);
       this.failureListeners.add(failureListener);
+      cancelTurn = failWith;
     });
+    // A turn/start failure throws before `completed` is awaited; without a pre-attached handler its rejection would crash the process.
+    completed.catch(() => undefined);
 
-    await this.request("turn/start", { threadId, cwd, approvalPolicy: "never", input: [{ type: "text", text: prompt }] });
+    try {
+      await this.request("turn/start", { threadId, cwd, approvalPolicy: "never", input: [{ type: "text", text: prompt }] });
+    } catch (error) {
+      cancelTurn?.(error instanceof Error ? error : new Error(String(error)));
+      throw error;
+    }
     await completed;
     return text;
   }
