@@ -2,12 +2,12 @@
 import { spawn } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import process from "node:process";
-import { getCodexAuthStatus, type TurnActivity } from "./codex.js";
-import { analyzeWithCodex, formatAnalysisHeartbeat, type AnalysisProgress } from "./analyze.js";
+import { resolveReviewAgent, reviewAgents, type ReviewAgent, type ReviewAgentId, type TurnActivity } from "./agent.js";
+import { analyzeWithAgent, formatAnalysisHeartbeat, type AnalysisProgress } from "./analyze.js";
 import { importConversation } from "./conversation.js";
 import { GitReader, describeReviewScope } from "./git.js";
 import { startReviewServer } from "./http.js";
-import { ReviewStore } from "./store.js";
+import { ReviewStore, isAgentRevision } from "./store.js";
 import { installSkill, installedSkillIsStale } from "./skill.js";
 import { writeReviewArtifact } from "./artifact.js";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -34,38 +34,59 @@ async function packageVersion(): Promise<string> {
   return manifest.version ?? "unknown";
 }
 
+/** Reads a trailing `--agent <id>` option shared by the auth and skill commands. */
+function parseAgentOption(args: string[]): ReviewAgentId | undefined {
+  const index = args.indexOf("--agent");
+  if (index === -1) return undefined;
+  const value = args[index + 1];
+  if (value === undefined || value.startsWith("-")) fail("--agent requires a value.");
+  if (!reviewAgents.some((agent) => agent.id === value)) fail(`Unknown analysis agent: ${value}. Supported agents: ${reviewAgents.map((agent) => agent.id).join(", ")}.`);
+  return value as ReviewAgentId;
+}
+
 async function runSkill(args: string[]): Promise<void> {
-  if (args[0] !== "install") fail("Usage: ndrstnd skill install [--force]");
-  const destination = await installSkill(args.includes("--force"));
-  process.stdout.write(`Installed the ndrstnd Codex skill at ${destination}.\n`);
+  if (args[0] !== "install") fail("Usage: ndrstnd skill install [--force] [--agent <codex|claude>]");
+  const installations = await installSkill(args.includes("--force"), parseAgentOption(args)).catch((error: unknown) => fail(error instanceof Error ? error.message : String(error)));
+  for (const installation of installations) {
+    if (installation.status === "installed") process.stdout.write(`Installed the ndrstnd skill for ${installation.agent.name} at ${installation.destination}.\n`);
+    else process.stdout.write(`Skipped ${installation.agent.name}: ${installation.reason}.\n`);
+  }
+  if (!installations.some((installation) => installation.status === "installed")) {
+    fail("No skill was installed.");
+  }
 }
 
 async function runAuth(args: string[]): Promise<void> {
   const action = args[0] ?? "status";
+  const agentId = parseAgentOption(args);
   if (action === "status") {
-    const status = await getCodexAuthStatus();
-    if (status.state === "signed-in") process.stdout.write(`Codex authentication is ready (${status.accountType}).\n`);
-    else if (status.state === "signed-out") process.stdout.write("Codex is not signed in. Run `ndrstnd auth login`.\n");
-    else process.stdout.write(`Codex authentication could not be checked: ${status.reason}\n`);
+    const agents = agentId === undefined ? reviewAgents : reviewAgents.filter((agent) => agent.id === agentId);
+    for (const agent of agents) {
+      const status = await agent.getAuthStatus();
+      if (status.state === "signed-in") process.stdout.write(`${agent.name} authentication is ready (${status.accountType}).\n`);
+      else if (status.state === "signed-out") process.stdout.write(`${agent.name} is not signed in. Run \`ndrstnd auth login --agent ${agent.id}\`.\n`);
+      else process.stdout.write(`${agent.name} authentication could not be checked: ${status.reason}\n`);
+    }
     return;
   }
   if (action === "login") {
-    const beforeLogin = await getCodexAuthStatus();
+    const agent = await resolveReviewAgent(agentId).catch((error: unknown) => fail(error instanceof Error ? error.message : String(error)));
+    const beforeLogin = await agent.getAuthStatus();
     if (beforeLogin.state === "signed-in") {
-      process.stdout.write(`Codex authentication is already ready (${beforeLogin.accountType}).\n`);
+      process.stdout.write(`${agent.name} authentication is already ready (${beforeLogin.accountType}).\n`);
       return;
     }
-    await runCodexLogin();
-    const afterLogin = await getCodexAuthStatus();
-    if (afterLogin.state === "signed-in") process.stdout.write(`Codex authentication is ready (${afterLogin.accountType}).\n`);
-    else fail("Codex login completed but ndrstnd could not validate an authenticated app-server connection.");
+    await runAgentLogin(agent);
+    const afterLogin = await agent.getAuthStatus();
+    if (afterLogin.state === "signed-in") process.stdout.write(`${agent.name} authentication is ready (${afterLogin.accountType}).\n`);
+    else fail(`${agent.name} login completed but ndrstnd could not validate an authenticated connection.`);
     return;
   }
   fail(`Unknown auth action: ${action}`);
 }
 
-async function runCodexLogin(): Promise<void> {
-  const child = spawn("codex", ["login"], { stdio: "inherit" });
+async function runAgentLogin(agent: ReviewAgent): Promise<void> {
+  const child = spawn(agent.command, agent.loginArgs, { stdio: "inherit" });
   const exitCode = await new Promise<number | null>((resolve, reject) => {
     child.once("error", reject);
     child.once("exit", resolve);
@@ -78,7 +99,7 @@ async function runCodexLogin(): Promise<void> {
 /** A typo in a scope flag must fail loudly; silently ignoring it would review the wrong changes. */
 function parseReviewArgs(args: string[]): { targetRef?: string; values: Map<string, string>; flags: Set<string> } {
   // Defined here because the top-level command dispatch runs before module-level consts initialize.
-  const valueOptions = ["--base", "--repo", "--conversation", "--lens"];
+  const valueOptions = ["--base", "--repo", "--conversation", "--lens", "--agent"];
   const booleanOptions = ["--uncommitted", "--live", "--no-open"];
   const values = new Map<string, string>();
   const flags = new Set<string>();
@@ -115,6 +136,7 @@ async function runReview(args: string[]): Promise<void> {
   const repoPath = values.get("--repo") ?? process.cwd();
   const baseRef = uncommitted ? "HEAD" : explicitBase;
   const lensId = values.get("--lens") ?? "default";
+  const agent = await resolveReviewAgent(values.get("--agent")).catch((error: unknown) => fail(error instanceof Error ? error.message : String(error)));
   const conversationPath = values.get("--conversation");
   const conversation = conversationPath === undefined ? undefined : await importConversation(conversationPath);
   const input = await new GitReader().collectReviewInput(repoPath, targetRef, baseRef);
@@ -125,32 +147,32 @@ async function runReview(args: string[]): Promise<void> {
     process.stdout.write(`Warning: the inferred base ${input.baseRef} is ${scope.localCommitsIncluded} commit${scope.localCommitsIncluded === 1 ? "" : "s"} behind ${scope.targetLabel}, so those commits are included. Pass --base to narrow the review, or --uncommitted for only uncommitted changes.\n`);
   }
   if (await installedSkillIsStale()) {
-    process.stdout.write("The installed ndrstnd Codex skill is older than this version; run `ndrstnd skill install --force` to refresh it.\n");
+    process.stdout.write("The installed ndrstnd skill is older than this version; run `ndrstnd skill install --force` to refresh it.\n");
   }
   const store = openReviewStore();
   const lens = store.getLens(lensId);
   if (lens === undefined) fail(`Unknown review lens: ${lensId}`);
   const session = store.getOrCreateSession(input, conversation);
-  let revision = store.listRevisions(session.id).find((candidate) => candidate.source === "codex");
+  let revision = store.listRevisions(session.id).find(isAgentRevision);
   if (revision === undefined) {
-    const auth = await getCodexAuthStatus();
-    if (auth.state === "signed-out") fail("Codex is not signed in, so ndrstnd cannot analyze this change. Run `ndrstnd auth login` first.");
-    if (auth.state === "unreachable") fail(`Codex could not be reached, so ndrstnd cannot analyze this change: ${auth.reason}`);
-    process.stdout.write("Drafting the review narrative with Codex… This takes minutes on large branches; a heartbeat line prints every 15 seconds while the analysis is alive.\n");
-    const heartbeat = startAnalysisHeartbeat();
+    const auth = await agent.getAuthStatus();
+    if (auth.state === "signed-out") fail(`${agent.name} is not signed in, so ndrstnd cannot analyze this change. Run \`ndrstnd auth login --agent ${agent.id}\` first.`);
+    if (auth.state === "unreachable") fail(`${agent.name} could not be reached, so ndrstnd cannot analyze this change: ${auth.reason}`);
+    process.stdout.write(`Drafting the review narrative with ${agent.name}… This takes minutes on large branches; a heartbeat line prints every 15 seconds while the analysis is alive.\n`);
+    const heartbeat = startAnalysisHeartbeat(agent);
     try {
-      const document = await analyzeWithCodex(input, conversation, heartbeat.progress, lens.instructions);
-      revision = store.createRevision(session.id, "codex", "complete", document);
+      const document = await analyzeWithAgent(agent, input, conversation, heartbeat.progress, lens.instructions);
+      revision = store.createRevision(session.id, agent.id, "complete", document);
     } catch (error) {
       store.close();
-      fail(`Codex analysis failed, so no review artifact was written: ${error instanceof Error ? error.message : String(error)} Nothing was persisted; re-run the same ndrstnd review command to retry.`);
+      fail(`${agent.name} analysis failed, so no review artifact was written: ${error instanceof Error ? error.message : String(error)} Nothing was persisted; re-run the same ndrstnd review command to retry.`);
     } finally {
       heartbeat.stop();
     }
   }
   process.stdout.write(`merge-base=${input.mergeBase.slice(0, 12)} files=${input.files.length} meaningful-files=${meaningfulFiles} hunks=${input.hunks.length}${conversation === undefined ? "" : ` conversation=${conversation.messages.length}`}\n`);
   if (live) {
-    const server = await startReviewServer({ session, revision, store });
+    const server = await startReviewServer({ session, revision, store, agent });
     process.stdout.write(`ndrstnd live workspace: ${server.url}\n`);
     process.stdout.write("Lens re-analysis and evidence-grounded questions stay available while this process runs. Press Ctrl+C to stop.\n");
     if (!noOpen) openBrowser(server.url);
@@ -169,15 +191,15 @@ async function runReview(args: string[]): Promise<void> {
   store.close();
 }
 
-/** Prints liveness lines while Codex analyzes so a caller — human or agent — never mistakes a long turn for a hang. */
-function startAnalysisHeartbeat(): { progress: AnalysisProgress; stop: () => void } {
+/** Prints liveness lines while the agent analyzes so a caller — human or agent — never mistakes a long turn for a hang. */
+function startAnalysisHeartbeat(agent: ReviewAgent): { progress: AnalysisProgress; stop: () => void } {
   // Defined here because the top-level command dispatch runs before module-level consts initialize.
   const HEARTBEAT_INTERVAL_MS = 15_000;
   const startedAt = Date.now();
   let latest: TurnActivity | undefined;
   let lastEventAt = startedAt;
   const timer = setInterval(() => {
-    process.stdout.write(`${formatAnalysisHeartbeat(Date.now() - startedAt, latest, Date.now() - lastEventAt)}\n`);
+    process.stdout.write(`${formatAnalysisHeartbeat(agent.name, Date.now() - startedAt, latest, Date.now() - lastEventAt)}\n`);
   }, HEARTBEAT_INTERVAL_MS);
   timer.unref();
   return {
@@ -187,7 +209,7 @@ function startAnalysisHeartbeat(): { progress: AnalysisProgress; stop: () => voi
         lastEventAt = Date.now();
       },
       onRepair: (attempt, attempts, problem) => {
-        process.stdout.write(`Codex's draft failed validation; requesting repair turn ${attempt} of ${attempts}: ${problem}\n`);
+        process.stdout.write(`${agent.name}'s draft failed validation; requesting repair turn ${attempt} of ${attempts}: ${problem}\n`);
       },
     },
     stop: () => clearInterval(timer),
@@ -214,7 +236,7 @@ function openBrowser(url: string): void {
 }
 
 function printHelp(): void {
-  process.stdout.write(`ndrstnd — understand agent-produced branch changes\n\nUsage:\n  ndrstnd auth <status|login>\n  ndrstnd skill install [--force]\n  ndrstnd review [branch] [--base <branch>] [--uncommitted] [--live] [--repo <path>] [--conversation <path>] [--lens <id>] [--no-open]\n  ndrstnd --version\n\nWithout a branch, ndrstnd reviews the checked-out branch including uncommitted changes.\n--uncommitted reviews only the uncommitted working-tree changes (an alias for --base HEAD).\n--live serves an interactive workspace with lens re-analysis and evidence-grounded questions instead of writing the portable artifact.\n`);
+  process.stdout.write(`ndrstnd — understand agent-produced branch changes\n\nUsage:\n  ndrstnd auth <status|login> [--agent <codex|claude>]\n  ndrstnd skill install [--force] [--agent <codex|claude>]\n  ndrstnd review [branch] [--base <branch>] [--uncommitted] [--live] [--repo <path>] [--conversation <path>] [--lens <id>] [--agent <codex|claude>] [--no-open]\n  ndrstnd --version\n\nWithout a branch, ndrstnd reviews the checked-out branch including uncommitted changes.\n--uncommitted reviews only the uncommitted working-tree changes (an alias for --base HEAD).\n--live serves an interactive workspace with lens re-analysis and evidence-grounded questions instead of writing the portable artifact.\n--agent picks the analysis agent; without it ndrstnd uses NDRSTND_AGENT, then the Codex or Claude Code session it runs inside, then the first installed CLI, preferring Codex.\n`);
 }
 
 function fail(message: string): never {

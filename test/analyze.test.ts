@@ -390,10 +390,10 @@ describe("analysis documents", () => {
 });
 
 describe("formatAnalysisHeartbeat", () => {
-  it("reports elapsed time, the latest Codex activity, draft growth, and staleness", () => {
-    expect(formatAnalysisHeartbeat(45_000, undefined)).toBe("still analyzing (45s): waiting for the first Codex event");
-    expect(formatAnalysisHeartbeat(125_000, { label: "running `git diff --stat`", notifications: 12, draftCharacters: 0 }, 2_000)).toBe("still analyzing (2m05s): running `git diff --stat`");
-    expect(formatAnalysisHeartbeat(200_000, { label: "drafting the narrative", notifications: 40, draftCharacters: 3_449 }, 1_000)).toBe("still analyzing (3m20s): drafting the narrative; 3.4k draft characters");
-    expect(formatAnalysisHeartbeat(300_000, { label: "reasoning about the branch", notifications: 12, draftCharacters: 120 }, 90_000)).toBe("still analyzing (5m00s): reasoning about the branch; 120 draft characters; no new Codex events for 1m30s");
+  it("reports elapsed time, the latest agent activity, draft growth, and staleness", () => {
+    expect(formatAnalysisHeartbeat("Codex", 45_000, undefined)).toBe("still analyzing (45s): waiting for the first Codex event");
+    expect(formatAnalysisHeartbeat("Codex", 125_000, { label: "running `git diff --stat`", notifications: 12, draftCharacters: 0 }, 2_000)).toBe("still analyzing (2m05s): running `git diff --stat`");
+    expect(formatAnalysisHeartbeat("Claude Code", 200_000, { label: "drafting the narrative", notifications: 40, draftCharacters: 3_449 }, 1_000)).toBe("still analyzing (3m20s): drafting the narrative; 3.4k draft characters");
+    expect(formatAnalysisHeartbeat("Claude Code", 300_000, { label: "reasoning about the branch", notifications: 12, draftCharacters: 120 }, 90_000)).toBe("still analyzing (5m00s): reasoning about the branch; 120 draft characters; no new Claude Code events for 1m30s");
   });
 });

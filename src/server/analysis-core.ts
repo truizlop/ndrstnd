@@ -168,7 +168,7 @@ ${JSON.stringify(reviewInput)}`;
 }
 
 /**
- * Inline patch text spares Codex a git round trip per hunk — the dominant cost
+ * Inline patch text spares the analysis agent a git round trip per hunk — the dominant cost
  * on small and medium branches, where every inspection command is a full model
  * turn. The budget keeps huge branches on reference-first inspection so the
  * prompt stays bounded.
@@ -312,7 +312,7 @@ function compactHunk(hunk: CollectedReviewInput["hunks"][number], path: string |
   const additions = hunk.lines.filter((line) => line.kind === "addition");
   const deletions = hunk.lines.filter((line) => line.kind === "deletion");
   const context = hunk.lines.length - additions.length - deletions.length;
-  // Samples only anchor hunk IDs to recognizable content; Codex reads the inline
+  // Samples only anchor hunk IDs to recognizable content; the agent reads the inline
   // patch or inspects the real one for detail, so two short previews per hunk are enough.
   const sampleLines = deletions.length > 0 && additions.length > 0 ? [deletions[0], additions[0]] : [...deletions, ...additions].slice(0, 2);
   const changedLineSamples = sampleLines.map((line) => ({
@@ -364,7 +364,7 @@ function diffRange(input: CollectedReviewInput): string {
 }
 
 export function extractJson(text: string): string {
-  // Codex sometimes narrates around the document; accept a fenced block anywhere,
+  // Agents sometimes narrate around the document; accept a fenced block anywhere,
   // then fall back to the outermost braces before giving up on the raw text.
   const fenced = /```(?:json)?\s*([\s\S]*?)```/.exec(text);
   const candidate = (fenced?.[1] ?? text).trim();

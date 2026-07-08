@@ -24,9 +24,14 @@ export interface AnalysisRevision {
   sessionId: string;
   status: "partial" | "complete" | "failed";
   // "fallback" only survives in databases written before fallback analysis was removed.
-  source: "fallback" | "codex";
+  source: "fallback" | "codex" | "claude";
   document: AnalysisDocument;
   createdAt: string;
+}
+
+/** True for revisions produced by a real analysis agent, excluding legacy fallback rows. */
+export function isAgentRevision(revision: AnalysisRevision): boolean {
+  return revision.source !== "fallback";
 }
 
 export interface ReviewLens { id: string; name: string; instructions: string; builtIn: boolean; }

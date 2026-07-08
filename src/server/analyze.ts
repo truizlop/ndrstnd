@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { CollectedReviewInput } from "./git.js";
 import type { ConversationContext } from "./conversation.js";
-import { CodexAppServerClient, type TurnActivity } from "./codex.js";
+import type { AgentClient, ReviewAgent, TurnActivity } from "./agent.js";
 import { analysisPrompt, buildPromptReviewInput, extractJson, parseAnalysisDocument } from "./analysis-core.js";
 
 export { analysisPrompt, buildPromptReviewInput, parseAnalysisDocument } from "./analysis-core.js";
@@ -13,9 +13,9 @@ export interface AnalysisProgress {
   onRepair?: (attempt: number, attempts: number, problem: string) => void;
 }
 
-export async function analyzeWithCodex(input: CollectedReviewInput, conversation?: ConversationContext, progress?: AnalysisProgress, lensInstructions?: string) {
+export async function analyzeWithAgent(agent: ReviewAgent, input: CollectedReviewInput, conversation?: ConversationContext, progress?: AnalysisProgress, lensInstructions?: string) {
   const prompt = analysisPrompt(input, conversation, lensInstructions);
-  return withFreshClientRetry(async (client) => {
+  return withFreshClientRetry(agent, async (client) => {
     const thread = await client.startTextThread(input.repoPath);
     try {
       let response = await thread.send(prompt, progress?.onActivity);
@@ -30,7 +30,7 @@ export async function analyzeWithCodex(input: CollectedReviewInput, conversation
           response = await thread.send(`Your prior response failed validation: ${lastError} Return only the corrected JSON document, with every other field kept as it was.`, progress?.onActivity);
         }
       }
-      throw new Error(`Codex produced an analysis that still failed validation after ${REPAIR_ATTEMPTS} repair turns: ${lastError}`);
+      throw new Error(`${agent.name} produced an analysis that still failed validation after ${REPAIR_ATTEMPTS} repair turns: ${lastError}`);
     } finally {
       await thread.close();
     }
@@ -38,10 +38,10 @@ export async function analyzeWithCodex(input: CollectedReviewInput, conversation
 }
 
 /** One reviewer-facing liveness line, printed on an interval so a long quiet analysis is never mistaken for a hang. */
-export function formatAnalysisHeartbeat(elapsedMs: number, activity: TurnActivity | undefined, sinceActivityMs?: number): string {
-  if (activity === undefined) return `still analyzing (${formatDuration(elapsedMs)}): waiting for the first Codex event`;
+export function formatAnalysisHeartbeat(agentName: string, elapsedMs: number, activity: TurnActivity | undefined, sinceActivityMs?: number): string {
+  if (activity === undefined) return `still analyzing (${formatDuration(elapsedMs)}): waiting for the first ${agentName} event`;
   const draft = activity.draftCharacters > 0 ? `; ${formatCount(activity.draftCharacters)} draft characters` : "";
-  const stale = sinceActivityMs !== undefined && sinceActivityMs >= 60_000 ? `; no new Codex events for ${formatDuration(sinceActivityMs)}` : "";
+  const stale = sinceActivityMs !== undefined && sinceActivityMs >= 60_000 ? `; no new ${agentName} events for ${formatDuration(sinceActivityMs)}` : "";
   return `still analyzing (${formatDuration(elapsedMs)}): ${activity.label}${draft}${stale}`;
 }
 
@@ -55,11 +55,11 @@ function formatCount(count: number): string {
   return count < 1_000 ? String(count) : `${(count / 1_000).toFixed(1)}k`;
 }
 
-const TRANSIENT_CODEX_FAILURE = /stalled|timed out|exited with status|app-server closed|could not run|not running/i;
+const TRANSIENT_AGENT_FAILURE = /stalled|timed out|exited with status|app-server closed|could not run|not running/i;
 
-async function withFreshClientRetry<T>(run: (client: CodexAppServerClient) => Promise<T>): Promise<T> {
+async function withFreshClientRetry<T>(agent: ReviewAgent, run: (client: AgentClient) => Promise<T>): Promise<T> {
   const attempt = async (): Promise<T> => {
-    const client = new CodexAppServerClient();
+    const client = agent.createClient();
     try {
       return await run(client);
     } finally {
@@ -69,19 +69,19 @@ async function withFreshClientRetry<T>(run: (client: CodexAppServerClient) => Pr
   try {
     return await attempt();
   } catch (error) {
-    if (!TRANSIENT_CODEX_FAILURE.test(error instanceof Error ? error.message : String(error))) throw error;
+    if (!TRANSIENT_AGENT_FAILURE.test(error instanceof Error ? error.message : String(error))) throw error;
     try {
       return await attempt();
     } catch (retryError) {
-      throw new Error(`${retryError instanceof Error ? retryError.message : String(retryError)} (already retried once with a fresh Codex app-server)`);
+      throw new Error(`${retryError instanceof Error ? retryError.message : String(retryError)} (already retried once with a fresh ${agent.name} client)`);
     }
   }
 }
 
 const QuestionAnswerSchema = z.object({ answer: z.string().min(1).max(700), provenance: z.enum(["branch", "conversation", "both", "general"]) });
 
-export async function answerQuestionWithCodex(input: CollectedReviewInput, conversation: ConversationContext | undefined, selection: string, question: string): Promise<z.infer<typeof QuestionAnswerSchema>> {
-  const client = new CodexAppServerClient();
+export async function answerQuestionWithAgent(agent: ReviewAgent, input: CollectedReviewInput, conversation: ConversationContext | undefined, selection: string, question: string): Promise<z.infer<typeof QuestionAnswerSchema>> {
+  const client = agent.createClient();
   try {
     const reviewInput = buildPromptReviewInput(input, conversation);
     const text = await client.runTextTurn(input.repoPath, `You are ndrstnd. Answer this comprehension question without judging the code or proposing changes. Return compact minified JSON only: {answer,provenance}. Keep answer under 120 words. provenance must be branch, conversation, both, or general. Mark general only if the answer is not based on the selected text, inspected branch files, compact manifest, or conversation excerpts.

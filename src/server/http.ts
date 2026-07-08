@@ -1,7 +1,9 @@
 import { randomBytes } from "node:crypto";
 import { createServer, type Server } from "node:http";
 import type { AnalysisRevision, ReviewStore, StoredReviewSession } from "./store.js";
-import { analyzeWithCodex, answerQuestionWithCodex } from "./analyze.js";
+import { isAgentRevision } from "./store.js";
+import { codexAgent, type ReviewAgent } from "./agent.js";
+import { analyzeWithAgent, answerQuestionWithAgent } from "./analyze.js";
 import { renderWorkspace } from "../web/page.js";
 import { createReviewPresentationData } from "./review-presentation.js";
 
@@ -15,9 +17,10 @@ export interface ReviewServerOptions {
   session?: StoredReviewSession;
   revision?: AnalysisRevision;
   store?: ReviewStore;
+  agent?: ReviewAgent;
 }
 
-export async function startReviewServer({ port = 0, session, revision, store }: ReviewServerOptions = {}): Promise<ReviewServer> {
+export async function startReviewServer({ port = 0, session, revision, store, agent = codexAgent }: ReviewServerOptions = {}): Promise<ReviewServer> {
   const launchToken = randomBytes(24).toString("base64url");
   const server = createServer(async (request, response) => {
     const requestUrl = new URL(request.url ?? "/", "http://127.0.0.1");
@@ -34,7 +37,7 @@ export async function startReviewServer({ port = 0, session, revision, store }: 
       response.end("Not found");
       return;
     }
-    const activeRevision = session === undefined ? revision : store?.listRevisions(session.id).find((candidate) => candidate.source === "codex") ?? revision;
+    const activeRevision = session === undefined ? revision : store?.listRevisions(session.id).find(isAgentRevision) ?? revision;
 
     if (session !== undefined && requestUrl.pathname === `/api/session/${session.id}` && requestUrl.searchParams.get("token") === launchToken) {
       response.writeHead(200, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store" });
@@ -76,7 +79,7 @@ export async function startReviewServer({ port = 0, session, revision, store }: 
           const question = typeof body.question === "string" ? body.question.slice(0, 2_000) : "";
           if (selection === "" || question === "") return sendJson(response, { error: "Selection and question are required." }, 400);
           const card = store.createQuestion(activeRevision.id, selection, question);
-          const answer = await answerQuestionWithCodex(session.input, session.conversation, selection, question);
+          const answer = await answerQuestionWithAgent(agent, session.input, session.conversation, selection, question);
           store.answerQuestion(card.id, answer.answer, answer.provenance);
           return sendJson(response, { ...card, answer: answer.answer, provenance: answer.provenance });
         } catch (error) {
@@ -89,8 +92,8 @@ export async function startReviewServer({ port = 0, session, revision, store }: 
         const body = await readJson(request);
         const lens = store.getLens(typeof body.lensId === "string" ? body.lensId : "default") ?? store.getLens("default");
         if (lens === undefined) return sendJson(response, { error: "No default review lens is configured." }, 500);
-        const document = await analyzeWithCodex(session.input, session.conversation, undefined, lens.instructions);
-        const next = store.createRevision(session.id, "codex", "complete", document);
+        const document = await analyzeWithAgent(agent, session.input, session.conversation, undefined, lens.instructions);
+        const next = store.createRevision(session.id, agent.id, "complete", document);
         return sendJson(response, next);
       } catch (error) {
         return sendJson(response, { error: error instanceof Error ? error.message : String(error) }, 500);
