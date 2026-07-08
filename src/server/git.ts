@@ -38,7 +38,8 @@ export class GitReader implements GitRepositoryReader {
     const comparison = includeWorkingTree ? [mergeBase] : [mergeBase, targetRef];
     const nameStatus = await git(repoPath, ["diff", "--name-status", "-z", "--find-renames", "--find-copies", ...comparison]);
     const trackedFiles = parseNameStatus(nameStatus);
-    const patch = await git(repoPath, ["diff", "--no-ext-diff", "--unified=3", "--find-renames", "--find-copies", "--binary", ...comparison]);
+    // Without --binary git prints a one-line "Binary files ... differ" marker, which is all parsePatch needs; the full binary payload would only risk overflowing maxBuffer.
+    const patch = await git(repoPath, ["diff", "--no-ext-diff", "--unified=3", "--find-renames", "--find-copies", ...comparison]);
     const untracked = includeWorkingTree ? await collectUntrackedPatch(repoPath, trackedFiles) : { files: [], patch: "" };
     const files = [...trackedFiles, ...untracked.files];
     const parsedPatch = parsePatch(`${patch}\n${untracked.patch}`, files);
@@ -66,7 +67,7 @@ async function collectUntrackedPatch(repoPath: string, files: ChangedFile[]): Pr
   const untracked = (await git(repoPath, ["ls-files", "--others", "--exclude-standard", "-z"])).split("\0").filter(Boolean);
   const patches: string[] = [];
   for (const path of untracked) {
-    patches.push(await gitAllowDifference(repoPath, ["diff", "--no-index", "--unified=3", "--binary", "--", "/dev/null", path]));
+    patches.push(await gitAllowDifference(repoPath, ["diff", "--no-index", "--unified=3", "--", "/dev/null", path]));
   }
   return { files: untrackedFiles(untracked, files), patch: patches.join("\n") };
 }

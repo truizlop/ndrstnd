@@ -158,6 +158,28 @@ describe("GitReader", () => {
     expect(input.files).toMatchObject([expect.objectContaining({ status: "added" }), expect.objectContaining({ status: "added" })]);
   });
 
+  it("marks committed and untracked binary files without collecting their payload", async () => {
+    repository = await mkdtemp(join(tmpdir(), "ndrstnd-git-"));
+    await git(repository, ["init", "-b", "main"]);
+    await git(repository, ["config", "user.email", "ndrstnd@example.test"]);
+    await git(repository, ["config", "user.name", "ndrstnd Test"]);
+    await writeFile(join(repository, "base.txt"), "base\n");
+    await git(repository, ["add", "."]);
+    await git(repository, ["commit", "-m", "base"]);
+    await git(repository, ["switch", "-c", "agent-change"]);
+    await writeFile(join(repository, "asset.bin"), Buffer.from([0, 1, 2, 3, 0, 255, 254]));
+    await git(repository, ["add", "."]);
+    await git(repository, ["commit", "-m", "binary asset"]);
+    await writeFile(join(repository, "untracked.bin"), Buffer.from([0, 9, 8, 7, 0]));
+
+    const input = await new GitReader().collectReviewInput(repository, "agent-change", "main");
+
+    const byPath = new Map(input.files.map((file) => [file.path, file]));
+    expect(byPath.get("asset.bin")).toMatchObject({ binary: true, signal: "low-signal", signalReason: "Binary change" });
+    expect(byPath.get("untracked.bin")).toMatchObject({ binary: true, signal: "low-signal", signalReason: "Binary change" });
+    expect(input.hunks).toHaveLength(0);
+  });
+
   it("reports a pure rename as a rename rather than a binary change", async () => {
     repository = await mkdtemp(join(tmpdir(), "ndrstnd-git-"));
     await git(repository, ["init", "-b", "main"]);
