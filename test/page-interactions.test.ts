@@ -325,6 +325,16 @@ it("collapses each desktop rail and opens the review details as a mobile sheet",
   expect(shell.classList.contains("mobile-inspector-open")).toBe(true);
   document.querySelector<HTMLElement>(".collapse-inspector")?.click();
   expect(shell.classList.contains("mobile-inspector-open")).toBe(false);
+
+  // Collapsing the sidebar while the details sheet is open must dismiss the sheet and keep the shell grid and aria state in step.
+  Object.defineProperty(window, "innerWidth", { configurable: true, value: 900 });
+  document.querySelector<HTMLElement>(".mobile-inspector-toggle")?.click();
+  expect(shell.classList.contains("mobile-inspector-open")).toBe(true);
+  document.querySelector<HTMLElement>(".collapse-sidebar")?.click();
+  expect(shell.classList.contains("mobile-inspector-open")).toBe(false);
+  expect(sidebar.classList.contains("collapsed")).toBe(false);
+  expect(shell.classList.contains("sidebar-collapsed")).toBe(false);
+  expect(document.querySelector(".collapse-sidebar")?.getAttribute("aria-expanded")).toBe("true");
 });
 
 it("restores and saves portable UI preferences when local storage is available", () => {

@@ -998,7 +998,8 @@ export const portableEnhancements = `
     if (shell?.classList.contains('mobile-inspector-open') && window.innerWidth <= 1080 && !target.closest('.inspector') && !target.closest('.mobile-inspector-toggle')) {
       shell.classList.remove('mobile-inspector-open');
       document.querySelector('.mobile-inspector-toggle')?.setAttribute('aria-expanded', 'false');
-      return;
+      // A sidebar-collapse click also dismisses the sheet, but its own handling below must still run or the shell grid and aria state desync.
+      if (!target.closest('.collapse-sidebar')) return;
     }
     if (target.closest('.collapse-sidebar')) {
       const collapsed = document.querySelector('.sidebar')?.classList.contains('collapsed') ?? false;
