@@ -110,6 +110,18 @@ describe("analysis documents", () => {
     }, input)).toThrow("Chapter one synopsis is 3 words but must be 20-55");
   });
 
+  it("rejects evidence classified more than once and duplicate chapter or step ids", () => {
+    const chapter = { id: "one", title: "Runner behavior", kind: "behavior" as const, synopsis: validSynopsis, confidence: "high" as const, attention: "contained" as const, riskCategories: ["behavior" as const], evidenceIds: ["source-hunk"] };
+    const omittedGroups = [{ title: "Low-signal changes", reason: "Lockfile evidence is grouped.", evidenceIds: ["lock-hunk"] }];
+
+    expect(() => parseAnalysisDocument({ summary: validSummary, chapters: [chapter], steps: [sourceStep], omittedGroups, unclassifiedEvidenceIds: ["source-hunk"] }, input))
+      .toThrow("Analysis evidence was classified more than once: source-hunk");
+    expect(() => parseAnalysisDocument({ summary: validSummary, chapters: [chapter, { ...chapter, evidenceIds: ["lock-hunk"] }], steps: [sourceStep], omittedGroups, unclassifiedEvidenceIds: [] }, input))
+      .toThrow("Analysis chapter ids are duplicated: one");
+    expect(() => parseAnalysisDocument({ summary: validSummary, chapters: [chapter], steps: [sourceStep, { ...sourceStep, evidenceIds: ["lock-hunk"] }], omittedGroups, unclassifiedEvidenceIds: [] }, input))
+      .toThrow("Analysis step ids are duplicated: step-01");
+  });
+
   it("rejects missing or duplicated step evidence", () => {
     const chapter = { id: "one", title: "Runner behavior", kind: "behavior" as const, synopsis: "Runner behavior changes.", confidence: "high" as const, attention: "contained" as const, riskCategories: ["behavior" as const], evidenceIds: ["source-hunk"] };
     expect(() => parseAnalysisDocument({ summary: "x", chapters: [chapter], steps: [], omittedGroups: [{ title: "Low", reason: "Lockfile.", evidenceIds: ["lock-hunk"] }], unclassifiedEvidenceIds: [] }, input)).toThrow("steps did not account");

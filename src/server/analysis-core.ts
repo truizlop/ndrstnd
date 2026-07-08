@@ -7,11 +7,19 @@ import { deriveEvidenceOrder } from "./evidence-ordering.js";
 
 export function parseAnalysisDocument(value: unknown, input: CollectedReviewInput, options?: { focus?: "require" | "salvage" }): AnalysisDocument {
   const document = parseWireAnalysisDocument(value);
+  const duplicateChapterIds = duplicated(document.chapters.map((chapter) => chapter.id));
+  if (duplicateChapterIds.length > 0) throw new Error(`Analysis chapter ids are duplicated: ${duplicateChapterIds.join(", ")}. Give every chapter in c a unique id.`);
+  const duplicateStepIds = duplicated(document.steps.map((step) => step.id));
+  if (duplicateStepIds.length > 0) throw new Error(`Analysis step ids are duplicated: ${duplicateStepIds.join(", ")}. Give every step in t a unique id.`);
+  const classified = [
+    ...document.chapters.flatMap((chapter) => chapter.evidenceIds),
+    ...document.omittedGroups.flatMap((group) => group.evidenceIds),
+    ...document.unclassifiedEvidenceIds,
+  ];
+  const duplicateEvidence = duplicated(classified);
+  if (duplicateEvidence.length > 0) throw new Error(`Analysis evidence was classified more than once: ${duplicateEvidence.join(", ")}. Each evidence ID must appear exactly once across c, o, and u.`);
   const knownEvidence = new Set(input.hunks.map((hunk) => hunk.id));
-  const referenced = new Set<string>();
-  for (const chapter of document.chapters) for (const id of chapter.evidenceIds) referenced.add(id);
-  for (const group of document.omittedGroups) for (const id of group.evidenceIds) referenced.add(id);
-  for (const id of document.unclassifiedEvidenceIds) referenced.add(id);
+  const referenced = new Set(classified);
   for (const id of referenced) if (!knownEvidence.has(id)) throw new Error(`Analysis referenced unknown evidence: ${id}. Use only hunk IDs listed in the review input manifest.`);
   const meaningfulEvidence = input.hunks
     .filter((hunk) => input.files.find((file) => file.id === hunk.fileId)?.signal === "meaningful")
@@ -80,6 +88,16 @@ export const PROSE_WORD_RANGES = {
   goal: { min: 12, max: 40 },
   youNowHave: { min: 12, max: 40 },
 } as const;
+
+function duplicated(values: readonly string[]): string[] {
+  const seen = new Set<string>();
+  const dupes = new Set<string>();
+  for (const value of values) {
+    if (seen.has(value)) dupes.add(value);
+    seen.add(value);
+  }
+  return [...dupes];
+}
 
 function wordCount(text: string): number {
   const trimmed = text.trim();
