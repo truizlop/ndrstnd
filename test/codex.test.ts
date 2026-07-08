@@ -26,6 +26,15 @@ function stubbedClient(client: CodexAppServerClient, onTurnStart?: (internal: Cl
   return internal;
 }
 
+async function runSingleTurn(client: CodexAppServerClient, prompt: string, onActivity?: (activity: TurnActivity) => void): Promise<string> {
+  const thread = await client.startTextThread("/repo");
+  try {
+    return await thread.send(prompt, onActivity);
+  } finally {
+    await thread.close();
+  }
+}
+
 describe("CodexAppServerClient", () => {
   it("archives an analysis thread after its turn completes", async () => {
     const client = new CodexAppServerClient();
@@ -33,7 +42,7 @@ describe("CodexAppServerClient", () => {
       queueMicrotask(() => internal.handleOutput('{"method":"turn/completed","params":{"threadId":"analysis-thread"}}\n'));
     });
 
-    await expect(client.runTextTurn("/repo", "Explain this branch.")).resolves.toBe("");
+    await expect(runSingleTurn(client, "Explain this branch.")).resolves.toBe("");
 
     expect(internal.request).toHaveBeenCalledWith("thread/archive", { threadId: "analysis-thread" });
   });
@@ -44,7 +53,7 @@ describe("CodexAppServerClient", () => {
       queueMicrotask(() => internal.fail(new Error("Codex app-server exited with status 1. Codex app-server reported: native module mismatch")));
     });
 
-    await expect(client.runTextTurn("/repo", "Explain this branch.")).rejects.toThrow("exited with status 1. Codex app-server reported: native module mismatch");
+    await expect(runSingleTurn(client, "Explain this branch.")).rejects.toThrow("exited with status 1. Codex app-server reported: native module mismatch");
   });
 
   it("rejects a turn the app-server reports as failed, with the reported reason", async () => {
@@ -53,7 +62,7 @@ describe("CodexAppServerClient", () => {
       queueMicrotask(() => internal.handleOutput('{"method":"turn/failed","params":{"threadId":"analysis-thread","error":{"message":"sandbox denied file read"}}}\n'));
     });
 
-    await expect(client.runTextTurn("/repo", "Explain this branch.")).rejects.toThrow("Codex analysis turn failed: sandbox denied file read");
+    await expect(runSingleTurn(client, "Explain this branch.")).rejects.toThrow("Codex analysis turn failed: sandbox denied file read");
   });
 
   it("reports labelled turn activity so callers can print heartbeats", async () => {
@@ -68,7 +77,7 @@ describe("CodexAppServerClient", () => {
     });
     const activities: TurnActivity[] = [];
 
-    await client.runTextTurn("/repo", "Explain this branch.", (activity) => activities.push(activity));
+    await runSingleTurn(client, "Explain this branch.", (activity) => activities.push(activity));
 
     expect(activities[0]).toEqual({ label: "starting the analysis turn", notifications: 1, draftCharacters: 0 });
     expect(activities[1]).toEqual({ label: "running `git diff --stat main...HEAD`", notifications: 2, draftCharacters: 0 });
@@ -89,6 +98,6 @@ describe("CodexAppServerClient", () => {
     });
     internal.stderrTail = "429 too many requests";
 
-    await expect(client.runTextTurn("/repo", "Explain this branch.")).rejects.toThrow(/stalled: no app-server activity for 0s after 1 thread notifications and 7 draft characters\. Codex app-server reported: 429 too many requests/);
+    await expect(runSingleTurn(client, "Explain this branch.")).rejects.toThrow(/stalled: no app-server activity for 0s after 1 thread notifications and 7 draft characters\. Codex app-server reported: 429 too many requests/);
   });
 });

@@ -48,6 +48,15 @@ function stubbedClient(client: ClaudeCodeClient, script: (child: FakeClaudeProce
   return { calls };
 }
 
+async function runSingleTurn(client: ClaudeCodeClient, prompt: string): Promise<string> {
+  const thread = await client.startTextThread("/repo");
+  try {
+    return await thread.send(prompt);
+  } finally {
+    await thread.close();
+  }
+}
+
 describe("ClaudeCodeClient", () => {
   it("reports labelled turn activity, returns the result text, and resumes the session for repair turns", async () => {
     const client = new ClaudeCodeClient();
@@ -91,7 +100,7 @@ describe("ClaudeCodeClient", () => {
       child.emit("close", 0);
     });
 
-    await expect(client.runTextTurn("/repo", "Explain this branch.")).resolves.toBe("ok");
+    await expect(runSingleTurn(client, "Explain this branch.")).resolves.toBe("ok");
 
     const args = calls[0];
     expect(args.slice(args.indexOf("--permission-mode"), args.indexOf("--permission-mode") + 2)).toEqual(["--permission-mode", "dontAsk"]);
@@ -108,7 +117,7 @@ describe("ClaudeCodeClient", () => {
       child.emit("close", 1);
     });
 
-    await expect(client.runTextTurn("/repo", "Explain this branch.")).rejects.toThrow("Claude Code analysis turn failed: rate limited");
+    await expect(runSingleTurn(client, "Explain this branch.")).rejects.toThrow("Claude Code analysis turn failed: rate limited");
   });
 
   it("fails when the CLI exits without a result, including stderr", async () => {
@@ -118,7 +127,7 @@ describe("ClaudeCodeClient", () => {
       child.emit("close", 1);
     });
 
-    await expect(client.runTextTurn("/repo", "Explain this branch.")).rejects.toThrow("exited with status 1 before reporting a result. Claude Code reported: native module mismatch");
+    await expect(runSingleTurn(client, "Explain this branch.")).rejects.toThrow("exited with status 1 before reporting a result. Claude Code reported: native module mismatch");
   });
 
   it("times out on inactivity with progress diagnostics and the stderr tail", async () => {
@@ -128,6 +137,6 @@ describe("ClaudeCodeClient", () => {
       child.stderr.write("429 too many requests");
     });
 
-    await expect(client.runTextTurn("/repo", "Explain this branch.")).rejects.toThrow(/stalled: no CLI activity for 0s after 1 stream events and 7 draft characters\. Claude Code reported: 429 too many requests/);
+    await expect(runSingleTurn(client, "Explain this branch.")).rejects.toThrow(/stalled: no CLI activity for 0s after 1 stream events and 7 draft characters\. Claude Code reported: 429 too many requests/);
   });
 });

@@ -51,15 +51,6 @@ export class ClaudeCodeClient implements AgentClient {
 
   constructor(private readonly inactivityTimeoutMs = 300_000) {}
 
-  async runTextTurn(cwd: string, prompt: string, onActivity?: (activity: TurnActivity) => void): Promise<string> {
-    const thread = await this.startTextThread(cwd);
-    try {
-      return await thread.send(prompt, onActivity);
-    } finally {
-      await thread.close();
-    }
-  }
-
   async startTextThread(cwd: string): Promise<AgentTextThread> {
     let sessionId: string | undefined;
     return {

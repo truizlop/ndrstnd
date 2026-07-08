@@ -1,8 +1,7 @@
-import { z } from "zod";
 import type { CollectedReviewInput } from "./git.js";
 import type { ConversationContext } from "./conversation.js";
 import type { AgentClient, ReviewAgent, TurnActivity } from "./agent.js";
-import { analysisPrompt, buildPromptReviewInput, extractJson, parseAnalysisDocument } from "./analysis-core.js";
+import { analysisPrompt, extractJson, parseAnalysisDocument } from "./analysis-core.js";
 
 export { analysisPrompt, buildPromptReviewInput, parseAnalysisDocument } from "./analysis-core.js";
 
@@ -75,29 +74,5 @@ async function withFreshClientRetry<T>(agent: ReviewAgent, run: (client: AgentCl
     } catch (retryError) {
       throw new Error(`${retryError instanceof Error ? retryError.message : String(retryError)} (already retried once with a fresh ${agent.name} client)`);
     }
-  }
-}
-
-const QuestionAnswerSchema = z.object({ answer: z.string().min(1).max(700), provenance: z.enum(["branch", "conversation", "both", "general"]) });
-
-export async function answerQuestionWithAgent(agent: ReviewAgent, input: CollectedReviewInput, conversation: ConversationContext | undefined, selection: string, question: string): Promise<z.infer<typeof QuestionAnswerSchema>> {
-  const client = agent.createClient();
-  try {
-    const reviewInput = buildPromptReviewInput(input, conversation);
-    const text = await client.runTextTurn(input.repoPath, `You are ndrstnd. Answer this comprehension question without judging the code or proposing changes. Return compact minified JSON only: {answer,provenance}. Keep answer under 120 words. provenance must be branch, conversation, both, or general. Mark general only if the answer is not based on the selected text, inspected branch files, compact manifest, or conversation excerpts.
-
-You are running in the reviewed repository with a read-only sandbox. Use the manifest's suggested git commands if the selected text is not enough.
-
-Selected diff text:
-${selection}
-
-Question:
-${question}
-
-Review input:
-${JSON.stringify(reviewInput)}`);
-    return QuestionAnswerSchema.parse(JSON.parse(extractJson(text)));
-  } finally {
-    client.close();
   }
 }

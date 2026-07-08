@@ -66,15 +66,6 @@ export class CodexAppServerClient implements AgentClient {
     this.initialized = false;
   }
 
-  async runTextTurn(cwd: string, prompt: string, onActivity?: (activity: TurnActivity) => void): Promise<string> {
-    const thread = await this.startTextThread(cwd);
-    try {
-      return await thread.send(prompt, onActivity);
-    } finally {
-      await thread.close();
-    }
-  }
-
   /** Starts a reusable thread so follow-up turns (validation repairs) keep the inspection context instead of resending the full prompt. */
   async startTextThread(cwd: string): Promise<AgentTextThread> {
     const threadResponse = asObject(await this.request("thread/start", { cwd, sandbox: "read-only", approvalPolicy: "never" }));

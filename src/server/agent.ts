@@ -23,7 +23,6 @@ export interface AgentTextThread {
 }
 
 export interface AgentClient {
-  runTextTurn(cwd: string, prompt: string, onActivity?: (activity: TurnActivity) => void): Promise<string>;
   startTextThread(cwd: string): Promise<AgentTextThread>;
   close(): void;
 }
