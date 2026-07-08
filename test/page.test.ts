@@ -47,6 +47,7 @@ describe("renderArtifact", () => {
       input: { repoPath: "/repo", targetRef: "agent-change", baseRef: "main", mergeBase: "abcdef123456", files: [], hunks: [] },
     };
     const page = await renderArtifact(createReviewPresentationData(session, { id: "revision", sessionId: "session", source: "codex", status: "complete", document: buildTestAnalysis(session.input), createdAt: "now" }));
+    expect(page).toContain('id="toast" class="toast" role="status" aria-live="polite"');
     expect(page).toContain('class="collapse-sidebar panel-toggle"');
     expect(page).toContain('class="collapse-inspector panel-toggle"');
     expect(page).toContain('class="mobile-inspector-toggle panel-toggle"');
