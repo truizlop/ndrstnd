@@ -141,6 +141,10 @@ a.cchip:hover{text-decoration:none;background:var(--rail);border-color:var(--fai
 .shot-dots{display:flex;gap:6px}
 .shot-dots i{width:10px;height:10px;border-radius:50%;background:var(--hair-2)}
 .shot-url{flex:1;max-width:430px;margin:0 auto;padding:5px 12px;border:1px solid var(--hair);border-radius:7px;background:var(--surface);font:400 11px/1.4 var(--mono);color:var(--ink-3);text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.agent-switch{display:inline-flex;gap:2px;padding:3px;border:1px solid var(--hair);border-radius:9px;background:var(--surface)}
+.agent-switch button{border:0;padding:7px 12px;border-radius:6px;background:transparent;color:var(--ink-2);font:600 11px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;cursor:pointer}
+.agent-switch button:hover{color:var(--ink)}
+.agent-switch button.active{background:var(--rail);color:var(--accent)}
 .shot-caption{margin:16px 0 0;text-align:center;font:400 14px/1.6 var(--sans);color:var(--ink-3)}
 .am{display:grid;grid-template-columns:170px minmax(0,1fr) 168px;background:var(--surface);font-size:12px;text-align:left}
 .am-side{background:var(--rail);border-right:1px solid var(--hair);padding:14px 11px}
@@ -521,7 +525,7 @@ a.cchip:hover{text-decoration:none;background:var(--rail);border-color:var(--fai
   </div>
   <p class="s-lede rise" style="--d:120ms;font-size:24px;max-width:40em">A <strong>local comprehension workspace</strong> for agent-produced changes. It turns a branch diff into an evidence-linked story, and reads it to you the way you'd want a colleague to: <strong>claims first, meaning second, evidence on demand.</strong></p>
   <div class="rise" style="--d:180ms;margin-top:36px">
-    <span class="hero-chip"><span class="ps1">$</span>ndrstnd review codex/checkout-retry-hardening --repo .</span>
+    <span class="hero-chip"><span class="ps1">$</span>ndrstnd review <span data-codex="codex/checkout-retry-hardening" data-claude="claude/checkout-retry-hardening">codex/checkout-retry-hardening</span> --repo .</span>
   </div>
   <ul class="meta-list rise" style="--d:240ms">
     <li>Runs entirely on your machine</li>
@@ -538,7 +542,7 @@ a.cchip:hover{text-decoration:none;background:var(--rail);border-color:var(--fai
   </div>
   <div class="rise" style="--d:120ms">
     <div class="shot" role="img" aria-label="The ndrstnd Story view: a review summary, five semantic chapters with color-coded attention levels, and an at-a-glance inspector.">
-      <div class="shot-bar" aria-hidden="true"><span class="shot-dots"><i></i><i></i><i></i></span><span class="shot-url">.ndrstnd/codex-checkout-retry-hardening.html</span><span style="width:46px"></span></div>
+      <div class="shot-bar" aria-hidden="true"><span class="shot-dots"><i></i><i></i><i></i></span><span class="shot-url" data-codex=".ndrstnd/codex-checkout-retry-hardening.html" data-claude=".ndrstnd/claude-checkout-retry-hardening.html">.ndrstnd/codex-checkout-retry-hardening.html</span><span style="width:46px"></span></div>
       <div class="am dense" aria-hidden="true">
         <aside class="am-side">
           <div class="am-brand"><svg viewBox="0 0 20 22"><path d="M4.4 3.4 10 7.6l5.6-4.2"/><path d="M4.4 8.9 10 13.1l5.6-4.2"/><path class="mark-deep" d="M4.4 14.4 10 18.6l5.6-4.2"/></svg><b>ndrstnd</b></div>
@@ -553,7 +557,7 @@ a.cchip:hover{text-decoration:none;background:var(--rail);border-color:var(--fai
           <div class="am-masthead">
             <div>
               <p class="am-overline">Change review</p>
-              <p class="am-ref">codex/checkout-retry-hardening</p>
+              <p class="am-ref" data-codex="codex/checkout-retry-hardening" data-claude="claude/checkout-retry-hardening">codex/checkout-retry-hardening</p>
               <div class="am-crumbs"><span>against <strong>main</strong></span><span>merge base <code>f3a91c02</code></span></div>
             </div>
             <div class="dial" style="width:150px;height:24px;flex:none" aria-hidden="true">
@@ -589,7 +593,7 @@ a.cchip:hover{text-decoration:none;background:var(--rail);border-color:var(--fai
           <section>
             <h5>Actions</h5>
             <div class="am-action"><svg viewBox="0 0 16 16"><path d="M8 9.8V2.6M5.2 5.2L8 2.4l2.8 2.8"/><path d="M2.8 9.6v2.6a1.2 1.2 0 0 0 1.2 1.2h8a1.2 1.2 0 0 0 1.2-1.2V9.6"/></svg>Export review…</div>
-            <div class="am-action"><svg viewBox="0 0 16 16"><rect x="5.4" y="5.4" width="7.8" height="8.6" rx="1.6"/><path d="M2.8 10.6V4.2a1.4 1.4 0 0 1 1.4-1.4h5.4"/></svg>Copy Codex prompt</div>
+            <div class="am-action"><svg viewBox="0 0 16 16"><rect x="5.4" y="5.4" width="7.8" height="8.6" rx="1.6"/><path d="M2.8 10.6V4.2a1.4 1.4 0 0 1 1.4-1.4h5.4"/></svg>Copy <span data-codex="Codex" data-claude="Claude Code">Codex</span> prompt</div>
           </section>
         </aside>
       </div>
@@ -822,7 +826,7 @@ a.cchip:hover{text-decoration:none;background:var(--rail);border-color:var(--fai
     </div>
     <div class="rise" style="--d:200ms">
       <div class="shot" role="img" aria-label="A browser window opening a local ndrstnd artifact file.">
-        <div class="shot-bar" aria-hidden="true"><span class="shot-dots"><i></i><i></i><i></i></span><span class="shot-url">file://…/repo/.ndrstnd/codex-checkout-retry-hardening.html</span><span style="width:46px"></span></div>
+        <div class="shot-bar" aria-hidden="true"><span class="shot-dots"><i></i><i></i><i></i></span><span class="shot-url" data-codex="file://…/repo/.ndrstnd/codex-checkout-retry-hardening.html" data-claude="file://…/repo/.ndrstnd/claude-checkout-retry-hardening.html">file://…/repo/.ndrstnd/codex-checkout-retry-hardening.html</span><span style="width:46px"></span></div>
         <div style="display:flex;align-items:center;justify-content:center;gap:14px;padding:64px 20px;background:var(--well)" aria-hidden="true">
           <svg style="width:30px;height:33px;color:var(--ink)" viewBox="0 0 20 22"><g style="fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round"><path d="M4.4 3.4 10 7.6l5.6-4.2"/><path d="M4.4 8.9 10 13.1l5.6-4.2"/><path style="stroke:var(--accent)" d="M4.4 14.4 10 18.6l5.6-4.2"/></g></svg>
           <span style="font:500 15px/1.6 var(--mono);color:var(--ink-2)">1 file · 0 dependencies · 0 servers</span>
@@ -832,28 +836,32 @@ a.cchip:hover{text-decoration:none;background:var(--rail);border-color:var(--fai
   </div>
 </section>
 
-<!-- 16 · CODEX INTEGRATION -->
-<section class="slide" aria-label="Codex integration">
+<!-- 16 · AGENT INTEGRATION -->
+<section class="slide" aria-label="Codex and Claude Code integration">
   <div class="shead" style="margin-bottom:30px">
-    <p class="overline rise">Codex integration</p>
+    <div class="rise" style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:14px">
+      <p class="overline" style="margin:0">Codex &amp; Claude Code integration</p>
+      <div class="agent-switch" role="group" aria-label="Show the example for"><button class="active" data-agent="codex" type="button">Codex</button><button data-agent="claude" type="button">Claude Code</button></div>
+    </div>
     <h2 class="s-head rise" style="--d:60ms">Your agent hands you the review.</h2>
   </div>
   <div class="duo" style="align-items:start">
     <ul class="cx-points rise" style="--d:120ms">
-      <li><span class="n">1</span><div><b>Skill-aware</b><p>Install the skill once, and Codex ends its coding tasks by preparing an ndrstnd workspace for the human instead of a wall of diff.</p></div></li>
+      <li><span class="n">1</span><div><b>Skill-aware</b><p>Install the skill once, and Codex or Claude Code ends its coding tasks by preparing an ndrstnd workspace for the human instead of a wall of diff — analyzed by the same agent that asked.</p></div></li>
       <li><span class="n">2</span><div><b>Conversation-informed</b><p>Pass <code>--conversation</code> and the implementation dialogue becomes part of the story: the decisions, not just the diff.</p></div></li>
-      <li><span class="n">3</span><div><b>Zero token custody</b><p>ndrstnd rides Codex's existing authenticated session. It never stores a credential of its own.</p></div></li>
+      <li><span class="n">3</span><div><b>Zero token custody</b><p>ndrstnd rides your agent's existing authenticated session. It never stores a credential of its own.</p></div></li>
     </ul>
-    <div class="term rise" style="--d:180ms" role="img" aria-label="Terminal session: installing the ndrstnd Codex skill and reviewing a branch.">
+    <div class="term rise" style="--d:180ms" role="img" aria-label="Terminal session: installing the ndrstnd skill for Codex and Claude Code and reviewing a branch.">
       <div class="term-bar" aria-hidden="true"><i></i><i></i><i></i><em>zsh · ~/work/checkout</em></div>
       <pre aria-hidden="true"><span class="ps1">$</span> <span class="cmd">ndrstnd skill install</span>
-<span class="out">Installed the ndrstnd Codex skill at ~/.codex/skills/ndrstnd.</span>
+<span class="out">Installed the ndrstnd skill for Codex at ~/.codex/skills/ndrstnd.</span>
+<span class="out">Installed the ndrstnd skill for Claude Code at ~/.claude/skills/ndrstnd.</span>
 
-<span class="ps1">$</span> <span class="cmd">ndrstnd review codex/checkout-retry-hardening --repo .</span>
-<span class="out">Drafting the review narrative with Codex…</span>
+<span class="ps1">$</span> <span class="cmd">ndrstnd review <span data-codex="codex/checkout-retry-hardening" data-claude="claude/checkout-retry-hardening">codex/checkout-retry-hardening</span> --repo .</span>
+<span class="out">Drafting the review narrative with <span data-codex="Codex" data-claude="Claude Code">Codex</span>…</span>
 <span class="out">merge-base=f3a91c02b7d4 files=12 meaningful-files=7</span>
 <span class="out">hunks=31 conversation=42</span>
-<span class="out">ndrstnd artifact: <span class="hl">.ndrstnd/codex-checkout-retry-hardening.html</span></span></pre>
+<span class="out">ndrstnd artifact: <span class="hl" data-codex=".ndrstnd/codex-checkout-retry-hardening.html" data-claude=".ndrstnd/claude-checkout-retry-hardening.html">.ndrstnd/codex-checkout-retry-hardening.html</span></span></pre>
     </div>
   </div>
 </section>
@@ -877,13 +885,13 @@ a.cchip:hover{text-decoration:none;background:var(--rail);border-color:var(--fai
     <span class="parrow"><svg viewBox="0 0 16 16"><path d="M2.5 8h11M9.5 4l4 4-4 4"/></svg></span>
     <div class="pstage"><i>02</i><h4>Classify</h4><p>Parse and index every hunk; separate meaningful changes from lockfiles, generated, and vendored code.</p></div>
     <span class="parrow"><svg viewBox="0 0 16 16"><path d="M2.5 8h11M9.5 4l4 4-4 4"/></svg></span>
-    <div class="pstage"><i>03</i><h4>Analyze</h4><p>Ask Codex for the narrative: chapters, timeline, test plan. Every claim is bound to real hunks and validated against a schema.</p></div>
+    <div class="pstage"><i>03</i><h4>Analyze</h4><p>Ask your agent — Codex or Claude Code — for the narrative: chapters, timeline, test plan. Every claim is bound to real hunks and validated against a schema.</p></div>
     <span class="parrow"><svg viewBox="0 0 16 16"><path d="M2.5 8h11M9.5 4l4 4-4 4"/></svg></span>
     <div class="pstage"><i>04</i><h4>Render</h4><p>Bake models, syntax highlighting, and UI into <strong>one self-contained HTML artifact</strong>.</p></div>
     <span class="parrow"><svg viewBox="0 0 16 16"><path d="M2.5 8h11M9.5 4l4 4-4 4"/></svg></span>
     <div class="pstage"><i>05</i><h4>Open</h4><p>Write it to the repo's <code>.ndrstnd/</code> directory and open it in your browser.</p></div>
   </div>
-  <p class="footnote rise" style="--d:180ms;margin-top:30px">Node ≥ 22 · TypeScript · everything runs locally: the diff goes to Codex through your own session, and nothing else leaves the machine.</p>
+  <p class="footnote rise" style="--d:180ms;margin-top:30px">Node ≥ 22 · TypeScript · everything runs locally: the diff goes to your agent through your own session, and nothing else leaves the machine.</p>
 </section>
 
 <!-- 19 · UNDER THE HOOD: DECISIONS -->
@@ -896,7 +904,7 @@ a.cchip:hover{text-decoration:none;background:var(--rail);border-color:var(--fai
     <div class="dcard rise" style="--d:100ms"><span class="n">1</span><div><b>Artifact, not app</b><p>A review is a static HTML file, not a running server. Nothing to install for readers, nothing to keep alive, nothing that phones home.</p></div></div>
     <div class="dcard rise" style="--d:150ms"><span class="n">2</span><div><b>Never fabricate</b><p>The analysis validates against a strict schema, with one repair turn. If it still fails, ndrstnd writes nothing and tells you. It never invents a story it can't back.</p></div></div>
     <div class="dcard rise" style="--d:200ms"><span class="n">3</span><div><b>Evidence-linked by construction</b><p>Claims that can't point at real hunks don't ship. Every sentence in the story is a link to the code that proves it.</p></div></div>
-    <div class="dcard rise" style="--d:250ms"><span class="n">4</span><div><b>Zero token custody</b><p>ndrstnd reuses Codex's authenticated session and never stores a credential of its own. Auth stays someone else's well-solved problem.</p></div></div>
+    <div class="dcard rise" style="--d:250ms"><span class="n">4</span><div><b>Zero token custody</b><p>ndrstnd reuses your agent's authenticated session — Codex or Claude Code — and never stores a credential of its own. Auth stays someone else's well-solved problem.</p></div></div>
   </div>
 </section>
 
@@ -907,12 +915,12 @@ a.cchip:hover{text-decoration:none;background:var(--rail);border-color:var(--fai
       <p class="overline rise">Under the hood</p>
       <h2 class="s-head rise" style="--d:60ms">Reviews that read from a phone.</h2>
       <p class="s-lede rise" style="--d:120ms">Agents finish while you're away from your desk. So the artifact treats mobile as a <strong>first-class layout</strong>, not a shrunken desktop: chapters read like an article, the zoom dial docks as a floating pill at the bottom, and the page never scrolls sideways.</p>
-      <p class="s-lede rise" style="--d:180ms">It pairs naturally with Codex Remote: kick off the work from anywhere, and read the finished story on your phone before you're back at a keyboard.</p>
+      <p class="s-lede rise" style="--d:180ms">It pairs naturally with remote agents like Codex Remote or Claude Code on the web: kick off the work from anywhere, and read the finished story on your phone before you're back at a keyboard.</p>
     </div>
     <div class="rise" style="--d:200ms;display:flex;justify-content:center">
       <div class="phone" role="img" aria-label="The artifact on a phone: story chapters stacked vertically with a floating zoom dial pill docked at the bottom.">
         <p class="am-overline">Change review</p>
-        <p class="am-ref" style="font-size:12.5px">codex/checkout-retry-hardening</p>
+        <p class="am-ref" style="font-size:12.5px" data-codex="codex/checkout-retry-hardening" data-claude="claude/checkout-retry-hardening">codex/checkout-retry-hardening</p>
         <div class="chl" aria-hidden="true">
           <article class="ch" style="grid-template-columns:32px minmax(0,1fr)"><span class="chn el">01</span><span class="ch-copy"><strong style="font-size:11px">Retry transient capture failures</strong><small style="font-size:9.5px">Gateway timeouts retry with backoff and jitter.</small></span></article>
           <article class="ch" style="grid-template-columns:32px minmax(0,1fr)"><span class="chn hi">02</span><span class="ch-copy"><strong style="font-size:11px">Idempotency keys guard every retry</strong><small style="font-size:9.5px">A stable key makes retries safe.</small></span></article>
@@ -927,9 +935,12 @@ a.cchip:hover{text-decoration:none;background:var(--rail);border-color:var(--fai
 
 <!-- 21 · INSTALL -->
 <section class="slide" aria-label="Install">
-  <div class="shead" style="margin-bottom:28px">
-    <p class="overline rise">Get started</p>
-    <h2 class="s-head rise" style="--d:60ms">Four commands to your first story.</h2>
+  <div class="shead" style="margin-bottom:28px;display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:14px">
+    <div>
+      <p class="overline rise">Get started</p>
+      <h2 class="s-head rise" style="--d:60ms">Four commands to your first story.</h2>
+    </div>
+    <div class="agent-switch" role="group" aria-label="Show the example for"><button class="active" data-agent="codex" type="button">Codex</button><button data-agent="claude" type="button">Claude Code</button></div>
   </div>
   <div class="steps">
     <div class="step rise" style="--d:100ms">
@@ -944,8 +955,8 @@ a.cchip:hover{text-decoration:none;background:var(--rail);border-color:var(--fai
     <div class="step rise" style="--d:150ms">
       <span class="step-n">2</span>
       <div>
-        <h3>Connect Codex</h3>
-        <div class="codeblock"><pre><span class="ps1">$ </span>ndrstnd auth login</pre></div>
+        <h3>Connect your agent</h3>
+        <div class="codeblock"><pre><span class="ps1">$ </span><span data-codex="ndrstnd auth login" data-claude="ndrstnd auth login --agent claude">ndrstnd auth login</span></pre></div>
       </div>
     </div>
     <div class="step rise" style="--d:200ms">
@@ -1014,9 +1025,9 @@ a.cchip:hover{text-decoration:none;background:var(--rail);border-color:var(--fai
   <div class="modgrid rise" style="--d:120ms">
     <div class="mod"><code>server/cli.ts</code><p>Command surface: <b>auth</b>, <b>skill install</b>, <b>review</b> with scope flags. Scope confirmation and inferred-base warnings live here.</p></div>
     <div class="mod"><code>server/git.ts · git-model.ts</code><p>Runs Git, finds the merge-base, parses hunks, and classifies files as meaningful vs. low-signal (lockfiles, generated, vendored, binary).</p></div>
-    <div class="mod"><code>server/analysis-core.ts · analyze.ts</code><p>Builds the prompts, calls Codex, validates the narrative against the schema, and runs the single repair turn.</p></div>
+    <div class="mod"><code>server/analysis-core.ts · analyze.ts</code><p>Builds the prompts, calls the selected agent — Codex or Claude Code — validates the narrative against the schema, and runs the single repair turn.</p></div>
     <div class="mod"><code>web/page.ts + models</code><p>Renders the artifact: evidence and test-plan presentation models, language heuristics, and the whole UI baked into one HTML file.</p></div>
-    <div class="mod"><code>skill-assets/ndrstnd</code><p>The Codex skill: teaches the agent to choose a review scope, default to a conversation export, and hand back the artifact link.</p></div>
+    <div class="mod"><code>skill-assets/ndrstnd</code><p>The agent skill, installed for Codex and Claude Code: teaches the agent to choose a review scope, default to a conversation export, and hand back the artifact link.</p></div>
     <div class="mod"><code>test/</code><p>Unit and DOM tests over the models and rendering; the artifact is asserted against real generated pages.</p></div>
   </div>
   <div class="chips rise" style="--d:180ms">
@@ -1187,6 +1198,16 @@ a.cchip:hover{text-decoration:none;background:var(--rail);border-color:var(--fai
     const n = parseInt(location.hash.slice(1), 10);
     go(Number.isFinite(n) ? n - 1 : 0);
   };
+  /* Agent switcher: swaps agent-specific example content; Codex is the default. */
+  const applyAgent = (agent) => {
+    document.querySelectorAll('[data-codex]').forEach((node) => {
+      const value = node.getAttribute('data-' + agent);
+      if (value !== null) node.textContent = value;
+    });
+    document.querySelectorAll('.agent-switch button').forEach((button) => button.classList.toggle('active', button.dataset.agent === agent));
+  };
+  document.querySelectorAll('.agent-switch button').forEach((button) => button.addEventListener('click', () => applyAgent(button.dataset.agent)));
+
   window.addEventListener('hashchange', fromHash);
   setLevel(0);
   fromHash();
