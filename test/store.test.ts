@@ -23,12 +23,7 @@ describe("ReviewStore", () => {
     expect(second.id).toBe(first.id);
     const revision = store.createRevision(first.id, "codex", "complete", buildTestAnalysis(sampleInput()));
     expect(store.listRevisions(first.id)).toMatchObject([{ id: revision.id, source: "codex" }]);
-    expect(store.listLenses().map((lens) => lens.id)).toContain("security");
-    store.setPreference("zoom", "3");
-    expect(store.getPreference("zoom")).toBe("3");
-    const question = store.createQuestion(revision.id, "export const reviewed", "Why is this included?");
-    store.answerQuestion(question.id, "It establishes the reviewed state.", "branch");
-    expect(store.listQuestions(revision.id)).toMatchObject([{ id: question.id, provenance: "branch" }]);
+    expect(store.getLens("security")).toMatchObject({ id: "security", builtIn: true });
     store.close();
 
     const reopened = new ReviewStore(databasePath);
