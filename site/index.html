@@ -186,6 +186,16 @@ h2.display{margin:0 0 14px;font:600 clamp(28px,4.4vw,42px)/1.15 var(--serif);let
 .chip-add{color:var(--add-ink);font-weight:600}
 .chip-del{color:var(--del-ink);font-weight:600}
 
+/* ---------- demo video ---------- */
+.demo{padding:88px 0;border-bottom:1px solid var(--hair)}
+.demo-head{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:14px;margin-bottom:14px}
+.demo-head .overline{margin:0}
+.demo-shot{position:relative;margin-top:34px;border:1px solid var(--hair-2);border-radius:14px;background:var(--surface);box-shadow:var(--shadow);overflow:hidden}
+.demo-shot video{display:block;width:100%;aspect-ratio:8/5;background:var(--well);cursor:pointer}
+.demo-toggle{position:absolute;right:14px;bottom:14px;display:grid;place-items:center;width:44px;height:44px;border:0;border-radius:50%;background:#1c2126cc;color:#fff;cursor:pointer;opacity:0;transition:opacity 160ms ease}
+.demo-shot:hover .demo-toggle,.demo-toggle:focus-visible,.demo-shot.paused .demo-toggle{opacity:1}
+.demo-toggle svg{width:17px;height:17px;fill:currentColor}
+
 /* ---------- reveal on scroll ---------- */
 .reveal{opacity:0;transform:translateY(14px);transition:opacity 520ms ease,transform 520ms cubic-bezier(.2,.8,.2,1);transition-delay:var(--d,0ms)}
 .reveal.in{opacity:1;transform:none}
@@ -449,6 +459,7 @@ h2.display{margin:0 0 14px;font:600 clamp(28px,4.4vw,42px)/1.15 var(--serif);let
       <b>ndrstnd</b>
     </a>
     <nav class="site-nav" aria-label="Sections">
+      <a href="#demo">Demo</a>
       <a href="#why">Why</a>
       <a href="#zoom">Zoom</a>
       <a href="#timeline">Timeline</a>
@@ -543,6 +554,27 @@ h2.display{margin:0 0 14px;font:600 clamp(28px,4.4vw,42px)/1.15 var(--serif);let
       </div>
     </div>
     <p class="hero-shot-caption">The Story view of an ndrstnd artifact: one self-contained HTML file, no server required.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ======================== DEMO ======================== -->
+<section class="demo" id="demo">
+  <div class="wrap">
+    <div class="demo-head reveal">
+      <p class="overline">See it in action</p>
+      <div class="agent-switch" role="group" aria-label="Show the demo for"><button class="active" data-agent="codex" type="button">Codex</button><button data-agent="claude" type="button">Claude Code</button></div>
+    </div>
+    <h2 class="display reveal" style="--d:60ms">Watch a branch become a story.</h2>
+    <p class="lede reveal" style="--d:120ms">Fifty seconds, end to end: your agent finishes the checkout branch, its ndrstnd skill drafts the review, and the workspace opens with the story, zoom dial, timeline, and test plan. Pick your agent above; the demo follows.</p>
+    <div class="demo-shot reveal" style="--d:180ms">
+      <video id="demo-video" data-agent="codex"
+        data-video-codex="media/demo-codex.mp4" data-video-claude="media/demo-claude.mp4"
+        data-poster-codex="media/demo-codex-poster.jpg" data-poster-claude="media/demo-claude-poster.jpg"
+        src="media/demo-codex.mp4" poster="media/demo-codex-poster.jpg"
+        muted playsinline loop preload="metadata"
+        aria-label="Demo video: a coding agent finishes the checkout branch, runs ndrstnd through its skill, and the review workspace opens as a story with zoomable evidence, a timeline, and a test plan."></video>
+      <button class="demo-toggle" id="demo-toggle" type="button" aria-label="Pause demo video"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 3h2.6v10H4.5zM8.9 3h2.6v10H8.9z"/></svg></button>
     </div>
   </div>
 </section>
@@ -941,6 +973,48 @@ h2.display{margin:0 0 14px;font:600 clamp(28px,4.4vw,42px)/1.15 var(--serif);let
   }));
   setLevel(0);
 
+  /* Demo video: follows the agent switch and plays while on screen. */
+  const demoVideo = document.getElementById('demo-video');
+  const demoToggle = document.getElementById('demo-toggle');
+  let demoUserPaused = false;
+  const demoPlay = () => demoVideo.play().catch(() => {});
+  const swapDemoVideo = (agent) => {
+    if (!demoVideo || demoVideo.dataset.agent === agent) return;
+    const at = demoVideo.currentTime;
+    const resume = !demoVideo.paused;
+    demoVideo.dataset.agent = agent;
+    demoVideo.poster = demoVideo.getAttribute('data-poster-' + agent);
+    demoVideo.src = demoVideo.getAttribute('data-video-' + agent);
+    demoVideo.addEventListener('canplay', () => {
+      try { demoVideo.currentTime = Math.min(at, Math.max(0, demoVideo.duration - 0.2)); } catch { /* keep the start */ }
+      if (resume) demoPlay();
+    }, { once: true });
+  };
+  if (demoVideo) {
+    const syncDemoUi = () => {
+      demoVideo.closest('.demo-shot').classList.toggle('paused', demoVideo.paused);
+      demoToggle.innerHTML = demoVideo.paused
+        ? '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5.4 3.1v9.8l8-4.9z"/></svg>'
+        : '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 3h2.6v10H4.5zM8.9 3h2.6v10H8.9z"/></svg>';
+      demoToggle.setAttribute('aria-label', demoVideo.paused ? 'Play demo video' : 'Pause demo video');
+    };
+    const toggleDemo = () => {
+      demoUserPaused = !demoVideo.paused;
+      if (demoVideo.paused) demoPlay(); else demoVideo.pause();
+    };
+    demoVideo.addEventListener('play', syncDemoUi);
+    demoVideo.addEventListener('pause', syncDemoUi);
+    demoVideo.addEventListener('click', toggleDemo);
+    demoToggle.addEventListener('click', toggleDemo);
+    new IntersectionObserver((entries) => {
+      const visible = entries.some((entry) => entry.isIntersecting);
+      if (reduced) return;
+      if (visible && !demoUserPaused && demoVideo.paused) demoPlay();
+      if (!visible && !demoVideo.paused) demoVideo.pause();
+    }, { threshold: 0.4 }).observe(demoVideo);
+    syncDemoUi();
+  }
+
   /* Agent switcher: swaps agent-specific example content; Codex is the default. */
   const applyAgent = (agent) => {
     document.querySelectorAll('[data-codex]').forEach((node) => {
@@ -951,6 +1025,7 @@ h2.display{margin:0 0 14px;font:600 clamp(28px,4.4vw,42px)/1.15 var(--serif);let
       node.setAttribute('data-copy', node.getAttribute('data-copy-' + agent) || node.getAttribute('data-copy'));
     });
     document.querySelectorAll('.agent-switch button').forEach((button) => button.classList.toggle('active', button.dataset.agent === agent));
+    swapDemoVideo(agent);
   };
   document.querySelectorAll('.agent-switch button').forEach((button) => button.addEventListener('click', () => applyAgent(button.dataset.agent)));
 
