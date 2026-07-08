@@ -1,16 +1,7 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
+import type { AgentClient, AgentTextThread, AuthStatus, TurnActivity } from "./agent.js";
 
-export type AuthStatus =
-  | { state: "signed-in"; accountType: string }
-  | { state: "signed-out" }
-  | { state: "unreachable"; reason: string };
-
-/** A liveness snapshot of a running turn, emitted on every app-server thread notification. */
-export interface TurnActivity {
-  label: string;
-  notifications: number;
-  draftCharacters: number;
-}
+export type { TurnActivity } from "./agent.js";
 
 /** Turns a thread notification into reviewer-facing phrasing; undefined means the previous label still applies. */
 export function describeThreadNotification(method: string, params: Record<string, unknown>): string | undefined {
@@ -44,7 +35,7 @@ export async function getCodexAuthStatus(): Promise<AuthStatus> {
   }
 }
 
-export class CodexAppServerClient {
+export class CodexAppServerClient implements AgentClient {
   private process: ChildProcessWithoutNullStreams | undefined;
   private buffer = "";
   private stderrTail = "";
@@ -85,7 +76,7 @@ export class CodexAppServerClient {
   }
 
   /** Starts a reusable thread so follow-up turns (validation repairs) keep the inspection context instead of resending the full prompt. */
-  async startTextThread(cwd: string): Promise<{ send(prompt: string, onActivity?: (activity: TurnActivity) => void): Promise<string>; close(): Promise<void> }> {
+  async startTextThread(cwd: string): Promise<AgentTextThread> {
     const threadResponse = asObject(await this.request("thread/start", { cwd, sandbox: "read-only", approvalPolicy: "never" }));
     const threadId = String(asObject(threadResponse["thread"])["id"] ?? "");
     if (threadId === "") throw new Error("Codex app-server did not return an analysis thread ID.");
