@@ -7,6 +7,7 @@ export const frozenReviewData: ReviewPresentationData = {
   targetRef: "frozen-ui-change",
   baseRef: "main",
   mergeBase: "a1b2c3d4e5f6",
+  agentName: "Codex",
   files: [
     { id: "runner", path: "src/runner.ts", status: "modified", binary: false, signal: "meaningful" },
     { id: "retry", path: "src/retry-policy.ts", status: "added", binary: false, signal: "meaningful" },

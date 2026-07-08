@@ -263,10 +263,11 @@ it("exports a portable review file from the inspector actions", () => {
   expect(downloads.at(-1)).toContain("Use this ndrstnd review summary");
 });
 
-it("shows the Codex prompt manually when clipboard copy is denied", async () => {
+it("shows the agent prompt manually when clipboard copy is denied", async () => {
   const window = new Window({ url: "http://127.0.0.1:3000/" });
   const document = window.document;
   const prompts: Array<{ message: string; value?: string }> = [];
+  document.body.setAttribute("data-agent", "Codex");
   document.body.innerHTML = `<main class="main"><section id="trailer">Implementation story</section></main><button data-action="copy-summary"></button><div id="selection-menu" hidden></div><div id="toast" hidden></div>`;
   Object.defineProperty(window.navigator, "clipboard", { configurable: true, value: { writeText: async () => { throw new Error("denied"); } } });
   window.prompt = (message?: string, value?: string) => {
@@ -389,12 +390,13 @@ const selectEvidence = (window: Window) => {
   return selection;
 };
 
-it("copies an evidence-grounded Codex prompt from the selection menu and confirms with a toast", async () => {
+it("copies an evidence-grounded agent prompt from the selection menu and confirms with a toast", async () => {
   const window = new Window({ url: "http://127.0.0.1:3000/" });
   const document = window.document;
   document.title = "ndrstnd · agent-change";
   const copies: string[] = [];
   Object.defineProperty(window.navigator, "clipboard", { configurable: true, value: { writeText: async (value: string) => { copies.push(value); } } });
+  document.body.setAttribute("data-agent", "Codex");
   document.body.innerHTML = selectionFixture;
   window.eval(`${artifactClientScript}${portableEnhancements}`);
 

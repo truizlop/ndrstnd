@@ -16,4 +16,6 @@ export interface ReviewPresentationData {
   files: ChangedFile[];
   hunks: DiffHunk[];
   document: AnalysisDocument;
+  /** Display name of the agent that produced the analysis; copy actions address their prompts to it. */
+  agentName: string;
 }

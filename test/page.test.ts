@@ -18,6 +18,19 @@ describe("renderWorkspace", () => {
     expect(page).toContain("trailer ");
   });
 
+  it("addresses copy actions to the agent that produced the analysis", async () => {
+    const session: StoredReviewSession = {
+      id: "session", repoPath: "/repo", targetRef: "agent-change", baseRef: "main", mergeBase: "abcdef123456", inputHash: "hash", createdAt: "now",
+      input: { repoPath: "/repo", targetRef: "agent-change", baseRef: "main", mergeBase: "abcdef123456", files: [], hunks: [] },
+    };
+    const claudePage = await renderArtifact(createReviewPresentationData(session, { id: "revision", sessionId: "session", source: "claude", status: "complete", document: buildTestAnalysis(session.input), createdAt: "now" }));
+    expect(claudePage).toContain('<body data-agent="Claude Code">');
+    expect(claudePage).toContain("Copy Claude Code prompt");
+    const codexPage = await renderArtifact(createReviewPresentationData(session, { id: "revision", sessionId: "session", source: "codex", status: "complete", document: buildTestAnalysis(session.input), createdAt: "now" }));
+    expect(codexPage).toContain('<body data-agent="Codex">');
+    expect(codexPage).toContain("Copy Codex prompt");
+  });
+
   it("has a touch-first mobile layout without page-level horizontal overflow", () => {
     expect(styles).toContain("@media(max-width:760px)");
     expect(styles).toContain("@media(max-width:1080px)");

@@ -11,5 +11,6 @@ export function createReviewPresentationData(session: StoredReviewSession, revis
     files: session.input.files,
     hunks: session.input.hunks,
     document: revision.document,
+    agentName: revision.source === "claude" ? "Claude Code" : "Codex",
   };
 }
