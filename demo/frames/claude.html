@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>demo frame · claude app</title>
+<style>
+  /* A faithful recreation of the Claude desktop app (Code tab) for the landing demo video. */
+  :root{
+    --bg:#ffffff;--side:#fbfaf8;--hair:#e9e6e0;--hair-2:#ddd9d0;
+    --ink:#26251f;--ink-2:#5f5c54;--ink-3:#8f8b81;--faint:#b8b4a9;
+    --bubble:#f0efe9;--chip:#f3f1ec;--seg:#f1efec;--pill:#eceae4;
+    --link:#1a63c9;--star:#e07856;
+    --sans:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",sans-serif;
+    --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;width:1600px;height:1000px;overflow:hidden}
+  body{display:grid;grid-template-columns:254px 1fr;background:var(--bg);color:var(--ink);font:14px/1.55 var(--sans);-webkit-font-smoothing:antialiased}
+  svg{fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+
+  /* ---------- sidebar ---------- */
+  .side{display:flex;flex-direction:column;background:var(--side);border-right:1px solid var(--hair);padding:14px 12px 12px}
+  .lights{display:flex;align-items:center;gap:7px;padding:0 4px 16px}
+  .lights i{width:12px;height:12px;border-radius:50%}
+  .lights .r{background:#ff5f57}.lights .y{background:#febc2e}.lights .g{background:#28c840}
+  .lights .tools{margin-left:14px;display:flex;gap:12px;color:var(--ink-3)}
+  .lights .tools svg{width:14px;height:14px}
+  .seg{display:flex;gap:2px;padding:3px;border-radius:9px;background:var(--seg);margin-bottom:18px}
+  .seg span{flex:1;display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:6px 0;border-radius:7px;font-size:12.5px;font-weight:500;color:var(--ink-2)}
+  .seg span svg{width:13px;height:13px}
+  .seg .on{background:#fff;color:var(--ink);border:1px solid var(--hair-2);box-shadow:0 1px 3px rgba(38,37,31,.07);font-weight:600}
+  .snav{display:grid;gap:2px;margin-bottom:22px}
+  .srow{display:flex;align-items:center;gap:9px;padding:6px 8px;border-radius:8px;color:var(--ink-2);font-size:13px}
+  .srow svg{width:14px;height:14px;flex:none;color:var(--ink-3)}
+  .slabel{display:flex;align-items:center;justify-content:space-between;padding:0 8px 6px;font-size:11.5px;font-weight:600;color:var(--ink-3)}
+  .slabel svg{width:13px;height:13px}
+  .recent{display:block;padding:7px 10px;border-radius:8px;background:var(--pill);color:var(--ink);font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .sfoot{margin-top:auto;display:flex;align-items:center;gap:9px;padding:10px 6px 0}
+  .sfoot .avatar{display:grid;place-items:center;width:24px;height:24px;border-radius:50%;background:#cdc7ba;color:#fff;font:600 10.5px var(--sans)}
+  .sfoot b{font-weight:600;font-size:12.5px}
+  .sfoot svg{width:12px;height:12px;color:var(--ink-3)}
+
+  /* ---------- main ---------- */
+  .main{display:flex;flex-direction:column;min-width:0}
+  .top{display:flex;align-items:center;gap:9px;height:48px;padding:0 18px;flex:none}
+  .top svg{width:15px;height:15px;color:var(--ink-2)}
+  .top b{font-weight:600;font-size:13.5px}
+  .top .proj{padding:3px 9px;border-radius:7px;background:var(--chip);font-size:11.5px;color:var(--ink-2)}
+  .top .right{margin-left:auto;display:flex;gap:16px;color:var(--ink-2)}
+  .thread{flex:1;overflow:hidden;padding:22px 0 0}
+  .col{width:800px;margin:0 auto}
+  .u-msg{margin-left:auto;width:fit-content;max-width:72%;margin-bottom:26px;padding:11px 16px;border-radius:12px;background:var(--bubble);font-size:14px}
+  .tool{display:flex;align-items:center;gap:6px;margin:16px 0 10px;color:var(--ink-3);font-size:13.5px;font-weight:500}
+  .tool svg{width:11px;height:11px}
+  .prose{margin:0 0 6px;font-size:14px;color:var(--ink)}
+  .prose code{font:12.5px var(--mono);background:var(--chip);border-radius:4px;padding:1px 5px}
+  .a-link{display:inline-flex;align-items:center;gap:7px;margin-top:10px;color:var(--link);font-size:13.5px;font-weight:500;cursor:pointer}
+  .a-link svg{width:14px;height:14px}
+  .star{width:15px;height:15px;margin:20px 0 0}
+  .star svg{width:15px;height:15px;stroke:var(--star);stroke-width:2.6;animation:pulse 1s ease infinite}
+  @keyframes pulse{50%{opacity:.35}}
+  .composer{flex:none;padding:0 0 14px}
+  .composer .box{display:flex;align-items:center;gap:10px;width:800px;margin:0 auto 10px;padding:12px 16px;border:1px solid var(--hair-2);border-radius:12px;font-size:14px;box-shadow:0 1px 4px rgba(38,37,31,.04)}
+  .composer .box .ph{color:var(--faint)}
+  .composer .box .ret{margin-left:auto;color:var(--ink-3)}
+  .composer .box .ret svg{width:14px;height:14px}
+  .caret{display:inline-block;width:1.5px;height:17px;background:var(--ink);vertical-align:-3px;animation:blink 1s steps(1) infinite}
+  @keyframes blink{50%{opacity:0}}
+  .composer .row{display:flex;align-items:center;gap:16px;width:800px;margin:0 auto;color:var(--ink-2);font-size:12.5px}
+  .composer .row svg{width:14px;height:14px;color:var(--ink-3)}
+  .composer .row .right{margin-left:auto;display:inline-flex;align-items:center;gap:12px}
+  .composer .row .spin{width:12px;height:12px;border:1.6px solid var(--hair-2);border-top-color:var(--ink-3);border-radius:50%}
+  [data-anim]{display:none}
+</style>
+</head>
+<body>
+
+<aside class="side">
+  <div class="lights"><i class="r"></i><i class="y"></i><i class="g"></i>
+    <span class="tools"><svg viewBox="0 0 16 16"><rect x="2" y="2.8" width="12" height="10.4" rx="2.4"/><path d="M6.2 2.8v10.4"/></svg><svg viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.4"/><path d="M10.4 10.4l3 3"/></svg></span>
+  </div>
+  <div class="seg">
+    <span><svg viewBox="0 0 16 16"><path d="M13.4 7.6a5.4 5.1 0 0 1-5.4 5.1 5.8 5.8 0 0 1-2-.35L2.8 13l.7-2.6a5 5 0 0 1-.9-2.8 5.4 5.1 0 0 1 5.4-5.1 5.4 5.1 0 0 1 5.4 5.1z"/></svg>Chat</span>
+    <span><svg viewBox="0 0 16 16"><path d="M3 4.6h2.4M3 8h2.4M3 11.4h2.4M7.6 4.6H13M7.6 8H13M7.6 11.4H13"/></svg>Cowork</span>
+    <span class="on"><svg viewBox="0 0 16 16"><path d="M6 4.5L3 8l3 3.5M10 4.5L13 8l-3 3.5"/></svg>Code</span>
+  </div>
+  <nav class="snav">
+    <span class="srow"><svg viewBox="0 0 16 16"><path d="M8 3.4v9.2M3.4 8h9.2"/></svg>New session</span>
+    <span class="srow"><svg viewBox="0 0 16 16"><path d="M8 2.4l4.8 2.8v5.6L8 13.6 3.2 10.8V5.2z"/><path d="M8 8l4.8-2.8M8 8v5.6M8 8L3.2 5.2"/></svg>Artifacts</span>
+    <span class="srow"><svg viewBox="0 0 16 16"><rect x="2.6" y="4" width="10.8" height="8.6" rx="1.8"/><path d="M5.4 4V2.8h5.2V4"/></svg>Customize</span>
+    <span class="srow"><svg viewBox="0 0 12 12" style="width:11px;height:11px"><path d="M3 4.8l3 3 3-3"/></svg>More</span>
+  </nav>
+  <p class="slabel">Recents<svg viewBox="0 0 16 16"><path d="M5 3.4v9.2M5 12.6l-2-2M5 12.6l2-2M11 12.6V3.4M11 3.4L9 5.4M11 3.4l2 2"/></svg></p>
+  <span class="recent">Understanding claude/checkout-retry-hard…</span>
+  <div class="sfoot"><span class="avatar">T</span><b>Tomás</b><svg viewBox="0 0 12 12"><path d="M3 4.8l3 3 3-3"/></svg></div>
+</aside>
+
+<main class="main">
+  <div class="top">
+    <svg viewBox="0 0 16 16"><rect x="2.6" y="3.4" width="10.8" height="7.2" rx="1.4"/><path d="M1.8 12.6h12.4"/></svg>
+    <b>Understanding claude/checkout-retry-hardening</b>
+    <span class="proj">checkout</span>
+    <span class="right"><svg viewBox="0 0 16 16"><path d="M3.4 5l3 3-3 3M8.4 11.4h4.2"/></svg><svg viewBox="0 0 16 16"><rect x="2.4" y="3" width="11.2" height="10" rx="2"/><path d="M9.8 3v10"/></svg><svg viewBox="0 0 16 16"><path d="M5.4 3.6l7 4.4-7 4.4z"/></svg><svg viewBox="0 0 16 16"><circle cx="8" cy="3.6" r=".9"/><circle cx="8" cy="8" r=".9"/><circle cx="8" cy="12.4" r=".9"/></svg></span>
+  </div>
+  <div class="thread">
+    <div class="col">
+      <div class="u-msg" data-anim id="user-msg"></div>
+      <p class="tool" data-anim id="tool-1">Ran skill /ndrstnd<svg viewBox="0 0 12 12"><path d="M4.5 2.5L8 6l-3.5 3.5"/></svg></p>
+      <p class="prose" data-anim id="prose-1">Reviewing <code>claude/checkout-retry-hardening</code> against <code>main</code>. ndrstnd is drafting the story, timeline, and test plan from 31 evidence hunks.</p>
+      <p class="tool" data-anim id="tool-2">Ran ndrstnd review claude/checkout-retry-hardening<svg viewBox="0 0 12 12"><path d="M4.5 2.5L8 6l-3.5 3.5"/></svg></p>
+      <p class="prose" data-anim id="prose-2"></p>
+      <span class="a-link" data-anim id="artifact-link"><svg viewBox="0 0 16 16"><path d="M5.5 2.6h5l2.4 2.4v8.4h-7.4z"/><path d="M10.5 2.6v2.4h2.4"/></svg>.ndrstnd/claude-checkout-retry-hardening.html</span>
+      <div class="star" data-anim id="star"><svg viewBox="0 0 16 16"><path d="M8 1.8v4M8 10.2v4M1.8 8h4M10.2 8h4M3.6 3.6l2.9 2.9M9.5 9.5l2.9 2.9M12.4 3.6L9.5 6.5M6.5 9.5l-2.9 2.9"/></svg></div>
+    </div>
+  </div>
+  <div class="composer">
+    <div class="box"><span id="composer-text" class="ph">Type / for commands</span><span class="caret" id="caret" hidden></span><span class="ret"><svg viewBox="0 0 16 16"><path d="M12.6 3.6v4a2 2 0 0 1-2 2H3.8M6 6.8L3.2 9.6 6 12.4"/></svg></span></div>
+    <div class="row">
+      <span>Accept edits</span>
+      <svg viewBox="0 0 16 16"><path d="M8 3.4v9.2M3.4 8h9.2"/></svg>
+      <svg viewBox="0 0 16 16"><rect x="6" y="2.4" width="4" height="7.4" rx="2"/><path d="M3.6 8a4.4 4.4 0 0 0 8.8 0M8 12.4v1.4"/></svg>
+      <span class="right">Opus 4.8<span>High</span><span class="spin"></span></span>
+    </div>
+  </div>
+</main>
+
+<script src="cursor.js"></script>
+<script>
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const show = (el, display = "block") => { el.style.display = display; };
+
+  async function typeInto(node, text, cps = 22) {
+    for (const ch of text) { node.textContent += ch; await sleep(cps + Math.random() * 10); }
+  }
+
+  async function streamInto(node, html, wordMs = 36) {
+    const words = html.split(" ");
+    for (let i = 0; i < words.length; i += 1) { node.innerHTML += (i ? " " : "") + words[i]; await sleep(wordMs); }
+  }
+
+  window.play = async () => {
+    const question = "Use ndrstnd to help me understand the changes in branch claude/checkout-retry-hardening";
+    await sleep(1300);
+
+    const composer = document.getElementById("composer-text");
+    const caret = document.getElementById("caret");
+    composer.classList.remove("ph"); composer.textContent = ""; caret.hidden = false;
+    await typeInto(composer, question);
+    await sleep(360);
+    composer.classList.add("ph"); composer.textContent = "Type / for commands"; caret.hidden = true;
+    const userMsg = document.getElementById("user-msg");
+    userMsg.textContent = question; show(userMsg);
+    show(document.getElementById("star"));
+    await sleep(1300);
+
+    show(document.getElementById("tool-1"), "flex");
+    await sleep(750);
+    show(document.getElementById("prose-1"));
+    await sleep(1500);
+    show(document.getElementById("tool-2"), "flex");
+    await sleep(750);
+
+    const prose2 = document.getElementById("prose-2");
+    show(prose2);
+    await streamInto(prose2, "The review is ready to read like a story: five chapters, a build-path timeline, and a test plan, with every claim linked to its evidence. Opening the artifact:");
+    document.getElementById("star").style.display = "none";
+    await sleep(240);
+    show(document.getElementById("artifact-link"), "inline-flex");
+    await sleep(650);
+
+    await window.__cursor.show(1050, 760);
+    await window.__cursor.moveToEl("#artifact-link", 800);
+    await window.__cursor.click("#artifact-link");
+    await sleep(700);
+  };
+</script>
+</body>
+</html>
