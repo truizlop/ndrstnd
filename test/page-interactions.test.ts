@@ -137,6 +137,20 @@ it("jumps between Timeline steps and Story chapters in the portable artifact", (
   expect(document.querySelector<HTMLElement>(".chapter-detail")?.hidden).toBe(false);
 });
 
+it("materializes test excerpts from their templates when zoom reaches Evidence and Raw", () => {
+  const window = new Window();
+  const document = window.document;
+  document.body.innerHTML = `<button data-view="trailer" class="nav-item active"></button><section id="trailer" class="view active"></section><section id="tests" class="view"><div class="test-plan-evidence"><details data-test-case="case-1"><div class="test-excerpt-slot" data-test-hunk="hunk-1"></div></details></div><div class="test-plan-raw"><div class="test-raw-slot" data-test-hunk="hunk-1"></div></div></section><section id="diff" class="view"><div data-diff-hunk="hunk-1"><pre><span class="line addition"><code>expect(ok).toBe(true);</code></span></pre></div></section><div id="map" hidden></div><div class="story-zoom-controls"><div id="zoom-control"><div id="zoom-callout"><output id="zoom-label"></output><span id="zoom-description"></span></div><button data-zoom="0"></button><button data-zoom="1"></button><button data-zoom="2"></button><button data-zoom="3"></button><button data-zoom="4"></button></div></div><div id="test-excerpt-library" hidden><template data-test-excerpt-template="hunk-1"><article class="evidence"><pre>focused excerpt</pre></article></template></div><div id="selection-menu" hidden></div>`;
+  window.eval(`${artifactClientScript}${portableEnhancements}`);
+
+  expect(document.querySelector(".test-excerpt-slot")?.innerHTML).toBe("");
+
+  document.querySelector<HTMLElement>('[data-zoom="3"]')?.click();
+
+  expect(document.querySelector(".test-excerpt-slot")?.textContent).toContain("focused excerpt");
+  expect(document.querySelector(".test-raw-slot")?.textContent).toContain("expect(ok).toBe(true);");
+});
+
 it("opens a Story chapter whose id contains selector metacharacters", () => {
   const window = new Window();
   const document = window.document;

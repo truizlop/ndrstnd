@@ -394,6 +394,11 @@ describe("renderArtifact", () => {
     expect(page).toContain("Complete output");
     expect(page).not.toContain("Coverage gap");
     expect(page).not.toContain("Suggested test");
+    expect(page).toContain('data-test-excerpt-template="test-hunk"');
+    expect(page).toContain('class="test-excerpt-slot" data-test-hunk="test-hunk"');
+    expect(page).toContain('class="test-raw-slot" data-test-hunk="test-hunk"');
+    // The test body ships in the Full diff, the evidence library, and the excerpt template only; Evidence and Raw levels clone it at runtime.
+    expect(page.split("draft.ts").length - 1).toBeLessThanOrEqual(3);
   });
 
   it("renders a neutral Test plan empty state", async () => {

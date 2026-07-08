@@ -299,7 +299,18 @@ function renderTestPlan(document: AnalysisDocument, hunks: DiffHunk[], filePaths
     `${runs.length} observed test run${runs.length === 1 ? "" : "s"}`,
     runs.length === 0 ? "Run result not observed" : `Observed result: ${aggregateRunOutcome(runs)}`,
   ].map((item) => `<span>${escapeHtml(item)}</span>`).join("");
-  return `<div class="test-plan-summary">${summary}</div><div class="test-plan-level test-plan-map">${renderTestPlanMap(themes)}</div><div class="test-plan-level test-plan-summary-level">${renderTestPlanSummary(themes)}</div><div class="test-plan-level test-plan-explanation">${renderTestPlanExplanation(themes)}</div><div class="test-plan-level test-plan-evidence">${renderTestPlanEvidence(themes, highlighter, runs)}</div><div class="test-plan-level test-plan-raw">${renderTestPlanRaw(themes, highlighter, runs)}</div>`;
+  return `<div class="test-plan-summary">${summary}</div><div class="test-plan-level test-plan-map">${renderTestPlanMap(themes)}</div><div class="test-plan-level test-plan-summary-level">${renderTestPlanSummary(themes)}</div><div class="test-plan-level test-plan-explanation">${renderTestPlanExplanation(themes)}</div><div class="test-plan-level test-plan-evidence">${renderTestPlanEvidence(themes, runs)}</div><div class="test-plan-level test-plan-raw">${renderTestPlanRaw(themes, runs)}</div>${renderTestExcerptLibrary(themes, highlighter)}`;
+}
+
+/** Each test hunk's excerpt ships once as a template; the Evidence and Raw levels clone into their slots at runtime. */
+function renderTestExcerptLibrary(themes: TestThemeModel[], highlighter: Highlighter): string {
+  const seen = new Set<string>();
+  const templates = themes.flatMap((theme) => theme.cases).flatMap((testCase) => {
+    if (seen.has(testCase.hunk.id)) return [];
+    seen.add(testCase.hunk.id);
+    return [`<template data-test-excerpt-template="${escapeHtml(testCase.hunk.id)}">${renderTestExcerpt(testCase.hunk, testCase.filePath, highlighter, false)}</template>`];
+  });
+  return templates.length === 0 ? "" : `<div id="test-excerpt-library" hidden>${templates.join("")}</div>`;
 }
 
 type TestExecutionRun = NonNullable<AnalysisDocument["testExecution"]>[number];
@@ -324,20 +335,21 @@ function renderTestPlanExplanation(themes: TestThemeModel[]): string {
   return themes.map((theme) => `<section class="test-explanation-group"><h2>${escapeHtml(theme.title)}</h2>${theme.cases.length === 0 ? `<p class="empty-note">No associated test evidence</p>` : theme.cases.map((testCase) => `<article class="test-explanation-card" data-test-case="${escapeHtml(testCase.id)}"><h3>${escapeHtml(testCase.name)}</h3><p class="test-what">${renderProse(testCase.chapter.synopsis)}</p>${renderSemantic(testCase.chapter.before, testCase.chapter.after)}<div class="test-refs"><span class="test-ref-file">${escapeHtml(testCase.filePath)}</span>${theme.storyClaims[0] && theme.storyClaims[0].title !== theme.title ? `<span class="test-ref-claim">Story · ${escapeHtml(theme.storyClaims[0].title)}</span>` : ""}</div></article>`).join("")}</section>`).join("");
 }
 
-function renderTestPlanEvidence(themes: TestThemeModel[], highlighter: Highlighter, runs: TestExecutionRun[]): string {
+function renderTestPlanEvidence(themes: TestThemeModel[], runs: TestExecutionRun[]): string {
   const execution = runs.length === 0 ? "Execution evidence not observed" : `${runs[0].command}${runs.length > 1 ? ` and ${runs.length - 1} more run${runs.length === 2 ? "" : "s"}` : ""}`;
   const result = runs.length === 0 ? "Not observed" : `Suite ${aggregateRunOutcome(runs)}`;
-  return themes.map((theme) => theme.cases.length === 0 ? `<article class="test-evidence-card"><h2>${escapeHtml(theme.title)}</h2><p class="empty-note">No associated test evidence</p></article>` : theme.cases.map((testCase) => `<details class="test-evidence-card" data-test-case="${escapeHtml(testCase.id)}"><summary><span><strong>${escapeHtml(testCase.name)}</strong><small>${escapeHtml(testCase.filePath)}</small></span><span class="test-state">Test implementation found</span></summary>${renderTestExcerpt(testCase.hunk, testCase.filePath, highlighter, false)}<div class="test-evidence-meta"><div><strong>Associated implementation</strong><span>Source mapping unavailable</span></div><div><strong>Observed execution</strong><span>${escapeHtml(execution)}</span></div><div><strong>Result</strong><span>${escapeHtml(result)}</span></div></div></details>`).join("")).join("");
+  return themes.map((theme) => theme.cases.length === 0 ? `<article class="test-evidence-card"><h2>${escapeHtml(theme.title)}</h2><p class="empty-note">No associated test evidence</p></article>` : theme.cases.map((testCase) => `<details class="test-evidence-card" data-test-case="${escapeHtml(testCase.id)}"><summary><span><strong>${escapeHtml(testCase.name)}</strong><small>${escapeHtml(testCase.filePath)}</small></span><span class="test-state">Test implementation found</span></summary><div class="test-excerpt-slot" data-test-hunk="${escapeHtml(testCase.hunk.id)}"></div><div class="test-evidence-meta"><div><strong>Associated implementation</strong><span>Source mapping unavailable</span></div><div><strong>Observed execution</strong><span>${escapeHtml(execution)}</span></div><div><strong>Result</strong><span>${escapeHtml(result)}</span></div></div></details>`).join("")).join("");
 }
 
-function renderTestPlanRaw(themes: TestThemeModel[], highlighter: Highlighter, runs: TestExecutionRun[]): string {
+function renderTestPlanRaw(themes: TestThemeModel[], runs: TestExecutionRun[]): string {
   const cases = themes.flatMap((theme) => theme.cases);
   if (cases.length === 0) return `<p class="empty-note">No test activity was captured for this change.</p>`;
   const seen = new Set<string>();
   const artifacts = cases.flatMap((testCase) => {
     if (seen.has(testCase.hunk.id)) return [];
     seen.add(testCase.hunk.id);
-    return [`<article class="test-raw-artifact"><h2>${escapeHtml(testCase.filePath)}</h2>${renderTestExcerpt(testCase.hunk, testCase.filePath, highlighter, true)}</article>`];
+    // The complete hunk body already ships in Full diff; the slot clones it at runtime instead of shipping a second copy.
+    return [`<article class="test-raw-artifact"><h2>${escapeHtml(testCase.filePath)}</h2><article class="evidence focused-evidence"><header><span class="evidence-path">${escapeHtml(testCase.filePath)}</span><span>Complete test artifact · @@ −${testCase.hunk.oldStart} +${testCase.hunk.newStart} @@</span></header><div class="test-raw-slot" data-test-hunk="${escapeHtml(testCase.hunk.id)}"></div></article></article>`];
   });
   const commands = runs.length === 0
     ? `<p class="empty-note">Execution evidence not observed</p>`
@@ -903,6 +915,11 @@ export const portableEnhancements = `
     raw.innerHTML = source.innerHTML;
     article.appendChild(raw);
   };
+  const materializeTestSlots = () => {
+    const templateFor = (id) => [...document.querySelectorAll('[data-test-excerpt-template]')].find((node) => node.getAttribute('data-test-excerpt-template') === id);
+    document.querySelectorAll('.test-excerpt-slot:not([data-materialized])').forEach((slot) => { const template = templateFor(slot.getAttribute('data-test-hunk')); if (!template) return; slot.appendChild(template.content.cloneNode(true)); slot.dataset.materialized = 'true'; });
+    document.querySelectorAll('.test-raw-slot:not([data-materialized])').forEach((slot) => { const id = slot.getAttribute('data-test-hunk'); const block = [...document.querySelectorAll('#diff [data-diff-hunk]')].find((node) => node.getAttribute('data-diff-hunk') === id); const source = block ? block.querySelector('pre') : null; if (!source) return; const copy = document.createElement('pre'); copy.innerHTML = source.innerHTML; slot.appendChild(copy); slot.dataset.materialized = 'true'; });
+  };
   const materializeEvidenceStack = (stack) => {
     if (!stack || stack.dataset.materialized === 'true' || stack.dataset.evidenceList === undefined) return;
     stack.dataset.evidenceList.split(' ').filter(Boolean).forEach((id) => { const template = document.querySelector('[data-evidence-template="' + cssAttr(id) + '"]'); if (template) stack.appendChild(template.content.cloneNode(true)); });
@@ -910,7 +927,7 @@ export const portableEnhancements = `
     if (Number(document.body.dataset.storyLevel ?? 1) >= 4) stack.querySelectorAll('.evidence[data-evidence-id]').forEach((article) => ensureRawEvidence(article));
   };
   const setChapterDetail = (chapter, expanded, animate) => { const detail = chapter.querySelector('.chapter-detail'); if (!detail) return; window.clearTimeout(Number(detail.dataset.zoomCollapseTimer)); if (expanded) { detail.hidden = false; materializeEvidenceStack(detail.querySelector('.evidence-stack')); if (animate) void detail.offsetHeight; chapter.classList.add('open'); detail.classList.toggle('zoom-revealed', animate); return; } chapter.classList.remove('open'); detail.classList.remove('zoom-revealed'); if (!animate) { detail.hidden = true; return; } detail.dataset.zoomCollapseTimer = String(window.setTimeout(() => { if (!chapter.classList.contains('open')) detail.hidden = true; }, 260)); };
-  const setZoom = (level) => { level = Math.max(0, Math.min(4, level)); const current = Number(document.body.dataset.storyLevel ?? 1); const changed = current !== level; const zoom = document.getElementById('zoom-control'); zoom?.classList.toggle('is-changing', changed); document.body.dataset.storyLevel = String(level); document.body.className = document.body.className.replace(/story-level-\\d/g, '') + ' story-level-' + level; document.querySelectorAll('[data-zoom]').forEach((button) => { const active = Number(button.dataset.zoom) === level; button.classList.toggle('active', active); button.setAttribute('aria-pressed', String(active)); }); updateZoomLabel(level); const callout = document.getElementById('zoom-callout'); if (callout) { callout.style.setProperty('--zoom-position', String(level / 4)); callout.dataset.edge = level === 0 ? 'start' : level === 4 ? 'end' : ''; } const map = document.getElementById('map'); if (map) map.hidden = level !== 0; document.querySelectorAll('.chapter').forEach((chapter) => setChapterDetail(chapter, level >= 2, changed)); if (level >= 4) document.querySelectorAll('.evidence[data-evidence-id]').forEach((article) => ensureRawEvidence(article)); if (changed) window.setTimeout(() => zoom?.classList.remove('is-changing'), 260); };
+  const setZoom = (level) => { level = Math.max(0, Math.min(4, level)); const current = Number(document.body.dataset.storyLevel ?? 1); const changed = current !== level; const zoom = document.getElementById('zoom-control'); zoom?.classList.toggle('is-changing', changed); document.body.dataset.storyLevel = String(level); document.body.className = document.body.className.replace(/story-level-\\d/g, '') + ' story-level-' + level; document.querySelectorAll('[data-zoom]').forEach((button) => { const active = Number(button.dataset.zoom) === level; button.classList.toggle('active', active); button.setAttribute('aria-pressed', String(active)); }); updateZoomLabel(level); const callout = document.getElementById('zoom-callout'); if (callout) { callout.style.setProperty('--zoom-position', String(level / 4)); callout.dataset.edge = level === 0 ? 'start' : level === 4 ? 'end' : ''; } const map = document.getElementById('map'); if (map) map.hidden = level !== 0; document.querySelectorAll('.chapter').forEach((chapter) => setChapterDetail(chapter, level >= 2, changed)); if (level >= 3) materializeTestSlots(); if (level >= 4) document.querySelectorAll('.evidence[data-evidence-id]').forEach((article) => ensureRawEvidence(article)); if (changed) window.setTimeout(() => zoom?.classList.remove('is-changing'), 260); };
   setZoom(1);
   const setZoomControlsVisible = (view) => { const hidden = view !== 'trailer' && view !== 'timeline' && view !== 'tests'; const controls = document.querySelector('.story-zoom-controls'); if (controls) controls.hidden = hidden; document.querySelector('.view-bar')?.classList.toggle('view-bar-empty', hidden); updateZoomLabel(Number(document.body.dataset.storyLevel ?? 1)); };
   setZoomControlsVisible(document.querySelector('[data-view].active')?.getAttribute('data-view') || 'trailer');
