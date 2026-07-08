@@ -1,10 +1,10 @@
 import { execFile } from "node:child_process";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
 import { afterEach, describe, expect, it } from "vitest";
-import { GitReader, describeReviewScope } from "../src/server/git.js";
+import { GitReader, describeReviewScope, ensureArtifactDirectoryIgnored } from "../src/server/git.js";
 
 const run = promisify(execFile);
 
@@ -241,6 +241,27 @@ describe("GitReader", () => {
     const uncommittedOnly = await reader.collectReviewInput(repository, "WORKTREE", "HEAD");
     expect(await describeReviewScope(repository, uncommittedOnly)).toEqual({ targetLabel: "agent-change", localCommitsIncluded: 0 });
     expect(uncommittedOnly.files.map((file) => file.path)).toEqual(["dirty.txt"]);
+  });
+
+  it("excludes the artifact directory from reviews of repositories that do not ignore it", async () => {
+    repository = await mkdtemp(join(tmpdir(), "ndrstnd-git-"));
+    await git(repository, ["init", "-b", "main"]);
+    await git(repository, ["config", "user.email", "ndrstnd@example.test"]);
+    await git(repository, ["config", "user.name", "ndrstnd Test"]);
+    await writeFile(join(repository, "base.txt"), "base\n");
+    await git(repository, ["add", "."]);
+    await git(repository, ["commit", "-m", "base"]);
+    await mkdir(join(repository, ".ndrstnd"));
+    await writeFile(join(repository, ".ndrstnd", "ndrstnd-old-review.html"), "<html></html>\n");
+    await writeFile(join(repository, "dirty.txt"), "dirty\n");
+
+    await ensureArtifactDirectoryIgnored(repository);
+    await ensureArtifactDirectoryIgnored(repository);
+
+    const input = await new GitReader().collectReviewInput(repository, "WORKTREE", "HEAD");
+    expect(input.files.map((file) => file.path)).toEqual(["dirty.txt"]);
+    const exclude = await readFile(join(repository, ".git", "info", "exclude"), "utf8");
+    expect(exclude.match(/\.ndrstnd\//g)).toHaveLength(1);
   });
 
   it("reviews an initial uncommitted repository against the empty tree", async () => {

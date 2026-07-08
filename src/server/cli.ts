@@ -5,7 +5,7 @@ import process from "node:process";
 import { resolveReviewAgent, reviewAgents, type ReviewAgent, type ReviewAgentId, type TurnActivity } from "./agent.js";
 import { analyzeWithAgent, formatAnalysisHeartbeat, type AnalysisProgress } from "./analyze.js";
 import { importConversation } from "./conversation.js";
-import { GitReader, describeReviewScope } from "./git.js";
+import { GitReader, describeReviewScope, ensureArtifactDirectoryIgnored } from "./git.js";
 import { ReviewStore, isAgentRevision } from "./store.js";
 import { installSkill, installedSkillIsStale } from "./skill.js";
 import { writeReviewArtifact } from "./artifact.js";
@@ -136,6 +136,7 @@ async function runReview(args: string[]): Promise<void> {
   const agent = await resolveReviewAgent(values.get("--agent")).catch((error: unknown) => fail(error instanceof Error ? error.message : String(error)));
   const conversationPath = values.get("--conversation");
   const conversation = conversationPath === undefined ? undefined : await importConversation(conversationPath);
+  await ensureArtifactDirectoryIgnored(repoPath);
   const input = await new GitReader().collectReviewInput(repoPath, targetRef, baseRef);
   const meaningfulFiles = input.files.filter((file) => file.signal === "meaningful").length;
   const scope = await describeReviewScope(repoPath, input);

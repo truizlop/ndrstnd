@@ -1,4 +1,6 @@
 import { execFile as execFileCallback } from "node:child_process";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { dirname, isAbsolute, join } from "node:path";
 import { promisify } from "node:util";
 import type { ChangedFile, DiffHunk } from "../shared/domain.js";
 import { finalizeFiles, parseNameStatus, parsePatch, untrackedFiles } from "./git-model.js";
@@ -48,6 +50,21 @@ export class GitReader implements GitRepositoryReader {
 
     return { repoPath, targetRef, baseRef: explicitBaseRef === "empty" ? "empty" : baseRef, mergeBase, includesWorkingTree: includeWorkingTree, files: finalizedFiles, hunks };
   }
+}
+
+/**
+ * Makes the artifact directory Git-ignored in the reviewed repository via .git/info/exclude,
+ * so artifacts never enter a working-tree review or risk being committed. Excluding through
+ * the repository's own .gitignore would modify a tracked file, which a review must not do.
+ */
+export async function ensureArtifactDirectoryIgnored(repoPath: string): Promise<void> {
+  if (await gitOptional(repoPath, ["check-ignore", "-q", ".ndrstnd"]) !== undefined) return;
+  const commonDir = (await git(repoPath, ["rev-parse", "--git-common-dir"])).trim();
+  const excludePath = join(isAbsolute(commonDir) ? commonDir : join(repoPath, commonDir), "info", "exclude");
+  await mkdir(dirname(excludePath), { recursive: true });
+  const existing = await readFile(excludePath, "utf8").catch(() => "");
+  const separator = existing === "" || existing.endsWith("\n") ? "" : "\n";
+  await writeFile(excludePath, `${existing}${separator}.ndrstnd/\n`, "utf8");
 }
 
 export interface ReviewScope {
