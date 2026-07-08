@@ -4,14 +4,16 @@
 
 ndrstnd helps a human understand a coding agent’s changes. It is a comprehension tool, not a code-critique tool: make the implementation story, decisions, risks, test coverage, and supporting evidence easy to read before making suggestions about the code.
 
-The primary reading surface is a portable, self-contained HTML artifact. It must work just as well in Codex on desktop and on mobile. Do not make the reviewer depend on a live localhost server for ordinary reading.
+ndrstnd analyzes through an agent CLI — Codex or Claude Code — and both must stay first-class: auth, skill installation, analysis, and artifact wording all go through the agent abstraction in `src/server/agent.ts` rather than naming one agent directly.
+
+The primary reading surface is a portable, self-contained HTML artifact. It must work just as well in Codex or Claude Code on desktop and on mobile. Do not make the reviewer depend on a live localhost server for ordinary reading.
 
 ## Artifact workflow
 
 - Generate artifacts under the Git-ignored `.ndrstnd/` directory in the reviewed workspace. Never write them to a tracked path.
 - Generate a fresh artifact with `ndrstnd review --base empty --repo <repo> --no-open` (or the appropriate base) only when the user explicitly requests a review or artifact. Link that artifact in the handoff so the user can test the current output.
 - Keep all reader-facing interactions usable without a server: tabs, Story disclosure, zoom/detail changes, Timeline jumps, Test Plan jumps, diff expansion, review state, and export.
-- When an action needs Codex context that a static artifact cannot call directly, make the action copy a concise, evidence-grounded prompt suitable for pasting into Codex. Never leave a button that only produces an empty toast.
+- When an action needs agent context that a static artifact cannot call directly, make the action copy a concise, evidence-grounded prompt suitable for pasting into the agent that produced the analysis. Never leave a button that only produces an empty toast.
 
 ## Review UI rules
 
@@ -25,7 +27,7 @@ The primary reading surface is a portable, self-contained HTML artifact. It must
 - Keep the two typographic voices with their semantic roles: mono (`--mono`) is the structural voice — letterspaced overlines, two-digit step indices, counts, identifiers (branch names, paths, code), and the depth-dial readout — while sans (`--sans`) carries prose and controls. Chapter and timeline attention is expressed by coloring the mono index and its tick or node together in the attention color, never a filled badge. Deep cobalt is reserved for interactive elements; the attention scale is green, light blue, amber, orange, red, with the light blue kept visibly lighter than the accent.
 - The depth dial is the hero control: a ruler of ticks with an accent needle and a mono readout. It lives in the `.view-bar`, which must stay sticky at the top on desktop (revealing the branch ref only once the masthead scrolls away) and docked as a floating bottom pill on mobile so zoom is always reachable without covering content.
 - Timeline is a rational reconstruction, not Story repeated: dependency-ordered build steps with goals, postconditions, deferred concerns, and forward references, partitioning the same evidence as Story. Its navigation is a compact step rail in the depth-dial language — attention-colored ticks, an accent needle on the active step, a mono readout, and previous/next controls — never a full-height step list. Being at step k shows the cumulative evidence of steps 1..k with the current step emphasized; steps keep jumping to their Story chapters and chapters link back to their steps. The mobile review-details sheet opens over a dimmed scrim with a slide-up animation and closes on outside tap.
-- Never fabricate analysis content. When Codex analysis fails or its output does not validate, surface the failure and write no artifact; do not fall back to synthesized summaries, chapters, or steps.
+- Never fabricate analysis content. When the agent analysis fails or its output does not validate, surface the failure and write no artifact; do not fall back to synthesized summaries, chapters, or steps.
 - Design mobile layouts first-class. The document must not scroll horizontally; only code panes and deliberately overflow-safe action menus may do so.
 
 ## Naming and storage
