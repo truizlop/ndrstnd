@@ -75,10 +75,19 @@ export function untrackedFiles(paths: readonly string[], knownFiles: readonly Ch
 export function finalizeFiles(files: readonly ChangedFile[], hunks: readonly DiffHunk[], binaryFileIds: ReadonlySet<string>): ChangedFile[] {
   const hunkFileIds = new Set(hunks.map((hunk) => hunk.fileId));
   return files.map((file) => {
-    const binary = binaryFileIds.has(file.id) || (!hunkFileIds.has(file.id) && !file.binary);
+    const binary = binaryFileIds.has(file.id);
     const classification = classifyFile(file.path, binary);
+    if (!binary && !hunkFileIds.has(file.id) && classification.signal === "meaningful") {
+      return { ...file, binary, signal: "low-signal" as const, signalReason: hunklessReason(file.status) };
+    }
     return { ...file, binary, signal: classification.signal, signalReason: classification.reason };
   });
+}
+
+function hunklessReason(status: ChangedFile["status"]): string {
+  if (status === "renamed") return "Rename without content changes";
+  if (status === "copied") return "Copy without content changes";
+  return "No content changes";
 }
 
 export function classifyFile(path: string, binary: boolean): { signal: FileSignal; reason?: string } {

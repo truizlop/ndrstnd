@@ -113,6 +113,26 @@ describe("GitReader", () => {
     expect(additions).toEqual(expect.arrayContaining(["committed unicode", "committed spaced", "untracked unicode"]));
   });
 
+  it("reports a pure rename as a rename rather than a binary change", async () => {
+    repository = await mkdtemp(join(tmpdir(), "ndrstnd-git-"));
+    await git(repository, ["init", "-b", "main"]);
+    await git(repository, ["config", "user.email", "ndrstnd@example.test"]);
+    await git(repository, ["config", "user.name", "ndrstnd Test"]);
+    await writeFile(join(repository, "before.ts"), "export const stable = true;\n");
+    await git(repository, ["add", "."]);
+    await git(repository, ["commit", "-m", "base"]);
+    await git(repository, ["switch", "-c", "agent-change"]);
+    await git(repository, ["mv", "before.ts", "after.ts"]);
+    await git(repository, ["commit", "-m", "rename"]);
+    await git(repository, ["switch", "main"]);
+
+    const input = await new GitReader().collectReviewInput(repository, "agent-change");
+
+    expect(input.files).toMatchObject([
+      { path: "after.ts", previousPath: "before.ts", status: "renamed", binary: false, signal: "low-signal", signalReason: "Rename without content changes" },
+    ]);
+  });
+
   it("infers the checked-out branch base for a worktree review", async () => {
     repository = await mkdtemp(join(tmpdir(), "ndrstnd-git-"));
     await git(repository, ["init", "-b", "main"]);

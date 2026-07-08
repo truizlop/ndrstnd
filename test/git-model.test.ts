@@ -87,16 +87,33 @@ describe("git model", () => {
     const files: ChangedFile[] = [
       { id: "source", path: "src/app.ts", status: "modified", binary: false, signal: "meaningful" },
       { id: "lock", path: "package-lock.json", status: "modified", binary: false, signal: "meaningful" },
-      { id: "empty", path: "image.png", status: "modified", binary: false, signal: "meaningful" },
+      { id: "image", path: "image.png", status: "modified", binary: false, signal: "meaningful" },
     ];
-    const finalized = finalizeFiles(files, [{ id: "hunk", fileId: "source", oldStart: 1, newStart: 1, lines: [] }], new Set(["empty"]));
+    const finalized = finalizeFiles(files, [{ id: "hunk", fileId: "source", oldStart: 1, newStart: 1, lines: [] }], new Set(["image"]));
 
     expect(finalized).toMatchObject([
       { path: "src/app.ts", binary: false, signal: "meaningful", signalReason: undefined },
-      { path: "package-lock.json", binary: true, signal: "low-signal", signalReason: "Binary change" },
+      { path: "package-lock.json", binary: false, signal: "low-signal", signalReason: "Lockfile" },
       { path: "image.png", binary: true, signal: "low-signal", signalReason: "Binary change" },
     ]);
     expect(files[1]?.binary).toBe(false);
+  });
+
+  it("labels hunk-less changes by what they are instead of calling them binary", () => {
+    const files: ChangedFile[] = [
+      { id: "moved", path: "src/next.ts", previousPath: "src/prior.ts", status: "renamed", binary: false, signal: "meaningful" },
+      { id: "copied", path: "src/copy.ts", previousPath: "src/original.ts", status: "copied", binary: false, signal: "meaningful" },
+      { id: "empty", path: "src/empty.ts", status: "added", binary: false, signal: "meaningful" },
+      { id: "mode", path: "scripts/run.sh", status: "modified", binary: false, signal: "meaningful" },
+    ];
+    const finalized = finalizeFiles(files, [], new Set());
+
+    expect(finalized).toMatchObject([
+      { path: "src/next.ts", binary: false, signal: "low-signal", signalReason: "Rename without content changes" },
+      { path: "src/copy.ts", binary: false, signal: "low-signal", signalReason: "Copy without content changes" },
+      { path: "src/empty.ts", binary: false, signal: "low-signal", signalReason: "No content changes" },
+      { path: "scripts/run.sh", binary: false, signal: "low-signal", signalReason: "No content changes" },
+    ]);
   });
 
   it("classifies statuses and low-signal paths", () => {
