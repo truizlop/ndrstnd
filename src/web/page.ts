@@ -86,12 +86,13 @@ function renderChapters(document: AnalysisDocument, hunks: DiffHunk[], filePaths
   }
   return document.chapters.map((chapter, index) => {
     const metrics = chapterMetrics(chapter, hunks);
-    const stepChips = (stepsByChapter.get(chapter.id) ?? []).map((step) => `<span class="step-chip" role="button" tabindex="0" data-story-step="${escapeHtml(step.id)}">step ${String(step.index + 1).padStart(2, "0")}</span>`).join("");
+    const stepChips = (stepsByChapter.get(chapter.id) ?? []).map((step) => `<button type="button" class="step-chip" data-story-step="${escapeHtml(step.id)}">step ${String(step.index + 1).padStart(2, "0")}</button>`).join("");
     const evidenceIds = chapter.evidenceIds
       .map((id) => requireHunk(hunks, id))
       .filter((hunk) => !isSupportingFile(filesById.get(hunk.fileId)))
       .map((hunk) => hunk.id);
-    return `<article class="chapter" data-chapter="${escapeHtml(chapter.id)}"><button class="chapter-toggle" aria-expanded="false"><span class="chapter-number attention-${escapeHtml(chapter.attention)}">${String(index + 1).padStart(2, "0")}</span><span class="chapter-copy"><strong>${renderProse(chapter.title)}</strong><small>${renderProse(chapter.synopsis)}</small>${stepChips ? `<span class="chapter-steps">${stepChips}</span>` : ""}<span class="chapter-tags">${chapter.riskCategories.map((risk) => `<span class="chapter-tag">${categoryIcon(risk)}${escapeHtml(risk)}</span>`).join("")}</span>${renderChapterMapMetrics(metrics)}</span><span class="chevron" aria-hidden="true"><svg viewBox="0 0 12 12"><path d="M2.5 4.25L6 7.75l3.5-3.5"/></svg></span></button><div class="chapter-detail" hidden>${renderSemantic(chapter.before, chapter.after)}${evidenceIds.length > 0 ? `<div class="evidence-stack" data-evidence-list="${escapeHtml(evidenceIds.join(" "))}"></div>` : ""}</div></article>`;
+    // The toggle is a div-with-button-role rather than a button so the step chips inside it can stay real, keyboard-reachable buttons.
+    return `<article class="chapter" data-chapter="${escapeHtml(chapter.id)}"><div class="chapter-toggle" role="button" tabindex="0" aria-expanded="false"><span class="chapter-number attention-${escapeHtml(chapter.attention)}">${String(index + 1).padStart(2, "0")}</span><span class="chapter-copy"><strong>${renderProse(chapter.title)}</strong><small>${renderProse(chapter.synopsis)}</small>${stepChips ? `<span class="chapter-steps">${stepChips}</span>` : ""}<span class="chapter-tags">${chapter.riskCategories.map((risk) => `<span class="chapter-tag">${categoryIcon(risk)}${escapeHtml(risk)}</span>`).join("")}</span>${renderChapterMapMetrics(metrics)}</span><span class="chevron" aria-hidden="true"><svg viewBox="0 0 12 12"><path d="M2.5 4.25L6 7.75l3.5-3.5"/></svg></span></div><div class="chapter-detail" hidden>${renderSemantic(chapter.before, chapter.after)}${evidenceIds.length > 0 ? `<div class="evidence-stack" data-evidence-list="${escapeHtml(evidenceIds.join(" "))}"></div>` : ""}</div></article>`;
   }).join("");
 }
 
@@ -405,7 +406,7 @@ export const styles = `
 [hidden]{display:none!important}
 ::selection{background:#d9e3f8}
 button{font-family:inherit}
-button:focus-visible,select:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+button:focus-visible,select:focus-visible,summary:focus-visible,[role="button"]:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 
 .app-shell{display:grid;grid-template-columns:236px minmax(0,1fr) 264px;min-height:100vh;transition:grid-template-columns 220ms ease}
 .app-shell.sidebar-collapsed{grid-template-columns:64px minmax(0,1fr) 264px}
@@ -874,7 +875,8 @@ export const artifactClientScript = `
     const viewButton = target.closest('[data-view]');
     if (viewButton) { setActiveView(viewButton.getAttribute('data-view'), viewButton); return; }
     const chapterButton = target.closest('.chapter-toggle');
-    if (chapterButton) { if (currentStoryLevel() <= 1) return; const chapter = chapterButton.closest('.chapter'); openChapter(chapter, !chapter.classList.contains('open')); return; }
+    // Step chips inside the toggle navigate to the Timeline; they must not also flip the chapter.
+    if (chapterButton && !target.closest('.step-chip')) { if (currentStoryLevel() <= 1) return; const chapter = chapterButton.closest('.chapter'); openChapter(chapter, !chapter.classList.contains('open')); return; }
     const askButton = target.closest('[data-question], [data-action="ask"]');
     if (askButton) { const menu = byId('selection-menu'); menu.hidden = true; delete menu.dataset.pressed; if (!selectedText) return; const question = askButton.getAttribute('data-question'); if (question) copyPrompt(selectionPrompt(question), 'Prompt copied. Paste it into ' + agentName + ' to continue.'); else copyPrompt(selectionPrompt(), 'Selection copied. Paste it into ' + agentName + ' and add your question.'); return; }
     const action = target.closest('[data-action]')?.getAttribute('data-action');
@@ -882,6 +884,8 @@ export const artifactClientScript = `
     if (action === 'copy-summary') { copyPrompt(summaryPrompt(), 'Summary prompt copied for ' + agentName + '.'); return; }
     if (action === 'settings') toast('This portable artifact has no server-backed settings.');
   });
+  // Elements that carry role=button (the chapter toggles) must react to Enter and Space like real buttons.
+  document.addEventListener('keydown', (event) => { if (event.key !== 'Enter' && event.key !== ' ') return; const target = event.target instanceof Element ? event.target.closest('[role="button"][tabindex]') : null; if (!target) return; event.preventDefault(); target.click(); });
   document.addEventListener('selectionchange', () => { const menu = byId('selection-menu'); if (document.body.dataset.selectingPointer === 'true') { if (menu.dataset.pressed !== 'true') menu.hidden = true; return; } const selection = window.getSelection(); const anchor = selection && !selection.isCollapsed ? selection.anchorNode : null; const anchorElement = anchor ? (anchor instanceof Element ? anchor : anchor.parentElement) : null; const source = anchorElement ? anchorElement.closest('.evidence, .full-diff-file') : null; const text = source ? selection.toString().trim() : ''; if (!text) { if (menu.dataset.pressed !== 'true') menu.hidden = true; return; } selectedText = text; selectedPath = source.querySelector('.evidence-path, .file-path')?.textContent?.trim() || ''; const rect = selection.getRangeAt(0).getBoundingClientRect(); menu.style.left = Math.max(8, rect.left) + 'px'; menu.style.top = Math.max(8, rect.top - 42) + 'px'; menu.hidden = false; });
   function openChapter(chapter, open) { if (!chapter) return; chapter.classList.toggle('open', open); chapter.querySelector('.chapter-detail').hidden = !open; chapter.querySelector('.chapter-toggle').setAttribute('aria-expanded', String(open)); }
   function downloadReview() { const blob = new Blob(['<!doctype html>\\n' + document.documentElement.outerHTML], { type: 'text/html' }); const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = document.title.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase() + '.html'; document.body.append(link); link.click(); link.remove(); window.setTimeout(() => URL.revokeObjectURL(link.href), 1000); }

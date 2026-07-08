@@ -222,7 +222,7 @@ describe("renderArtifact", () => {
       unclassifiedEvidenceIds: [],
     };
     const page = await renderArtifact(createReviewPresentationData(session, { id: "revision", sessionId: "session", source: "codex", status: "complete", document, createdAt: "now" }));
-    const card = page.match(/<article class="chapter" data-chapter="runner-story"><button class="chapter-toggle"[\s\S]*?<\/button>/)?.[0] ?? "";
+    const card = page.match(/<article class="chapter" data-chapter="runner-story"><div class="chapter-toggle"[\s\S]*?<div class="chapter-detail"/)?.[0] ?? "";
     expect(card).toContain('class="chapter-map-meta" aria-label="3 additions, 1 deletion, 2 files, 2 hunks"');
     expect(card).toContain('<b class="additions">+3</b><b class="deletions">−1</b>');
     expect(card).toContain("<span>2 files</span><span>2 hunks</span>");

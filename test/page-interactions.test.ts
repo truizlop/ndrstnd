@@ -137,6 +137,29 @@ it("jumps between Timeline steps and Story chapters in the portable artifact", (
   expect(document.querySelector<HTMLElement>(".chapter-detail")?.hidden).toBe(false);
 });
 
+it("toggles chapters from the keyboard and keeps step chips from flipping the chapter", () => {
+  const window = new Window();
+  const document = window.document;
+  document.body.innerHTML = `<button data-view="trailer" class="nav-item active"></button><button data-view="timeline" class="nav-item"></button><section id="trailer" class="view active"><article class="chapter" data-chapter="chapter-1"><div class="chapter-toggle" role="button" tabindex="0" aria-expanded="false"><button type="button" class="step-chip" data-story-step="step-01">step 01</button></div><div class="chapter-detail" hidden></div></article></section><section id="timeline" class="view"><button data-timeline-select="step-01" role="tab"></button><article class="timeline-state active" data-timeline-state="step-01" data-step-index="1"></article></section><div id="map" hidden></div><div class="story-zoom-controls"><div id="zoom-control"><div id="zoom-callout"><output id="zoom-label"></output><span id="zoom-description"></span></div><button data-zoom="0"></button><button data-zoom="1"></button><button data-zoom="2"></button><button data-zoom="3"></button><button data-zoom="4"></button></div></div><div id="selection-menu" hidden></div>`;
+  window.eval(`${artifactClientScript}${portableEnhancements}`);
+  document.querySelector<HTMLElement>('[data-zoom="2"]')?.click();
+  const toggle = document.querySelector<HTMLElement>(".chapter-toggle");
+  expect(document.querySelector(".chapter")?.classList.contains("open")).toBe(true);
+
+  toggle?.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+  expect(document.querySelector(".chapter")?.classList.contains("open")).toBe(false);
+  expect(toggle?.getAttribute("aria-expanded")).toBe("false");
+
+  toggle?.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+  expect(document.querySelector(".chapter")?.classList.contains("open")).toBe(true);
+  expect(toggle?.getAttribute("aria-expanded")).toBe("true");
+
+  document.querySelector<HTMLElement>(".step-chip")?.click();
+  expect(document.querySelector("#timeline")?.classList.contains("active")).toBe(true);
+  document.querySelector<HTMLElement>('[data-view="trailer"]')?.click();
+  expect(document.querySelector(".chapter")?.classList.contains("open")).toBe(true);
+});
+
 it("materializes test excerpts from their templates when zoom reaches Evidence and Raw", () => {
   const window = new Window();
   const document = window.document;
