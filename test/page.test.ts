@@ -1,17 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { renderArtifact, renderWorkspace, styles } from "../src/web/page.js";
+import { renderArtifact, styles } from "../src/web/page.js";
 import { createReviewPresentationData } from "../src/server/review-presentation.js";
 import { buildTestAnalysis } from "./fixtures/analysis-fixture.js";
 import type { StoredReviewSession } from "../src/server/store.js";
 import { frozenReviewData } from "../src/web/frozen-review-data.js";
 
-describe("renderWorkspace", () => {
+describe("renderArtifact", () => {
   it("renders the three review modes and evidence-backed data", async () => {
     const session: StoredReviewSession = {
       id: "session", repoPath: "/repo", targetRef: "agent-change", baseRef: "main", mergeBase: "abcdef123456", inputHash: "hash", createdAt: "now",
       input: { repoPath: "/repo", targetRef: "agent-change", baseRef: "main", mergeBase: "abcdef123456", files: [{ id: "file", path: "app.ts", status: "modified", binary: false, signal: "meaningful" }], hunks: [{ id: "hunk", fileId: "file", oldStart: 1, newStart: 1, lines: [{ kind: "addition", content: "trailer = true;", newLine: 1 }] }] },
     };
-    const page = await renderWorkspace(createReviewPresentationData(session, { id: "revision", sessionId: "session", source: "codex", status: "complete", document: buildTestAnalysis(session.input), createdAt: "now" }), "token");
+    const page = await renderArtifact(createReviewPresentationData(session, { id: "revision", sessionId: "session", source: "codex", status: "complete", document: buildTestAnalysis(session.input), createdAt: "now" }));
     expect(page).toContain("Story");
     expect(page).toContain("Timeline");
     expect(page).toContain("Full diff");

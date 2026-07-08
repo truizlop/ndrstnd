@@ -40,7 +40,6 @@ describe("review artifact e2e", () => {
       expect(artifact).toContain("app.test.ts");
       expect(artifact).toContain("Copy Codex prompt");
       expect(artifact).toContain("Prompt copied");
-      expect(artifact).not.toContain("const ndrstnd=");
     } finally {
       store.close();
     }

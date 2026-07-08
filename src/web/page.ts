@@ -25,16 +25,7 @@ function actionIcon(kind: "export" | "copy"): string {
   return `<svg viewBox="0 0 16 16" aria-hidden="true">${paths[kind]}</svg>`;
 }
 
-export async function renderWorkspace(data: ReviewPresentationData, launchToken: string): Promise<string> {
-  return renderPage(data, launchToken, false);
-}
-
 export async function renderArtifact(data: ReviewPresentationData): Promise<string> {
-  return renderPage(data, "", true);
-}
-
-async function renderPage(data: ReviewPresentationData, launchToken: string, artifact: boolean): Promise<string> {
-  const state = JSON.stringify({ sessionId: data.sessionId, revisionId: data.revisionId, token: launchToken }).replace(/</g, "\\u003c");
   const counts = attentionCounts(data.document);
   const filePaths = new Map(data.files.map((file) => [file.id, file.path]));
   const highlighter = await syntaxHighlighter(data.files);
@@ -42,8 +33,7 @@ async function renderPage(data: ReviewPresentationData, launchToken: string, art
   // every syntax color pair the page uses before it is emitted as CSS.
   const body = `<body data-agent="${escapeHtml(data.agentName)}"><div class="app-shell">
   <aside class="sidebar"><div class="brand"><svg class="brand-mark" viewBox="0 0 20 22" aria-hidden="true"><path d="M4.4 3.4 10 7.6l5.6-4.2"/><path d="M4.4 8.9 10 13.1l5.6-4.2"/><path class="mark-deep" d="M4.4 14.4 10 18.6l5.6-4.2"/></svg><span class="brand-name">ndrstnd</span><button class="collapse-sidebar panel-toggle" aria-label="Collapse navigation" aria-expanded="true">${panelIcon("collapse-left")}</button><button class="mobile-inspector-toggle panel-toggle" aria-label="Show review details" aria-expanded="false">${panelIcon("details")}</button></div><nav aria-label="Review views"><button class="nav-item active" data-view="trailer">${navIcon("story")}Story</button><button class="nav-item" data-view="timeline">${navIcon("timeline")}Timeline</button>${data.document.chapters.some((chapter) => chapter.kind === "test") ? `<button class="nav-item" data-view="tests">${navIcon("tests")}Test plan</button>` : ""}<button class="nav-item" data-view="diff">${navIcon("diff")}Full diff</button></nav></aside>
-  <main class="main"><header class="page-header"><div class="masthead"><p class="masthead-overline">Change review</p><h1>${escapeHtml(data.targetRef)}</h1><div class="breadcrumbs"><span>against <strong>${escapeHtml(data.baseRef)}</strong></span><span>merge base <code>${escapeHtml(data.mergeBase.slice(0, 8))}</code></span></div></div></header><div class="view-bar"><span class="view-bar-ref">${escapeHtml(data.targetRef)}</span>${artifact ? "" : `<label class="lens-label">Lens <select id="lens-select" aria-label="Review lens"><option>Loading…</option></select></label>`}<div class="story-zoom-controls"><button data-zoom-step="-1" aria-label="Decrease detail">−</button><div class="zoom" id="zoom-control" role="group" aria-label="Story detail level"><div class="zoom-callout" id="zoom-callout" aria-live="polite"><output id="zoom-label">Summary</output><span id="zoom-description">Story claims and summaries</span></div><button data-zoom="0" aria-label="Map" title="Map"></button><button data-zoom="1" aria-label="Summary" title="Summary" class="active"></button><button data-zoom="2" aria-label="Explanation" title="Explanation"></button><button data-zoom="3" aria-label="Evidence" title="Evidence"></button><button data-zoom="4" aria-label="Raw" title="Raw"></button></div><button data-zoom-step="1" aria-label="Increase detail">+</button></div></div>
-  ${artifact ? "" : `<div id="lens-notice" class="notice" hidden><span>Review lens changed. Grouping and risk signals will change.</span><button id="rerun">Re-run analysis</button></div>`}
+  <main class="main"><header class="page-header"><div class="masthead"><p class="masthead-overline">Change review</p><h1>${escapeHtml(data.targetRef)}</h1><div class="breadcrumbs"><span>against <strong>${escapeHtml(data.baseRef)}</strong></span><span>merge base <code>${escapeHtml(data.mergeBase.slice(0, 8))}</code></span></div></div></header><div class="view-bar"><span class="view-bar-ref">${escapeHtml(data.targetRef)}</span><div class="story-zoom-controls"><button data-zoom-step="-1" aria-label="Decrease detail">−</button><div class="zoom" id="zoom-control" role="group" aria-label="Story detail level"><div class="zoom-callout" id="zoom-callout" aria-live="polite"><output id="zoom-label">Summary</output><span id="zoom-description">Story claims and summaries</span></div><button data-zoom="0" aria-label="Map" title="Map"></button><button data-zoom="1" aria-label="Summary" title="Summary" class="active"></button><button data-zoom="2" aria-label="Explanation" title="Explanation"></button><button data-zoom="3" aria-label="Evidence" title="Evidence"></button><button data-zoom="4" aria-label="Raw" title="Raw"></button></div><button data-zoom-step="1" aria-label="Increase detail">+</button></div></div>
   <section id="trailer" class="view active"><p class="review-summary">${renderProse(data.document.summary)}</p><p class="coverage">${data.files.length} files · ${data.hunks.length} evidence hunks · ${data.document.chapters.length} story chapters · ${data.document.steps.length} build steps</p><div class="story-toolbar"><div id="map" class="map" hidden>${Object.entries(counts).map(([key, value]) => `<div><span class="dot ${key}"></span>${escapeHtml(key)} <strong>${value}</strong></div>`).join("")}</div><button id="collapse-all">Collapse all</button></div><div class="chapter-list">${renderChapters(data.document, data.hunks, filePaths, data.files, highlighter)}</div>${renderOtherFilesChanged(data.files, data.hunks)}${renderOmitted(data.document, data.hunks)}</section>
   <section id="timeline" class="view"><p class="section-title">Build path</p><p class="view-subtitle">A constructive reconstruction of how you would assemble this change so each step builds on what came before.</p>${renderTimeline(data.document, data.hunks, filePaths, data.files, highlighter)}</section>
   <section id="diff" class="view"><p class="section-title">Every patch hunk</p>${data.files.map((file) => renderFullDiff(file, data.hunks.filter((hunk) => hunk.fileId === file.id), highlighter)).join("")}</section>
@@ -51,7 +41,7 @@ async function renderPage(data: ReviewPresentationData, launchToken: string, art
   <footer class="colophon"><svg viewBox="0 0 20 22" aria-hidden="true"><path d="M4.4 3.4 10 7.6l5.6-4.2"/><path d="M4.4 8.9 10 13.1l5.6-4.2"/><path class="mark-deep" d="M4.4 14.4 10 18.6l5.6-4.2"/></svg><span>ndrstnd · created by Tomás Ruiz-López</span></footer>
   </main>
   <aside class="inspector" aria-label="Review details"><header class="inspector-header"><h2>At a glance</h2><button class="collapse-inspector panel-toggle" aria-label="Collapse review details" aria-expanded="true">${panelIcon("collapse-right")}</button></header><div class="inspector-content"><section><h3>This change</h3><div class="stat-row"><span>Story chapters</span><strong>${data.document.chapters.length}</strong></div><div class="stat-row"><span>Build steps</span><strong>${data.document.steps.length}</strong></div><div class="stat-row"><span>Changed files</span><strong>${data.files.length}</strong></div><div class="stat-row"><span>Evidence hunks</span><strong>${data.hunks.length}</strong></div></section><section><h3>Focus areas</h3>${Object.entries(categoryCounts(data.document)).map(([category, count]) => `<div class="stat-row stat-category"><span>${categoryIcon(category)}${escapeHtml(category)}</span><strong>${count}</strong></div>`).join("")}</section><section><h3>Actions</h3><button class="inspector-action" data-action="export">${actionIcon("export")}Export review…</button><button class="inspector-action" data-action="copy-summary" title="Copy a concise prompt for asking ${escapeHtml(data.agentName)} about this review">${actionIcon("copy")}Copy ${escapeHtml(data.agentName)} prompt</button></section></div></aside>
-</div>${renderEvidenceLibrary(data, filePaths, highlighter)}<div id="selection-menu" class="selection-menu" hidden><button data-question="Explain the selected lines.">Explain selection</button><button data-question="Trace the callers, effects, and dependencies of the selected lines.">Trace effects</button><button data-question="Why is this included in the change?">Why included?</button><button data-action="ask">Ask a question…</button></div><div id="toast" class="toast" hidden></div><script>${artifact ? artifactClientScript : `const ndrstnd=${state};${clientScript}`}${portableEnhancements}</script></body></html>`;
+</div>${renderEvidenceLibrary(data, filePaths, highlighter)}<div id="selection-menu" class="selection-menu" hidden><button data-question="Explain the selected lines.">Explain selection</button><button data-question="Trace the callers, effects, and dependencies of the selected lines.">Trace effects</button><button data-question="Why is this included in the change?">Why included?</button><button data-action="ask">Ask a question…</button></div><div id="toast" class="toast" hidden></div><script>${artifactClientScript}${portableEnhancements}</script></body></html>`;
   return `<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ndrstnd · ${escapeHtml(data.targetRef)}</title><style>${styles}${tokenStyleRules()}</style></head>
 ${body}`;
@@ -445,14 +435,8 @@ button:focus-visible,select:focus-visible,summary:focus-visible{outline:2px soli
 .view-bar.view-bar-stuck::before{opacity:1;pointer-events:auto}
 .view-bar .story-zoom-controls{position:absolute;top:-112px;right:0;pointer-events:auto;transition:top 240ms cubic-bezier(.2,.8,.2,1)}
 .view-bar.view-bar-stuck .story-zoom-controls{top:5px}
-.view-bar .lens-label{position:absolute;top:-104px;right:246px;pointer-events:auto;transition:top 240ms cubic-bezier(.2,.8,.2,1)}
-.view-bar.view-bar-stuck .lens-label{top:13px}
 .view-bar-ref{position:absolute;left:0;top:20px;max-width:40%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:600 11.5px/1.4 var(--mono);color:var(--ink-3);opacity:0;transition:opacity 200ms ease}
 .view-bar.view-bar-stuck .view-bar-ref{opacity:1}
-.lens-label{display:flex;align-items:center;gap:7px;color:var(--ink-3);font-size:12px}
-.lens-label select{border:1px solid var(--hair-2);border-radius:7px;background:var(--surface);padding:7px 10px;color:var(--ink);font:inherit;min-height:34px}
-.notice{display:flex;justify-content:space-between;align-items:center;gap:12px;background:var(--wash);border:1px solid #d7e0f4;border-radius:10px;margin-top:16px;padding:10px 12px;color:#41506e;font-size:12px}
-.notice button{border:0;background:var(--accent);color:#fff;border-radius:7px;min-height:34px;padding:7px 12px;font:600 12px var(--sans);cursor:pointer}
 
 .story-zoom-controls{position:relative;display:flex;align-items:flex-start;gap:2px;height:52px;padding-top:2px}
 .story-zoom-controls[hidden]{display:none!important}
@@ -806,10 +790,8 @@ body.story-level-0 #collapse-all,body.story-level-1 #collapse-all{display:none}
 .view-bar{position:fixed;left:12px;right:12px;top:auto;bottom:calc(10px + env(safe-area-inset-bottom));z-index:25;display:flex;flex-wrap:wrap;gap:0;height:auto;margin:0;padding:4px 10px 6px;background:var(--surface);border:1px solid var(--hair);border-radius:16px;box-shadow:var(--shadow);pointer-events:auto}
 .view-bar::before{display:none}
 .view-bar .story-zoom-controls{position:relative;top:0;right:auto}
-.view-bar .lens-label{position:static}
 .view-bar-ref{display:none}
 .view-bar.view-bar-empty{display:none}
-.lens-label{width:100%;justify-content:space-between;margin:6px 4px 2px}
 .story-zoom-controls{flex:1;width:100%;height:66px;padding-top:0}
 .zoom{flex:1;width:auto;height:46px;padding:0 6px}
 .zoom button{width:40px;height:46px}
@@ -850,8 +832,6 @@ body.story-level-0 #collapse-all,body.story-level-1 #collapse-all{display:none}
 ::selection{background:#2c3e66}
 .panel-toggle:hover{background:#262c33}
 .nav-item:hover{background:#232930}
-.notice{border-color:#2f3d5e;color:#b9c4dc}
-.notice button{color:#10131a}
 .line code{color:#c9d1d9}
 .line code .tk{color:var(--shiki-dark,currentColor)!important}
 .chapter-churn-bar .additions{background:#3f7f57}
@@ -862,55 +842,6 @@ body.story-level-0 #collapse-all,body.story-level-1 #collapse-all{display:none}
 .app-shell.mobile-inspector-open::before{background:rgba(0,0,0,.5)}
 }
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;animation:none!important}}
-`;
-
-export const clientScript = `
-(() => {
-  const state = ndrstnd;
-  const byId = (id) => document.getElementById(id);
-  const agentName = document.body.dataset.agent || 'your agent';
-  const toast = (message) => { const node = byId('toast'); node.textContent = message; node.hidden = false; window.setTimeout(() => { node.hidden = true; }, 3600); };
-  const api = async (path, init = {}) => { const separator = path.includes('?') ? '&' : '?'; const response = await fetch(path + separator + 'token=' + encodeURIComponent(state.token), init); const result = await response.json(); if (!response.ok) throw new Error(result.error || 'Request failed'); return result; };
-  let selectedText = '';
-  let selectedPath = '';
-  let selectedLens = 'default';
-  const currentStoryLevel = () => Number(document.body.dataset.storyLevel ?? 1);
-  const setActiveView = (view, viewButton) => { document.querySelectorAll('[data-view]').forEach((node) => node.classList.toggle('active', node === viewButton)); document.querySelectorAll('.view').forEach((node) => node.classList.toggle('active', node.id === view)); const zoomControls = document.querySelector('.story-zoom-controls'); if (zoomControls) zoomControls.hidden = view !== 'trailer' && view !== 'timeline' && view !== 'tests'; };
-
-  document.addEventListener('click', async (event) => {
-    const target = event.target instanceof Element ? event.target : null;
-    if (!target) return;
-    const viewButton = target.closest('[data-view]');
-    if (viewButton) { setActiveView(viewButton.getAttribute('data-view'), viewButton); return; }
-    const zoomButton = target.closest('[data-zoom]');
-    if (zoomButton) { const zoom = Number(zoomButton.getAttribute('data-zoom')); document.querySelectorAll('[data-zoom]').forEach((node) => node.classList.toggle('active', node === zoomButton)); byId('map').hidden = zoom !== 0; if (zoom >= 3) document.querySelectorAll('.chapter').forEach((node) => openChapter(node, true)); try { await api('/api/preferences', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ zoom }) }); } catch {} return; }
-    const chapterButton = target.closest('.chapter-toggle');
-    if (chapterButton) { if (currentStoryLevel() <= 1) return; const chapter = chapterButton.closest('.chapter'); openChapter(chapter, !chapter.classList.contains('open')); return; }
-    const rerun = target.closest('#rerun');
-    if (rerun) { toast('Rebuilding the review narrative…'); try { await api('/api/session/' + state.sessionId + '/reanalyze', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ lensId: selectedLens }) }); window.location.reload(); } catch (error) { toast(error.message); } return; }
-    const questionButton = target.closest('[data-question], [data-action="ask"]');
-    if (questionButton) { const menu = byId('selection-menu'); delete menu.dataset.pressed; const question = questionButton.getAttribute('data-question') || window.prompt('What would you like to understand about these lines?'); if (question && selectedText) await submitQuestion(question); else menu.hidden = true; return; }
-    const action = target.closest('[data-action]')?.getAttribute('data-action');
-    if (action === 'export') { downloadReview(); toast('Review exported as an HTML file.'); return; }
-    if (action === 'copy-summary') { copyPrompt(summaryPrompt(), 'Summary prompt copied for ' + agentName + '.'); return; }
-    if (action === 'settings') { toast('Lens and zoom preferences are saved locally.'); }
-  });
-
-  byId('lens-select').addEventListener('change', (event) => { selectedLens = event.target.value; byId('lens-notice').hidden = false; });
-  document.addEventListener('selectionchange', () => { const menu = byId('selection-menu'); if (document.body.dataset.selectingPointer === 'true') { if (menu.dataset.pressed !== 'true') menu.hidden = true; return; } const selection = window.getSelection(); const anchor = selection && !selection.isCollapsed ? selection.anchorNode : null; const anchorElement = anchor ? (anchor instanceof Element ? anchor : anchor.parentElement) : null; const source = anchorElement ? anchorElement.closest('.evidence, .full-diff-file') : null; const text = source ? selection.toString().trim() : ''; if (!text) { if (menu.dataset.pressed !== 'true') menu.hidden = true; return; } selectedText = text; selectedPath = source.querySelector('.evidence-path, .file-path')?.textContent?.trim() || ''; const rect = selection.getRangeAt(0).getBoundingClientRect(); menu.style.left = Math.max(8, rect.left) + 'px'; menu.style.top = Math.max(8, rect.top - 42) + 'px'; menu.hidden = false; });
-  async function submitQuestion(question) { byId('selection-menu').hidden = true; toast('Grounding an answer in the selected evidence…'); try { await api('/api/revision/' + state.revisionId + '/questions', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ selection: selectedText, question }) }); await loadQuestions(); toast('Added an evidence-grounded note.'); } catch (error) { toast(error.message); } }
-  function openChapter(chapter, open) { if (!chapter) return; chapter.classList.toggle('open', open); chapter.querySelector('.chapter-detail').hidden = !open; chapter.querySelector('.chapter-toggle').setAttribute('aria-expanded', String(open)); }
-  function downloadReview() { const blob = new Blob(['<!doctype html>\\n' + document.documentElement.outerHTML], { type: 'text/html' }); const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = document.title.replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase() + '.html'; document.body.append(link); link.click(); link.remove(); window.setTimeout(() => URL.revokeObjectURL(link.href), 1000); }
-  function copyPrompt(text, successMessage) { const write = navigator.clipboard?.writeText?.(text); if (write && typeof write.then === 'function') { write.then(() => toast(successMessage)).catch(() => showManualCopy(text)); return; } showManualCopy(text); }
-  function showManualCopy(text) { window.prompt('Copy this prompt for ' + agentName + ':', text); toast('Copy prompt shown for ' + agentName + '.'); }
-  function summaryPrompt() { const story = document.querySelector('#trailer')?.innerText?.trim() || document.querySelector('.main')?.innerText?.trim() || document.title; return 'Use this ndrstnd review summary to help me understand the implementation, decisions, risks, and tests.\\n\\n' + story; }
-  async function loadLenses() { try { const lenses = await api('/api/lenses'); const select = byId('lens-select'); select.innerHTML = lenses.map((lens) => '<option value="' + escapeAttribute(lens.id) + '">' + escapeText(lens.name) + '</option>').join(''); select.value = lenses.some((lens) => lens.id === selectedLens) ? selectedLens : (lenses[0]?.id || 'default'); selectedLens = select.value; } catch (error) { toast('Could not load review lenses.'); } }
-  async function loadQuestions() { try { const cards = await api('/api/revision/' + state.revisionId + '/questions'); const container = byId('question-cards'); container.className = ''; container.innerHTML = cards.length ? cards.map((card) => '<article class="question"><strong>' + escapeText(card.question) + '</strong><br>' + escapeText(card.answer || 'Thinking…') + '<small>' + provenance(card.provenance) + '</small></article>').join('') : 'No notes yet.'; } catch {} }
-  const escapeText = (value) => String(value).replace(/[&<>"']/g, (char) => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' })[char]);
-  const escapeAttribute = escapeText;
-  const provenance = (value) => value === 'general' ? 'General explanation; not repository-specific' : value === 'conversation' ? 'Based on supplied conversation' : value === 'both' ? 'Based on branch and conversation' : 'Based on branch and repository';
-  loadLenses(); loadQuestions(); api('/api/preferences').then((preferences) => { const zoom = Number(preferences.zoom); const button = document.querySelector('[data-zoom="' + zoom + '"]'); if (button) button.click(); }).catch(() => {});
-})();
 `;
 
 export const artifactClientScript = `
