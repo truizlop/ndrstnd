@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import type { CollectedReviewInput } from "../src/server/git.js";
-import { ReviewStore } from "../src/server/store.js";
+import { ReviewStore, selectReusableRevision, type AnalysisRevision } from "../src/server/store.js";
 import { buildTestAnalysis } from "./fixtures/analysis-fixture.js";
 
 describe("ReviewStore", () => {
@@ -42,6 +42,19 @@ describe("ReviewStore", () => {
 
     expect(store.listRevisions(session.id).map((revision) => revision.id)).toEqual([good.id]);
     store.close();
+  });
+
+  it("only reuses complete revisions produced by the requested agent", () => {
+    const base = { id: "r", sessionId: "s", document: buildTestAnalysis(sampleInput()), createdAt: "2026-07-08T00:00:00.000Z" };
+    const revisions: AnalysisRevision[] = [
+      { ...base, id: "codex-partial", source: "codex", status: "partial" },
+      { ...base, id: "claude-complete", source: "claude", status: "complete" },
+      { ...base, id: "codex-complete", source: "codex", status: "complete" },
+    ];
+
+    expect(selectReusableRevision(revisions, "codex")?.id).toBe("codex-complete");
+    expect(selectReusableRevision(revisions, "claude")?.id).toBe("claude-complete");
+    expect(selectReusableRevision(revisions.slice(0, 1), "codex")).toBeUndefined();
   });
 
   it("persists and reuses an unchanged review input", async () => {

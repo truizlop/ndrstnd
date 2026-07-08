@@ -1,16 +1,16 @@
 #!/usr/bin/env node
 import { spawn } from "node:child_process";
-import { readFile } from "node:fs/promises";
+import { readFile, realpath } from "node:fs/promises";
 import process from "node:process";
 import { resolveReviewAgent, reviewAgents, type ReviewAgent, type ReviewAgentId, type TurnActivity } from "./agent.js";
 import { analyzeWithAgent, formatAnalysisHeartbeat, type AnalysisProgress } from "./analyze.js";
 import { importConversation } from "./conversation.js";
 import { GitReader, describeReviewScope, ensureArtifactDirectoryIgnored } from "./git.js";
-import { ReviewStore, isAgentRevision } from "./store.js";
+import { ReviewStore, selectReusableRevision } from "./store.js";
 import { installSkill, installedSkillIsStale } from "./skill.js";
 import { writeReviewArtifact } from "./artifact.js";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 
 const [command, ...args] = process.argv.slice(2);
 
@@ -99,7 +99,7 @@ async function runAgentLogin(agent: ReviewAgent): Promise<void> {
 function parseReviewArgs(args: string[]): { targetRef?: string; values: Map<string, string>; flags: Set<string> } {
   // Defined here because the top-level command dispatch runs before module-level consts initialize.
   const valueOptions = ["--base", "--repo", "--conversation", "--agent"];
-  const booleanOptions = ["--uncommitted", "--no-open"];
+  const booleanOptions = ["--uncommitted", "--no-open", "--fresh"];
   const values = new Map<string, string>();
   const flags = new Set<string>();
   let targetRef: string | undefined;
@@ -131,47 +131,74 @@ async function runReview(args: string[]): Promise<void> {
   if (uncommitted && targetArg !== undefined) fail("--uncommitted reviews the checked-out branch; do not pass a branch.");
   const targetRef = targetArg ?? "WORKTREE";
   const noOpen = flags.has("--no-open");
-  const repoPath = values.get("--repo") ?? process.cwd();
+  const repoPath = await canonicalRepoPath(values.get("--repo"));
   const baseRef = uncommitted ? "HEAD" : explicitBase;
   const agent = await resolveReviewAgent(values.get("--agent")).catch((error: unknown) => fail(error instanceof Error ? error.message : String(error)));
   const conversationPath = values.get("--conversation");
-  const conversation = conversationPath === undefined ? undefined : await importConversation(conversationPath);
-  await ensureArtifactDirectoryIgnored(repoPath);
-  const input = await new GitReader().collectReviewInput(repoPath, targetRef, baseRef);
-  const meaningfulFiles = input.files.filter((file) => file.signal === "meaningful").length;
-  const scope = await describeReviewScope(repoPath, input);
-  process.stdout.write(`Reviewing ${scope.targetLabel} against ${input.baseRef}${input.includesWorkingTree ? ", including uncommitted changes" : ""}: ${input.files.length} changed file${input.files.length === 1 ? "" : "s"} (${meaningfulFiles} meaningful).\n`);
-  if (baseRef === undefined && input.includesWorkingTree && scope.localCommitsIncluded > 0) {
-    process.stdout.write(`Warning: the inferred base ${input.baseRef} is ${scope.localCommitsIncluded} commit${scope.localCommitsIncluded === 1 ? "" : "s"} behind ${scope.targetLabel}, so those commits are included. Pass --base to narrow the review, or --uncommitted for only uncommitted changes.\n`);
-  }
-  if (await installedSkillIsStale()) {
-    process.stdout.write("The installed ndrstnd skill is older than this version; run `ndrstnd skill install --force` to refresh it.\n");
-  }
   const store = openReviewStore();
-  const session = store.getOrCreateSession(input, conversation);
-  let revision = store.listRevisions(session.id).find(isAgentRevision);
-  if (revision === undefined) {
-    const auth = await agent.getAuthStatus();
-    if (auth.state === "signed-out") fail(`${agent.name} is not signed in, so ndrstnd cannot analyze this change. Run \`ndrstnd auth login --agent ${agent.id}\` first.`);
-    if (auth.state === "unreachable") fail(`${agent.name} could not be reached, so ndrstnd cannot analyze this change: ${auth.reason}`);
-    process.stdout.write(`Drafting the review narrative with ${agent.name}… This takes minutes on large branches; a heartbeat line prints every 15 seconds while the analysis is alive.\n`);
-    const heartbeat = startAnalysisHeartbeat(agent);
-    try {
-      const document = await analyzeWithAgent(agent, input, conversation, heartbeat.progress);
-      revision = store.createRevision(session.id, agent.id, "complete", document);
-    } catch (error) {
-      store.close();
-      fail(`${agent.name} analysis failed, so no review artifact was written: ${error instanceof Error ? error.message : String(error)} Nothing was persisted; re-run the same ndrstnd review command to retry.`);
-    } finally {
-      heartbeat.stop();
+  try {
+    const conversation = conversationPath === undefined ? undefined : await importConversation(conversationPath);
+    await ensureArtifactDirectoryIgnored(repoPath);
+    const input = await new GitReader().collectReviewInput(repoPath, targetRef, baseRef);
+    const meaningfulFiles = input.files.filter((file) => file.signal === "meaningful").length;
+    const scope = await describeReviewScope(repoPath, input);
+    process.stdout.write(`Reviewing ${scope.targetLabel} against ${input.baseRef}${input.includesWorkingTree ? ", including uncommitted changes" : ""}: ${input.files.length} changed file${input.files.length === 1 ? "" : "s"} (${meaningfulFiles} meaningful).\n`);
+    if (baseRef === undefined && input.includesWorkingTree && scope.localCommitsIncluded > 0) {
+      process.stdout.write(`Warning: the inferred base ${input.baseRef} is ${scope.localCommitsIncluded} commit${scope.localCommitsIncluded === 1 ? "" : "s"} behind ${scope.targetLabel}, so those commits are included. Pass --base to narrow the review, or --uncommitted for only uncommitted changes.\n`);
     }
+    if (await installedSkillIsStale()) {
+      process.stdout.write("The installed ndrstnd skill is older than this version; run `ndrstnd skill install --force` to refresh it.\n");
+    }
+    const session = store.getOrCreateSession(input, conversation);
+    let revision = flags.has("--fresh") ? undefined : selectReusableRevision(store.listRevisions(session.id), agent.id);
+    if (revision !== undefined) {
+      process.stdout.write(`Reusing the ${agent.name} analysis cached ${formatRevisionAge(revision.createdAt)}; pass --fresh to re-analyze.\n`);
+    }
+    if (revision === undefined) {
+      const auth = await agent.getAuthStatus();
+      if (auth.state === "signed-out") throw new Error(`${agent.name} is not signed in, so ndrstnd cannot analyze this change. Run \`ndrstnd auth login --agent ${agent.id}\` first.`);
+      if (auth.state === "unreachable") throw new Error(`${agent.name} could not be reached, so ndrstnd cannot analyze this change: ${auth.reason}`);
+      process.stdout.write(`Drafting the review narrative with ${agent.name}… This takes minutes on large branches; a heartbeat line prints every 15 seconds while the analysis is alive.\n`);
+      const heartbeat = startAnalysisHeartbeat(agent);
+      try {
+        const document = await analyzeWithAgent(agent, input, conversation, heartbeat.progress);
+        revision = store.createRevision(session.id, agent.id, "complete", document);
+      } catch (error) {
+        throw new Error(`${agent.name} analysis failed, so no review artifact was written: ${error instanceof Error ? error.message : String(error)} Nothing was persisted; re-run the same ndrstnd review command to retry.`);
+      } finally {
+        heartbeat.stop();
+      }
+    }
+    process.stdout.write(`merge-base=${input.mergeBase.slice(0, 12)} files=${input.files.length} meaningful-files=${meaningfulFiles} hunks=${input.hunks.length}${conversation === undefined ? "" : ` conversation=${conversation.messages.length}`}\n`);
+    const artifactPath = await writeReviewArtifact(session, revision, { directory: join(repoPath, ".ndrstnd") });
+    process.stdout.write(`ndrstnd artifact: ${artifactPath}\n`);
+    process.stdout.write("This self-contained file is in the Git-ignored .ndrstnd directory; delete it when the review is done.\n");
+    if (!noOpen) openBrowser(pathToFileURL(artifactPath).href);
+  } catch (error) {
+    // fail() exits the process immediately, so the store must close first rather than in a finally.
+    store.close();
+    fail(error instanceof Error ? error.message : String(error));
   }
-  process.stdout.write(`merge-base=${input.mergeBase.slice(0, 12)} files=${input.files.length} meaningful-files=${meaningfulFiles} hunks=${input.hunks.length}${conversation === undefined ? "" : ` conversation=${conversation.messages.length}`}\n`);
-  const artifactPath = await writeReviewArtifact(session, revision, { directory: join(repoPath, ".ndrstnd") });
-  process.stdout.write(`ndrstnd artifact: ${artifactPath}\n`);
-  process.stdout.write("This self-contained file is in the Git-ignored .ndrstnd directory; delete it when the review is done.\n");
-  if (!noOpen) openBrowser(pathToFileURL(artifactPath).href);
   store.close();
+}
+
+/** Resolving and de-symlinking the repository path keeps session identity independent of how the path was spelled. */
+async function canonicalRepoPath(repoArgument: string | undefined): Promise<string> {
+  const requested = resolve(repoArgument ?? process.cwd());
+  try {
+    return await realpath(requested);
+  } catch {
+    fail(`The repository path ${requested} does not exist.`);
+  }
+}
+
+function formatRevisionAge(createdAt: string, now = Date.now()): string {
+  const minutes = Math.max(0, Math.round((now - Date.parse(createdAt)) / 60_000));
+  if (minutes < 60) return `${minutes} minute${minutes === 1 ? "" : "s"} ago`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 48) return `${hours} hour${hours === 1 ? "" : "s"} ago`;
+  const days = Math.round(hours / 24);
+  return `${days} day${days === 1 ? "" : "s"} ago`;
 }
 
 /** Prints liveness lines while the agent analyzes so a caller (human or agent) never mistakes a long turn for a hang. */
@@ -219,7 +246,7 @@ function openBrowser(url: string): void {
 }
 
 function printHelp(): void {
-  process.stdout.write(`ndrstnd: understand agent-produced branch changes\n\nUsage:\n  ndrstnd auth <status|login> [--agent <codex|claude>]\n  ndrstnd skill install [--force] [--agent <codex|claude>]\n  ndrstnd review [branch] [--base <branch>] [--uncommitted] [--repo <path>] [--conversation <path>] [--agent <codex|claude>] [--no-open]\n  ndrstnd --version\n\nWithout a branch, ndrstnd reviews the checked-out branch including uncommitted changes.\n--uncommitted reviews only the uncommitted working-tree changes (an alias for --base HEAD).\n--agent picks the analysis agent; without it ndrstnd uses NDRSTND_AGENT, then the Codex or Claude Code session it runs inside, then the first installed CLI, preferring Codex.\n`);
+  process.stdout.write(`ndrstnd: understand agent-produced branch changes\n\nUsage:\n  ndrstnd auth <status|login> [--agent <codex|claude>]\n  ndrstnd skill install [--force] [--agent <codex|claude>]\n  ndrstnd review [branch] [--base <branch>] [--uncommitted] [--repo <path>] [--conversation <path>] [--agent <codex|claude>] [--fresh] [--no-open]\n  ndrstnd --version\n\nWithout a branch, ndrstnd reviews the checked-out branch including uncommitted changes.\n--uncommitted reviews only the uncommitted working-tree changes (an alias for --base HEAD).\n--agent picks the analysis agent; without it ndrstnd uses NDRSTND_AGENT, then the Codex or Claude Code session it runs inside, then the first installed CLI, preferring Codex.\n--fresh re-analyzes even when a cached analysis exists for the same input.\n`);
 }
 
 function fail(message: string): never {

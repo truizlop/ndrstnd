@@ -34,6 +34,11 @@ export function isAgentRevision(revision: AnalysisRevision): boolean {
   return revision.source !== "fallback";
 }
 
+/** A cached revision may only stand in for a new analysis when the requested agent produced it and it completed. */
+export function selectReusableRevision(revisions: readonly AnalysisRevision[], agentId: string): AnalysisRevision | undefined {
+  return revisions.find((revision) => revision.source === agentId && revision.status === "complete");
+}
+
 export class ReviewStore {
   private readonly database: Database.Database;
 
