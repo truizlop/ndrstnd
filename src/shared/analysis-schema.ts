@@ -53,3 +53,6 @@ export const AnalysisDocumentSchema = z.object({
 });
 
 export type AnalysisDocument = z.infer<typeof AnalysisDocumentSchema>;
+
+/** Bump on any incompatible change to AnalysisDocument so cached revisions from older versions are re-analyzed instead of rendered broken. */
+export const ANALYSIS_DOCUMENT_VERSION = 1;

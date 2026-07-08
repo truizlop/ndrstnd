@@ -4,7 +4,7 @@ import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 import Database from "better-sqlite3";
 import type { ConversationContext } from "./conversation.js";
-import type { AnalysisDocument } from "../shared/analysis-schema.js";
+import { ANALYSIS_DOCUMENT_VERSION, AnalysisDocumentSchema, type AnalysisDocument } from "../shared/analysis-schema.js";
 import type { CollectedReviewInput } from "./git.js";
 
 export interface StoredReviewSession {
@@ -65,13 +65,14 @@ export class ReviewStore {
     if (!columns.some((column) => column.name === "conversation_json")) {
       this.database.exec("ALTER TABLE review_session ADD COLUMN conversation_json TEXT");
     }
+    const revisionColumns = this.database.prepare("PRAGMA table_info(analysis_revision)").all() as Array<{ name: string }>;
+    if (!revisionColumns.some((column) => column.name === "document_version")) {
+      this.database.exec("ALTER TABLE analysis_revision ADD COLUMN document_version INTEGER");
+    }
   }
 
   getOrCreateSession(input: CollectedReviewInput, conversation?: ConversationContext): StoredReviewSession {
     const inputHash = hashInput(input, conversation);
-    const existing = this.database.prepare("SELECT * FROM review_session WHERE input_hash = ?").get(inputHash) as SessionRow | undefined;
-    if (existing !== undefined) return deserialize(existing);
-
     const session: StoredReviewSession = {
       id: randomUUID(),
       repoPath: input.repoPath,
@@ -83,11 +84,14 @@ export class ReviewStore {
       conversation,
       createdAt: new Date().toISOString(),
     };
+    // Insert-then-select keeps concurrent reviews of the same input from racing a separate existence check into a UNIQUE violation.
     this.database.prepare(`
       INSERT INTO review_session (id, repo_path, target_ref, base_ref, merge_base, input_hash, input_json, conversation_json, created_at)
       VALUES (@id, @repoPath, @targetRef, @baseRef, @mergeBase, @inputHash, @inputJson, @conversationJson, @createdAt)
+      ON CONFLICT(input_hash) DO NOTHING
     `).run({ ...session, inputJson: JSON.stringify(input), conversationJson: conversation === undefined ? null : JSON.stringify(conversation) });
-    return session;
+    const row = this.database.prepare("SELECT * FROM review_session WHERE input_hash = ?").get(inputHash) as SessionRow;
+    return deserialize(row);
   }
 
   getSession(id: string): StoredReviewSession | undefined {
@@ -98,15 +102,21 @@ export class ReviewStore {
   createRevision(sessionId: string, source: AnalysisRevision["source"], status: AnalysisRevision["status"], document: AnalysisDocument): AnalysisRevision {
     const revision: AnalysisRevision = { id: randomUUID(), sessionId, source, status, document, createdAt: new Date().toISOString() };
     this.database.prepare(`
-      INSERT INTO analysis_revision (id, session_id, status, source, document_json, created_at)
-      VALUES (@id, @sessionId, @status, @source, @documentJson, @createdAt)
-    `).run({ ...revision, documentJson: JSON.stringify(document) });
+      INSERT INTO analysis_revision (id, session_id, status, source, document_json, document_version, created_at)
+      VALUES (@id, @sessionId, @status, @source, @documentJson, @documentVersion, @createdAt)
+    `).run({ ...revision, documentJson: JSON.stringify(document), documentVersion: ANALYSIS_DOCUMENT_VERSION });
     return revision;
   }
 
+  /** Rows written for another document version, or whose stored document no longer validates, read as absent so the caller re-analyzes instead of rendering a broken artifact. */
   listRevisions(sessionId: string): AnalysisRevision[] {
     const rows = this.database.prepare("SELECT * FROM analysis_revision WHERE session_id = ? ORDER BY created_at DESC").all(sessionId) as RevisionRow[];
-    return rows.map((row) => ({ id: row.id, sessionId: row.session_id, status: row.status as AnalysisRevision["status"], source: row.source as AnalysisRevision["source"], document: JSON.parse(row.document_json) as AnalysisDocument, createdAt: row.created_at }));
+    return rows.flatMap((row) => {
+      if (row.document_version !== null && row.document_version !== ANALYSIS_DOCUMENT_VERSION) return [];
+      const document = parseStoredDocument(row.document_json);
+      if (document === undefined) return [];
+      return [{ id: row.id, sessionId: row.session_id, status: row.status as AnalysisRevision["status"], source: row.source as AnalysisRevision["source"], document, createdAt: row.created_at }];
+    });
   }
 
   close(): void {
@@ -120,7 +130,17 @@ interface RevisionRow {
   status: string;
   source: string;
   document_json: string;
+  document_version: number | null;
   created_at: string;
+}
+
+function parseStoredDocument(documentJson: string): AnalysisDocument | undefined {
+  try {
+    const parsed = AnalysisDocumentSchema.safeParse(JSON.parse(documentJson));
+    return parsed.success ? parsed.data : undefined;
+  } catch {
+    return undefined;
+  }
 }
 interface SessionRow {
   id: string;

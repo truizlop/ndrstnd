@@ -13,6 +13,37 @@ describe("ReviewStore", () => {
     if (directory !== undefined) await rm(directory, { recursive: true, force: true });
   });
 
+  it("converges concurrent connections on one session per input", async () => {
+    directory = await mkdtemp(join(tmpdir(), "ndrstnd-store-"));
+    const databasePath = join(directory, "state.sqlite");
+    const first = new ReviewStore(databasePath);
+    const second = new ReviewStore(databasePath);
+
+    const sessionA = first.getOrCreateSession(sampleInput());
+    const sessionB = second.getOrCreateSession(sampleInput());
+
+    expect(sessionB.id).toBe(sessionA.id);
+    first.close();
+    second.close();
+  });
+
+  it("treats cached documents that no longer validate or belong to another version as absent", async () => {
+    directory = await mkdtemp(join(tmpdir(), "ndrstnd-store-"));
+    const databasePath = join(directory, "state.sqlite");
+    const store = new ReviewStore(databasePath);
+    const session = store.getOrCreateSession(sampleInput());
+    const good = store.createRevision(session.id, "codex", "complete", buildTestAnalysis(sampleInput()));
+
+    const database = (store as unknown as { database: import("better-sqlite3").Database }).database;
+    database.prepare("INSERT INTO analysis_revision (id, session_id, status, source, document_json, document_version, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)")
+      .run("corrupt", session.id, "complete", "codex", "{\"summary\":\"not a full document\"}", null, "2099-01-01T00:00:00.000Z");
+    database.prepare("INSERT INTO analysis_revision (id, session_id, status, source, document_json, document_version, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)")
+      .run("future", session.id, "complete", "codex", JSON.stringify(buildTestAnalysis(sampleInput())), 99, "2099-01-02T00:00:00.000Z");
+
+    expect(store.listRevisions(session.id).map((revision) => revision.id)).toEqual([good.id]);
+    store.close();
+  });
+
   it("persists and reuses an unchanged review input", async () => {
     directory = await mkdtemp(join(tmpdir(), "ndrstnd-store-"));
     const databasePath = join(directory, "state.sqlite");
