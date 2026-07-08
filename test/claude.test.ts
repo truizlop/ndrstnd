@@ -1,7 +1,7 @@
 import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
 import { describe, expect, it } from "vitest";
-import { ClaudeCodeClient, describeClaudeEvent, getClaudeAuthStatus } from "../src/server/claude.js";
+import { ClaudeCodeClient, describeClaudeEvent, getClaudeAuthStatus, runClaudeCommand } from "../src/server/claude.js";
 import type { TurnActivity } from "../src/server/agent.js";
 
 describe("getClaudeAuthStatus", () => {
@@ -56,6 +56,13 @@ async function runSingleTurn(client: ClaudeCodeClient, prompt: string): Promise<
     await thread.close();
   }
 }
+
+describe("runClaudeCommand", () => {
+  it("times out a command that never answers instead of hanging the review", async () => {
+    await expect(runClaudeCommand(["-e", "setTimeout(() => {}, 5000)"], { timeoutMs: 50, command: process.execPath }))
+      .rejects.toThrow(/did not answer within 0s/);
+  });
+});
 
 describe("ClaudeCodeClient", () => {
   it("reports labelled turn activity, returns the result text, and resumes the session for repair turns", async () => {

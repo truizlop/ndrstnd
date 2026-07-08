@@ -45,7 +45,7 @@ export class CodexAppServerClient implements AgentClient {
   private readonly notificationListeners = new Set<(method: string, params: Record<string, unknown>) => void>();
   private readonly failureListeners = new Set<(error: Error) => void>();
 
-  constructor(private readonly inactivityTimeoutMs = 300_000) {}
+  constructor(private readonly inactivityTimeoutMs = 300_000, private readonly requestTimeoutMs = 60_000) {}
 
   async request(method: string, params: Record<string, unknown>): Promise<unknown> {
     await this.start();
@@ -163,7 +163,22 @@ export class CodexAppServerClient implements AgentClient {
   private sendRequest(method: string, params: Record<string, unknown>): Promise<unknown> {
     const id = this.nextId++;
     return new Promise((resolve, reject) => {
-      this.pending.set(id, { resolve, reject });
+      // Turn progress is tracked by the notification inactivity timer; this bounds the request/response handshakes themselves, which are otherwise unbounded.
+      const timeout = setTimeout(() => {
+        this.pending.delete(id);
+        reject(new Error(`Codex app-server did not answer ${method} within ${Math.round(this.requestTimeoutMs / 1_000)}s.${this.stderrHint()}`));
+      }, this.requestTimeoutMs);
+      timeout.unref();
+      this.pending.set(id, {
+        resolve: (value) => {
+          clearTimeout(timeout);
+          resolve(value);
+        },
+        reject: (reason) => {
+          clearTimeout(timeout);
+          reject(reason);
+        },
+      });
       this.write({ id, method, params });
     });
   }

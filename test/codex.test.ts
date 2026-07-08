@@ -129,6 +129,15 @@ describe("CodexAppServerClient", () => {
     client.close();
   });
 
+  it("times out a request the app-server never answers", async () => {
+    const client = new CodexAppServerClient(300_000, 20);
+    const child = new FakeCodexProcess();
+    (client as unknown as { spawnCodex: () => FakeCodexProcess }).spawnCodex = () => child;
+
+    await expect(client.request("account/read", {})).rejects.toThrow(/did not answer initialize within 0s/);
+    client.close();
+  });
+
   it("times out on inactivity with progress diagnostics and the stderr tail", async () => {
     const client = new CodexAppServerClient(20);
     const internal = stubbedClient(client, () => {

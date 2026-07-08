@@ -176,9 +176,24 @@ export class ClaudeCodeClient implements AgentClient {
   }
 }
 
-function runClaudeCommand(args: string[]): Promise<{ stdout: string; stderr: string; exitCode: number | null }> {
+/** The command override lets tests exercise the timeout without a real claude binary. */
+export function runClaudeCommand(args: string[], options: { timeoutMs?: number; command?: string } = {}): Promise<{ stdout: string; stderr: string; exitCode: number | null }> {
+  const timeoutMs = options.timeoutMs ?? 60_000;
   return new Promise((resolve, reject) => {
-    const child = spawn("claude", args, { stdio: ["ignore", "pipe", "pipe"] });
+    const child = spawn(options.command ?? "claude", args, { stdio: ["ignore", "pipe", "pipe"] });
+    let settled = false;
+    const timeout = setTimeout(() => {
+      settled = true;
+      child.kill();
+      reject(new Error(`claude ${args.join(" ")} did not answer within ${Math.round(timeoutMs / 1_000)}s.`));
+    }, timeoutMs);
+    timeout.unref();
+    const settle = (outcome: () => void) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      outcome();
+    };
     let stdout = "";
     let stderr = "";
     child.stdout.on("data", (chunk: Buffer) => {
@@ -187,8 +202,8 @@ function runClaudeCommand(args: string[]): Promise<{ stdout: string; stderr: str
     child.stderr.on("data", (chunk: Buffer) => {
       stderr = `${stderr}${chunk.toString("utf8")}`.slice(-4_000);
     });
-    child.once("error", (error) => reject(new Error(`Claude Code could not run: ${error.message}`)));
-    child.once("close", (exitCode) => resolve({ stdout, stderr, exitCode }));
+    child.once("error", (error) => settle(() => reject(new Error(`Claude Code could not run: ${error.message}`))));
+    child.once("close", (exitCode) => settle(() => resolve({ stdout, stderr, exitCode })));
   });
 }
 
