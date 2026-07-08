@@ -371,12 +371,38 @@ function diffRange(input: CollectedReviewInput): string {
 }
 
 export function extractJson(text: string): string {
-  // Agents sometimes narrate around the document; accept a fenced block anywhere,
-  // then fall back to the outermost braces before giving up on the raw text.
-  const fenced = /```(?:json)?\s*([\s\S]*?)```/.exec(text);
-  const candidate = (fenced?.[1] ?? text).trim();
-  if (candidate.startsWith("{")) return candidate;
-  const start = candidate.indexOf("{");
-  const end = candidate.lastIndexOf("}");
-  return start !== -1 && end > start ? candidate.slice(start, end + 1).trim() : candidate;
+  // Agents sometimes narrate around the document, including other fenced snippets;
+  // take the first fence that holds an object, then fall back to the first balanced
+  // object in the raw text before giving up.
+  for (const match of text.matchAll(/```(?:json)?\s*([\s\S]*?)```/g)) {
+    const block = (match[1] ?? "").trim();
+    if (block.startsWith("{")) return balancedJsonObject(block) ?? block;
+  }
+  const start = text.indexOf("{");
+  if (start === -1) return text.trim();
+  const candidate = text.slice(start);
+  return balancedJsonObject(candidate) ?? candidate.trim();
+}
+
+/** Cuts the candidate at the brace closing its leading object, ignoring braces inside JSON strings, so trailing narration never corrupts the parse. */
+function balancedJsonObject(candidate: string): string | undefined {
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  for (let index = 0; index < candidate.length; index += 1) {
+    const character = candidate[index];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (character === "\\") escaped = true;
+      else if (character === "\"") inString = false;
+      continue;
+    }
+    if (character === "\"") inString = true;
+    else if (character === "{") depth += 1;
+    else if (character === "}") {
+      depth -= 1;
+      if (depth === 0) return candidate.slice(0, index + 1);
+    }
+  }
+  return undefined;
 }

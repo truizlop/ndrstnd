@@ -382,6 +382,9 @@ describe("analysis documents", () => {
     expect(extractJson('I will inspect the repo first.\n\n```json\n{"s":"ok"}\n```\nDone.')).toBe('{"s":"ok"}');
     expect(extractJson('I inspected the branch and here is the document: {"s":"ok"} - let me know.')).toBe('{"s":"ok"}');
     expect(extractJson("no json here")).toBe("no json here");
+    expect(extractJson('First run:\n```sh\nnpm test\n```\nThen the document:\n```json\n{"s":"ok"}\n```')).toBe('{"s":"ok"}');
+    expect(extractJson('{"s":"ok"} Hope that helps! {"note":"not the document"}')).toBe('{"s":"ok"}');
+    expect(extractJson('```json\n{"s":"a } brace and \\" quote inside"}\n```\ntrailing notes')).toBe('{"s":"a } brace and \\" quote inside"}');
   });
 
   it("reports every shallow field in one validation error", () => {
