@@ -6,7 +6,6 @@ import { resolveReviewAgent, reviewAgents, type ReviewAgent, type ReviewAgentId,
 import { analyzeWithAgent, formatAnalysisHeartbeat, type AnalysisProgress } from "./analyze.js";
 import { importConversation } from "./conversation.js";
 import { GitReader, describeReviewScope } from "./git.js";
-import { startReviewServer } from "./http.js";
 import { ReviewStore, isAgentRevision } from "./store.js";
 import { installSkill, installedSkillIsStale } from "./skill.js";
 import { writeReviewArtifact } from "./artifact.js";
@@ -100,7 +99,7 @@ async function runAgentLogin(agent: ReviewAgent): Promise<void> {
 function parseReviewArgs(args: string[]): { targetRef?: string; values: Map<string, string>; flags: Set<string> } {
   // Defined here because the top-level command dispatch runs before module-level consts initialize.
   const valueOptions = ["--base", "--repo", "--conversation", "--lens", "--agent"];
-  const booleanOptions = ["--uncommitted", "--live", "--no-open"];
+  const booleanOptions = ["--uncommitted", "--no-open"];
   const values = new Map<string, string>();
   const flags = new Set<string>();
   let targetRef: string | undefined;
@@ -127,7 +126,6 @@ function parseReviewArgs(args: string[]): { targetRef?: string; values: Map<stri
 async function runReview(args: string[]): Promise<void> {
   const { targetRef: targetArg, values, flags } = parseReviewArgs(args);
   const uncommitted = flags.has("--uncommitted");
-  const live = flags.has("--live");
   const explicitBase = values.get("--base");
   if (uncommitted && explicitBase !== undefined) fail("--uncommitted already reviews against HEAD; do not combine it with --base.");
   if (uncommitted && targetArg !== undefined) fail("--uncommitted reviews the checked-out branch; do not pass a branch.");
@@ -171,19 +169,6 @@ async function runReview(args: string[]): Promise<void> {
     }
   }
   process.stdout.write(`merge-base=${input.mergeBase.slice(0, 12)} files=${input.files.length} meaningful-files=${meaningfulFiles} hunks=${input.hunks.length}${conversation === undefined ? "" : ` conversation=${conversation.messages.length}`}\n`);
-  if (live) {
-    const server = await startReviewServer({ session, revision, store, agent });
-    process.stdout.write(`ndrstnd live workspace: ${server.url}\n`);
-    process.stdout.write("Lens re-analysis and evidence-grounded questions stay available while this process runs. Press Ctrl+C to stop.\n");
-    if (!noOpen) openBrowser(server.url);
-    await new Promise<void>((resolve) => {
-      process.once("SIGINT", resolve);
-      process.once("SIGTERM", resolve);
-    });
-    await server.close();
-    store.close();
-    return;
-  }
   const artifactPath = await writeReviewArtifact(session, revision, { directory: join(repoPath, ".ndrstnd") });
   process.stdout.write(`ndrstnd artifact: ${artifactPath}\n`);
   process.stdout.write("This self-contained file is in the Git-ignored .ndrstnd directory; delete it when the review is done.\n");
@@ -236,7 +221,7 @@ function openBrowser(url: string): void {
 }
 
 function printHelp(): void {
-  process.stdout.write(`ndrstnd: understand agent-produced branch changes\n\nUsage:\n  ndrstnd auth <status|login> [--agent <codex|claude>]\n  ndrstnd skill install [--force] [--agent <codex|claude>]\n  ndrstnd review [branch] [--base <branch>] [--uncommitted] [--live] [--repo <path>] [--conversation <path>] [--lens <id>] [--agent <codex|claude>] [--no-open]\n  ndrstnd --version\n\nWithout a branch, ndrstnd reviews the checked-out branch including uncommitted changes.\n--uncommitted reviews only the uncommitted working-tree changes (an alias for --base HEAD).\n--live serves an interactive workspace with lens re-analysis and evidence-grounded questions instead of writing the portable artifact.\n--agent picks the analysis agent; without it ndrstnd uses NDRSTND_AGENT, then the Codex or Claude Code session it runs inside, then the first installed CLI, preferring Codex.\n`);
+  process.stdout.write(`ndrstnd: understand agent-produced branch changes\n\nUsage:\n  ndrstnd auth <status|login> [--agent <codex|claude>]\n  ndrstnd skill install [--force] [--agent <codex|claude>]\n  ndrstnd review [branch] [--base <branch>] [--uncommitted] [--repo <path>] [--conversation <path>] [--lens <id>] [--agent <codex|claude>] [--no-open]\n  ndrstnd --version\n\nWithout a branch, ndrstnd reviews the checked-out branch including uncommitted changes.\n--uncommitted reviews only the uncommitted working-tree changes (an alias for --base HEAD).\n--agent picks the analysis agent; without it ndrstnd uses NDRSTND_AGENT, then the Codex or Claude Code session it runs inside, then the first installed CLI, preferring Codex.\n`);
 }
 
 function fail(message: string): never {

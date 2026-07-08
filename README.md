@@ -33,7 +33,7 @@ Pick the invocation so the diff equals exactly the work being reviewed:
 
 Without a branch, ndrstnd reviews the checked-out branch including staged, unstaged, and untracked changes. When an inferred base would pull extra local commits into the review, ndrstnd warns before analyzing.
 
-Add `--conversation path/to/ndrstnd-conversation-v1.json` to ground the narrative in the dialogue that produced the branch: motives, rejected alternatives, constraints, and any observed test runs feed the Story and the Test plan. Add `--live` to serve an interactive workspace with lens re-analysis and evidence-grounded questions instead of writing the portable artifact.
+Add `--conversation path/to/ndrstnd-conversation-v1.json` to ground the narrative in the dialogue that produced the branch: motives, rejected alternatives, constraints, and any observed test runs feed the Story and the Test plan.
 
 ## Scope
 
