@@ -268,7 +268,14 @@ function parseWireAnalysisDocument(value: unknown): AnalysisDocument {
   const full = AnalysisDocumentSchema.safeParse(value);
   if (full.success) return full.data;
 
-  const compact = CompactAnalysisDocumentSchema.parse(value);
+  const compactResult = CompactAnalysisDocumentSchema.safeParse(value);
+  if (!compactResult.success) {
+    // Repair turns quote this message; reporting the schema the document was aiming for keeps those turns productive.
+    const fullShaped = value !== null && typeof value === "object" && ("summary" in value || "chapters" in value);
+    const [shape, error] = fullShaped ? ["full", full.error] as const : ["compact", compactResult.error] as const;
+    throw new Error(`Analysis document did not match the ${shape} shape: ${error.issues.slice(0, 8).map((issue) => `${issue.path.join(".") || "document"}: ${issue.message}`).join("; ")}`);
+  }
+  const compact = compactResult.data;
   return AnalysisDocumentSchema.parse({
     summary: compact.s,
     chapters: compact.c.map((chapter) => ({

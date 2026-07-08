@@ -81,6 +81,25 @@ describe("analysis documents", () => {
     }, input).steps).toEqual([sourceStep]);
   });
 
+  it("reports the matching shape's validation error for a near-valid full document", () => {
+    let message = "";
+    try {
+      parseAnalysisDocument({
+        summary: validSummary,
+        chapters: [{ id: "one", title: "Runner behavior", kind: "behavior", synopsis: validSynopsis, confidence: "high", attention: "medium", riskCategories: ["behavior"], evidenceIds: ["source-hunk"] }],
+        steps: [sourceStep],
+        omittedGroups: [{ title: "Low-signal changes", reason: "Lockfile evidence is grouped.", evidenceIds: ["lock-hunk"] }],
+        unclassifiedEvidenceIds: [],
+      }, input);
+    } catch (error) {
+      message = error instanceof Error ? error.message : String(error);
+    }
+
+    expect(message).toContain("full shape");
+    expect(message).toContain("chapters.0.attention");
+    expect(message).not.toContain("s: Required");
+  });
+
   it("rejects shallow one-line prose with a self-fixing word range", () => {
     expect(() => parseAnalysisDocument({
       summary: validSummary,
