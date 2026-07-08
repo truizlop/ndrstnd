@@ -9,6 +9,7 @@ import { GitReader, describeReviewScope, ensureArtifactDirectoryIgnored } from "
 import { ReviewStore, selectReusableRevision } from "./store.js";
 import { installSkill, installedSkillIsStale } from "./skill.js";
 import { writeReviewArtifact } from "./artifact.js";
+import { browserOpenCommand } from "./cli-support.js";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { dirname, join, resolve } from "node:path";
 
@@ -242,9 +243,12 @@ function openReviewStore(): ReviewStore {
 }
 
 function openBrowser(url: string): void {
-  const command = process.platform === "darwin" ? "open" : process.platform === "win32" ? "cmd" : "xdg-open";
-  const args = process.platform === "win32" ? ["/c", "start", "", url] : [url];
+  const { command, args } = browserOpenCommand(url, process.platform);
   const child = spawn(command, args, { detached: true, stdio: "ignore" });
+  // A machine without an opener (headless Linux) must not turn a finished review into a crash.
+  child.once("error", (error) => {
+    process.stdout.write(`Could not open a browser automatically (${error.message}); open the artifact path above manually.\n`);
+  });
   child.unref();
 }
 

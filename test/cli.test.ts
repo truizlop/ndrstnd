@@ -3,6 +3,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { promisify } from "node:util";
 import { describe, expect, it } from "vitest";
+import { browserOpenCommand } from "../src/server/cli-support.js";
 
 const run = promisify(execFile);
 const projectRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
@@ -16,6 +17,17 @@ async function runCli(args: string[]): Promise<{ stdout: string; stderr: string;
     return { stdout: failed.stdout ?? "", stderr: failed.stderr ?? "", code: failed.code ?? 1 };
   }
 }
+
+describe("browserOpenCommand", () => {
+  it("escapes cmd.exe metacharacters in the opened URL on Windows", () => {
+    expect(browserOpenCommand("file:///C:/repos/a&b/(x)|y.html", "win32")).toEqual({
+      command: "cmd",
+      args: ["/c", "start", "", "file:///C:/repos/a^&b/^(x^)^|y.html"],
+    });
+    expect(browserOpenCommand("file:///tmp/review.html", "darwin")).toEqual({ command: "open", args: ["file:///tmp/review.html"] });
+    expect(browserOpenCommand("file:///tmp/review.html", "linux")).toEqual({ command: "xdg-open", args: ["file:///tmp/review.html"] });
+  });
+});
 
 describe("ndrstnd CLI", () => {
   it("prints help and exits cleanly without arguments", async () => {
