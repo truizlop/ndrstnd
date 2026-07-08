@@ -98,7 +98,7 @@ async function runAgentLogin(agent: ReviewAgent): Promise<void> {
 /** A typo in a scope flag must fail loudly; silently ignoring it would review the wrong changes. */
 function parseReviewArgs(args: string[]): { targetRef?: string; values: Map<string, string>; flags: Set<string> } {
   // Defined here because the top-level command dispatch runs before module-level consts initialize.
-  const valueOptions = ["--base", "--repo", "--conversation", "--lens", "--agent"];
+  const valueOptions = ["--base", "--repo", "--conversation", "--agent"];
   const booleanOptions = ["--uncommitted", "--no-open"];
   const values = new Map<string, string>();
   const flags = new Set<string>();
@@ -133,7 +133,6 @@ async function runReview(args: string[]): Promise<void> {
   const noOpen = flags.has("--no-open");
   const repoPath = values.get("--repo") ?? process.cwd();
   const baseRef = uncommitted ? "HEAD" : explicitBase;
-  const lensId = values.get("--lens") ?? "default";
   const agent = await resolveReviewAgent(values.get("--agent")).catch((error: unknown) => fail(error instanceof Error ? error.message : String(error)));
   const conversationPath = values.get("--conversation");
   const conversation = conversationPath === undefined ? undefined : await importConversation(conversationPath);
@@ -148,8 +147,6 @@ async function runReview(args: string[]): Promise<void> {
     process.stdout.write("The installed ndrstnd skill is older than this version; run `ndrstnd skill install --force` to refresh it.\n");
   }
   const store = openReviewStore();
-  const lens = store.getLens(lensId);
-  if (lens === undefined) fail(`Unknown review lens: ${lensId}`);
   const session = store.getOrCreateSession(input, conversation);
   let revision = store.listRevisions(session.id).find(isAgentRevision);
   if (revision === undefined) {
@@ -159,7 +156,7 @@ async function runReview(args: string[]): Promise<void> {
     process.stdout.write(`Drafting the review narrative with ${agent.name}… This takes minutes on large branches; a heartbeat line prints every 15 seconds while the analysis is alive.\n`);
     const heartbeat = startAnalysisHeartbeat(agent);
     try {
-      const document = await analyzeWithAgent(agent, input, conversation, heartbeat.progress, lens.instructions);
+      const document = await analyzeWithAgent(agent, input, conversation, heartbeat.progress);
       revision = store.createRevision(session.id, agent.id, "complete", document);
     } catch (error) {
       store.close();
@@ -221,7 +218,7 @@ function openBrowser(url: string): void {
 }
 
 function printHelp(): void {
-  process.stdout.write(`ndrstnd: understand agent-produced branch changes\n\nUsage:\n  ndrstnd auth <status|login> [--agent <codex|claude>]\n  ndrstnd skill install [--force] [--agent <codex|claude>]\n  ndrstnd review [branch] [--base <branch>] [--uncommitted] [--repo <path>] [--conversation <path>] [--lens <id>] [--agent <codex|claude>] [--no-open]\n  ndrstnd --version\n\nWithout a branch, ndrstnd reviews the checked-out branch including uncommitted changes.\n--uncommitted reviews only the uncommitted working-tree changes (an alias for --base HEAD).\n--agent picks the analysis agent; without it ndrstnd uses NDRSTND_AGENT, then the Codex or Claude Code session it runs inside, then the first installed CLI, preferring Codex.\n`);
+  process.stdout.write(`ndrstnd: understand agent-produced branch changes\n\nUsage:\n  ndrstnd auth <status|login> [--agent <codex|claude>]\n  ndrstnd skill install [--force] [--agent <codex|claude>]\n  ndrstnd review [branch] [--base <branch>] [--uncommitted] [--repo <path>] [--conversation <path>] [--agent <codex|claude>] [--no-open]\n  ndrstnd --version\n\nWithout a branch, ndrstnd reviews the checked-out branch including uncommitted changes.\n--uncommitted reviews only the uncommitted working-tree changes (an alias for --base HEAD).\n--agent picks the analysis agent; without it ndrstnd uses NDRSTND_AGENT, then the Codex or Claude Code session it runs inside, then the first installed CLI, preferring Codex.\n`);
 }
 
 function fail(message: string): never {

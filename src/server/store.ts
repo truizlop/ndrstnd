@@ -34,8 +34,6 @@ export function isAgentRevision(revision: AnalysisRevision): boolean {
   return revision.source !== "fallback";
 }
 
-export interface ReviewLens { id: string; name: string; instructions: string; builtIn: boolean; }
-
 export class ReviewStore {
   private readonly database: Database.Database;
 
@@ -62,14 +60,11 @@ export class ReviewStore {
         document_json TEXT NOT NULL,
         created_at TEXT NOT NULL
       );
-      CREATE TABLE IF NOT EXISTS analysis_lens (id TEXT PRIMARY KEY, name TEXT NOT NULL, instructions TEXT NOT NULL, built_in INTEGER NOT NULL);
     `);
     const columns = this.database.prepare("PRAGMA table_info(review_session)").all() as Array<{ name: string }>;
     if (!columns.some((column) => column.name === "conversation_json")) {
       this.database.exec("ALTER TABLE review_session ADD COLUMN conversation_json TEXT");
     }
-    const insertLens = this.database.prepare("INSERT OR IGNORE INTO analysis_lens (id, name, instructions, built_in) VALUES (?, ?, ?, 1)");
-    for (const lens of builtInLenses) insertLens.run(lens.id, lens.name, lens.instructions);
   }
 
   getOrCreateSession(input: CollectedReviewInput, conversation?: ConversationContext): StoredReviewSession {
@@ -114,11 +109,6 @@ export class ReviewStore {
     return rows.map((row) => ({ id: row.id, sessionId: row.session_id, status: row.status as AnalysisRevision["status"], source: row.source as AnalysisRevision["source"], document: JSON.parse(row.document_json) as AnalysisDocument, createdAt: row.created_at }));
   }
 
-  getLens(id: string): ReviewLens | undefined {
-    const row = this.database.prepare("SELECT * FROM analysis_lens WHERE id = ?").get(id) as LensRow | undefined;
-    return row === undefined ? undefined : { id: row.id, name: row.name, instructions: row.instructions, builtIn: row.built_in === 1 };
-  }
-
   close(): void {
     this.database.close();
   }
@@ -132,8 +122,6 @@ interface RevisionRow {
   document_json: string;
   created_at: string;
 }
-interface LensRow { id: string; name: string; instructions: string; built_in: number; }
-
 interface SessionRow {
   id: string;
   repo_path: string;
@@ -163,15 +151,6 @@ function deserialize(row: SessionRow): StoredReviewSession {
 function hashInput(input: CollectedReviewInput, conversation?: ConversationContext): string {
   return createHash("sha256").update(JSON.stringify({ input, conversation })).digest("hex");
 }
-
-const builtInLenses: ReviewLens[] = [
-  { id: "default", name: "Default", instructions: "Prioritize the implementation story and behavior changes.", builtIn: true },
-  { id: "security", name: "Security", instructions: "Elevate trust boundaries, authorization, secrets, and input validation.", builtIn: true },
-  { id: "performance", name: "Performance", instructions: "Elevate hot paths, allocations, data volume, and concurrency.", builtIn: true },
-  { id: "api", name: "API compatibility", instructions: "Elevate public contracts, schema changes, and callers.", builtIn: true },
-  { id: "migrations", name: "Data migrations", instructions: "Elevate persistence, migration, and backward compatibility effects.", builtIn: true },
-  { id: "tests", name: "Test coverage", instructions: "Elevate behavior that needs demonstrable test coverage.", builtIn: true },
-];
 
 function defaultDatabasePath(): string {
   if (process.env.NDRSTND_DATA_DIR !== undefined) return join(process.env.NDRSTND_DATA_DIR, "ndrstnd.sqlite");

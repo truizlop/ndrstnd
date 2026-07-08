@@ -12,8 +12,8 @@ export interface AnalysisProgress {
   onRepair?: (attempt: number, attempts: number, problem: string) => void;
 }
 
-export async function analyzeWithAgent(agent: ReviewAgent, input: CollectedReviewInput, conversation?: ConversationContext, progress?: AnalysisProgress, lensInstructions?: string) {
-  const prompt = analysisPrompt(input, conversation, lensInstructions);
+export async function analyzeWithAgent(agent: ReviewAgent, input: CollectedReviewInput, conversation?: ConversationContext, progress?: AnalysisProgress) {
+  const prompt = analysisPrompt(input, conversation);
   return withFreshClientRetry(agent, async (client) => {
     const thread = await client.startTextThread(input.repoPath);
     try {

@@ -23,7 +23,6 @@ describe("ReviewStore", () => {
     expect(second.id).toBe(first.id);
     const revision = store.createRevision(first.id, "codex", "complete", buildTestAnalysis(sampleInput()));
     expect(store.listRevisions(first.id)).toMatchObject([{ id: revision.id, source: "codex" }]);
-    expect(store.getLens("security")).toMatchObject({ id: "security", builtIn: true });
     store.close();
 
     const reopened = new ReviewStore(databasePath);
