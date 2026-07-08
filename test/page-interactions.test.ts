@@ -24,6 +24,7 @@ it("changes the portable Story surface at every zoom level with staged expansion
     expect(document.querySelector<HTMLElement>("#zoom-callout")?.dataset.edge).toBe(level === 0 ? "start" : level === 4 ? "end" : "");
     expect(document.querySelector<HTMLElement>(`[data-zoom="${level}"]`)?.getAttribute("aria-pressed")).toBe("true");
     expect(document.querySelector(".chapter")?.classList.contains("open")).toBe(expanded);
+    expect(document.querySelector(".chapter-toggle")?.getAttribute("aria-expanded")).toBe(String(expanded));
     expect(document.querySelector<HTMLElement>("#map")?.hidden).toBe(level !== 0);
   }
 
