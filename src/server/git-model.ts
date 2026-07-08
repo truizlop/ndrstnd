@@ -22,7 +22,7 @@ export function parseNameStatus(output: string): ChangedFile[] {
 }
 
 export function parsePatch(patch: string, files: readonly ChangedFile[]): ParsedPatch {
-  const filesByPath = new Map(files.map((file) => [file.path, file]));
+  const filesByHeader = mapFilesByHeaderLine(files);
   const hunks: DiffHunk[] = [];
   const binaryFileIds = new Set<string>();
   let currentFile: ChangedFile | undefined;
@@ -38,8 +38,7 @@ export function parsePatch(patch: string, files: readonly ChangedFile[]): Parsed
   for (const line of patch.split("\n")) {
     if (line.startsWith("diff --git ")) {
       finishHunk();
-      const match = /^diff --git a\/(.+) b\/(.+)$/.exec(line);
-      currentFile = match === null ? undefined : filesByPath.get(match[2]);
+      currentFile = filesByHeader.get(line);
       continue;
     }
     if (currentFile === undefined) continue;
@@ -98,4 +97,55 @@ export function statusFor(code: string): ChangedFile["status"] {
 
 export function stableId(value: string): string {
   return createHash("sha256").update(value).digest("hex").slice(0, 16);
+}
+
+/**
+ * Git prints each `diff --git` header side raw or C-quoted depending on the path and core.quotePath,
+ * and a raw path may itself contain ` b/`, so header lines cannot be split reliably. Matching whole
+ * header lines precomputed from the known files sidesteps both ambiguities.
+ */
+function mapFilesByHeaderLine(files: readonly ChangedFile[]): Map<string, ChangedFile> {
+  const byHeader = new Map<string, ChangedFile>();
+  for (const file of files) {
+    for (const oldSide of headerSideForms(`a/${file.previousPath ?? file.path}`)) {
+      for (const newSide of headerSideForms(`b/${file.path}`)) {
+        byHeader.set(`diff --git ${oldSide} ${newSide}`, file);
+      }
+    }
+  }
+  return byHeader;
+}
+
+function headerSideForms(side: string): Set<string> {
+  return new Set([side, cQuote(side, true), cQuote(side, false)]);
+}
+
+const C_QUOTE_ESCAPES = new Map<number, string>([
+  [0x07, "\\a"], [0x08, "\\b"], [0x09, "\\t"], [0x0a, "\\n"], [0x0b, "\\v"], [0x0c, "\\f"], [0x0d, "\\r"], [0x22, "\\\""], [0x5c, "\\\\"],
+]);
+
+function cQuote(side: string, quoteNonAscii: boolean): string {
+  let quoted = "";
+  let needsQuoting = false;
+  for (const character of side) {
+    const code = character.codePointAt(0) ?? 0;
+    const escape = C_QUOTE_ESCAPES.get(code);
+    if (escape !== undefined) {
+      quoted += escape;
+      needsQuoting = true;
+    } else if (code < 0x20 || code === 0x7f) {
+      quoted += octalEscape(code);
+      needsQuoting = true;
+    } else if (code > 0x7f && quoteNonAscii) {
+      for (const byte of Buffer.from(character, "utf8")) quoted += octalEscape(byte);
+      needsQuoting = true;
+    } else {
+      quoted += character;
+    }
+  }
+  return needsQuoting ? `"${quoted}"` : side;
+}
+
+function octalEscape(byte: number): string {
+  return `\\${byte.toString(8).padStart(3, "0")}`;
 }

@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { promisify } from "node:util";
@@ -85,6 +85,32 @@ describe("GitReader", () => {
     expect(input.hunks.flatMap((hunk) => hunk.lines)).toContainEqual(expect.objectContaining({ kind: "addition", content: "export const version = 3;" }));
     expect(input.hunks.flatMap((hunk) => hunk.lines)).toContainEqual(expect.objectContaining({ kind: "addition", content: "export const staged = true;" }));
     expect(input.hunks.flatMap((hunk) => hunk.lines)).toContainEqual(expect.objectContaining({ kind: "addition", content: "export const untracked = true;" }));
+  });
+
+  it("keeps hunks for files whose names require quoted diff headers", async () => {
+    repository = await mkdtemp(join(tmpdir(), "ndrstnd-git-"));
+    await git(repository, ["init", "-b", "main"]);
+    await git(repository, ["config", "user.email", "ndrstnd@example.test"]);
+    await git(repository, ["config", "user.name", "ndrstnd Test"]);
+    await writeFile(join(repository, "base.txt"), "base\n");
+    await git(repository, ["add", "."]);
+    await git(repository, ["commit", "-m", "base"]);
+    await git(repository, ["switch", "-c", "agent-change"]);
+    await writeFile(join(repository, "café.txt"), "committed unicode\n");
+    await mkdir(join(repository, "a b"));
+    await writeFile(join(repository, "a b", "c.txt"), "committed spaced\n");
+    await git(repository, ["add", "."]);
+    await git(repository, ["commit", "-m", "special names"]);
+    await writeFile(join(repository, "naïve.txt"), "untracked unicode\n");
+
+    const input = await new GitReader().collectReviewInput(repository, "agent-change", "main");
+
+    const byPath = new Map(input.files.map((file) => [file.path, file]));
+    expect(byPath.get("café.txt")).toMatchObject({ binary: false, signal: "meaningful" });
+    expect(byPath.get("a b/c.txt")).toMatchObject({ binary: false, signal: "meaningful" });
+    expect(byPath.get("naïve.txt")).toMatchObject({ binary: false, signal: "meaningful" });
+    const additions = input.hunks.flatMap((hunk) => hunk.lines).filter((line) => line.kind === "addition").map((line) => line.content);
+    expect(additions).toEqual(expect.arrayContaining(["committed unicode", "committed spaced", "untracked unicode"]));
   });
 
   it("infers the checked-out branch base for a worktree review", async () => {

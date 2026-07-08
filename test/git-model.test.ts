@@ -44,6 +44,37 @@ describe("git model", () => {
     expect(files[1]?.binary).toBe(false);
   });
 
+  it("attributes hunks through C-quoted, spaced, and rename diff headers", () => {
+    const files: ChangedFile[] = [
+      { id: "unicode", path: "café.txt", status: "added", binary: false, signal: "meaningful" },
+      { id: "spaced", path: "a b/c.txt", status: "modified", binary: false, signal: "meaningful" },
+      { id: "quoted", path: "qu\"ote.txt", status: "added", binary: false, signal: "meaningful" },
+      { id: "renamed", path: "cafe2.txt", previousPath: "café.txt", status: "renamed", binary: false, signal: "meaningful" },
+      { id: "plain-unicode", path: "naïve.txt", status: "added", binary: false, signal: "meaningful" },
+    ];
+    const parsed = parsePatch([
+      "diff --git \"a/caf\\303\\251.txt\" \"b/caf\\303\\251.txt\"",
+      "@@ -0,0 +1 @@",
+      "+unicode",
+      "diff --git a/a b/c.txt b/a b/c.txt",
+      "@@ -1 +1 @@",
+      "-before",
+      "+after",
+      "diff --git \"a/qu\\\"ote.txt\" \"b/qu\\\"ote.txt\"",
+      "@@ -0,0 +1 @@",
+      "+quote",
+      "diff --git \"a/caf\\303\\251.txt\" b/cafe2.txt",
+      "@@ -1 +1 @@",
+      "-old",
+      "+new",
+      "diff --git a/naïve.txt b/naïve.txt",
+      "@@ -0,0 +1 @@",
+      "+plain",
+    ].join("\n"), files);
+
+    expect(parsed.hunks.map((hunk) => hunk.fileId)).toEqual(["unicode", "spaced", "quoted", "renamed", "plain-unicode"]);
+  });
+
   it("creates untracked file records without duplicating known paths", () => {
     const known: ChangedFile[] = [{ id: "known", path: "known.ts", status: "modified", binary: false, signal: "meaningful" }];
 
