@@ -3,6 +3,7 @@
 # This repository doubles as a Homebrew tap, so users install with:
 #
 #   brew tap truizlop/ndrstnd https://github.com/truizlop/ndrstnd
+#   brew trust truizlop/ndrstnd
 #   brew install ndrstnd
 #
 # Cutting a release (tags are unprefixed, e.g. 0.1.0):

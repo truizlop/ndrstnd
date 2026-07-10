@@ -486,7 +486,7 @@ h2.display{margin:0 0 14px;font:600 clamp(28px,4.4vw,42px)/1.15 var(--serif);let
     <div class="cta-row reveal" style="--d:180ms">
       <a class="btn btn-primary" href="#install">Install ndrstnd</a>
       <a class="btn btn-ghost" href="https://github.com/truizlop/ndrstnd" rel="noopener">View on GitHub</a>
-      <span class="hero-chip"><span class="ps1">$</span>brew install ndrstnd<span class="soon">Soon</span><button class="copy-btn" data-copy="brew install ndrstnd" aria-label="Copy Homebrew command"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5.4" y="5.4" width="7.8" height="8.6" rx="1.6"/><path d="M2.8 10.6V4.2a1.4 1.4 0 0 1 1.4-1.4h5.4"/></svg></button></span>
+      <span class="hero-chip"><span class="ps1">$</span>brew install ndrstnd<button class="copy-btn" data-copy="brew install ndrstnd" aria-label="Copy Homebrew command"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5.4" y="5.4" width="7.8" height="8.6" rx="1.6"/><path d="M2.8 10.6V4.2a1.4 1.4 0 0 1 1.4-1.4h5.4"/></svg></button></span>
     </div>
     <ul class="hero-meta reveal" style="--d:240ms">
       <li>Runs entirely on your machine</li>
@@ -855,15 +855,16 @@ h2.display{margin:0 0 14px;font:600 clamp(28px,4.4vw,42px)/1.15 var(--serif);let
       <div class="agent-switch" role="group" aria-label="Show the example for"><button class="active" data-agent="codex" type="button">Codex</button><button data-agent="claude" type="button">Claude Code</button></div>
     </div>
     <h2 class="display reveal" style="--d:60ms">Four commands to your first story.</h2>
-    <p class="lede reveal" style="--d:120ms">ndrstnd is being prepared for Homebrew. The tap and formula already live in the repository, so the moment the first release is tagged, this is the whole setup:</p>
+    <p class="lede reveal" style="--d:120ms">The repository doubles as a Homebrew tap, so the whole setup is:</p>
     <div class="steps">
       <div class="step reveal">
         <span class="step-n">1</span>
         <div>
-          <h3>Install the CLI <span class="soon">Soon</span></h3>
-          <p>The repository doubles as a Homebrew tap.</p>
+          <h3>Install the CLI</h3>
+          <p>The repository doubles as a Homebrew tap; the trust step is Homebrew's confirmation for third-party taps.</p>
           <div class="codeblock"><pre><span class="ps1">$ </span>brew tap truizlop/ndrstnd https://github.com/truizlop/ndrstnd
-<span class="ps1">$ </span>brew install ndrstnd</pre><button class="copy-btn" data-copy="brew tap truizlop/ndrstnd https://github.com/truizlop/ndrstnd&#10;brew install ndrstnd" aria-label="Copy Homebrew install commands"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5.4" y="5.4" width="7.8" height="8.6" rx="1.6"/><path d="M2.8 10.6V4.2a1.4 1.4 0 0 1 1.4-1.4h5.4"/></svg></button></div>
+<span class="ps1">$ </span>brew trust truizlop/ndrstnd
+<span class="ps1">$ </span>brew install ndrstnd</pre><button class="copy-btn" data-copy="brew tap truizlop/ndrstnd https://github.com/truizlop/ndrstnd&#10;brew trust truizlop/ndrstnd&#10;brew install ndrstnd" aria-label="Copy Homebrew install commands"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5.4" y="5.4" width="7.8" height="8.6" rx="1.6"/><path d="M2.8 10.6V4.2a1.4 1.4 0 0 1 1.4-1.4h5.4"/></svg></button></div>
         </div>
       </div>
       <div class="step reveal" style="--d:60ms">
