@@ -1,4 +1,8 @@
+![ndrstnd: your agent shipped 3,000 lines overnight. Read them like a story.](header.png)
+
 # ndrstnd
+
+[![Landing page](https://img.shields.io/badge/ndrstnd-landing%20page-2757cf)](https://truizlop.github.io/ndrstnd/)
 
 ndrstnd is a local comprehension workspace for large, agent-produced branch changes. It turns a branch diff into an evidence-linked Story, Timeline, Test plan, and Full diff instead of asking a reviewer to start in alphabetical path order.
 
