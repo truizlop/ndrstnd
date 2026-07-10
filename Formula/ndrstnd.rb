@@ -21,6 +21,26 @@ class Ndrstnd < Formula
 
   depends_on "node"
 
+  def caveats
+    data_dir = OS.mac? ? "~/Library/Application Support/ndrstnd" : "$XDG_DATA_HOME/ndrstnd (default ~/.local/share/ndrstnd)"
+    <<~EOS
+      ndrstnd analyzes with an installed Codex or Claude Code CLI and uses its
+      authenticated session; it never stores a token itself.
+
+      ndrstnd stores local state under:
+        #{data_dir}/ndrstnd.sqlite
+      Review artifacts are written to the reviewed repository's Git-ignored
+      .ndrstnd/ directory; delete them when the review is done.
+
+      Quick start:
+        ndrstnd auth status
+        ndrstnd skill install
+        ndrstnd review feature/my-change --base main
+
+      Every command accepts --agent codex or --agent claude.
+    EOS
+  end
+
   def install
     # Dev dependencies are needed for the TypeScript build; the second
     # install packs the built package (dist/ plus skill assets) into libexec.
