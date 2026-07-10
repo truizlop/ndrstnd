@@ -32,8 +32,10 @@ Pick the invocation so the diff equals exactly the work being reviewed:
 
     ndrstnd review feature/my-change --base main       # committed work on a feature branch
     ndrstnd review --uncommitted                       # only uncommitted working-tree changes
-    ndrstnd review --base $(git merge-base main HEAD)  # commits since branching plus uncommitted changes
+    ndrstnd review --base main                         # commits since branching plus uncommitted changes
     ndrstnd review --base empty                        # a repository with no useful base
+
+Reviews always compare against the merge-base with the given base, so commits that landed on the base branch after the fork point never enter the review. Re-running an unchanged review reuses the cached analysis and says so; pass `--fresh` to analyze again.
 
 Without a branch, ndrstnd reviews the checked-out branch including staged, unstaged, and untracked changes. When an inferred base would pull extra local commits into the review, ndrstnd warns before analyzing.
 

@@ -11,7 +11,7 @@ Use ndrstnd whenever a human needs an intelligible story of a set of changes: af
 2. Pick the invocation so the diff equals exactly that work:
    - Committed work on a feature branch: `ndrstnd review <branch> --base <default-branch>`.
    - Only uncommitted changes on the checked-out branch: `ndrstnd review --uncommitted`.
-   - Commits since branching plus uncommitted changes: `ndrstnd review --base $(git merge-base <default-branch> HEAD)`.
+   - Commits since branching plus uncommitted changes: `ndrstnd review --base <default-branch>` (reviews always diff from the merge-base, so upstream commits after the fork point stay out).
    - First delivery in a history with no useful base: `ndrstnd review --base empty`.
    Never rely on an inferred base when the local default branch may be ahead of or behind origin; ndrstnd warns when an inferred base pulls extra local commits into the review, and that warning means the base must be corrected.
 3. Verify the scope cheaply before analyzing: `git diff --stat <base>...<target>` (or against the working tree) must list only files that belong to the handoff. Unrelated files mean a wrong base or stray dirty edits; fix that first, because the analysis takes minutes.
