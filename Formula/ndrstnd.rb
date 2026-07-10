@@ -15,7 +15,7 @@ class Ndrstnd < Formula
   desc "Comprehension workspace for large, agent-produced branch changes"
   homepage "https://truizlop.github.io/ndrstnd/"
   url "https://github.com/truizlop/ndrstnd/archive/refs/tags/0.1.0.tar.gz"
-  sha256 "REPLACE_WITH_RELEASE_TARBALL_SHA256"
+  sha256 "70349e11802aacd17231e62ade492b5745a038545247d986436a746547a28706"
   license "Apache-2.0"
   head "https://github.com/truizlop/ndrstnd.git", branch: "main"
 
