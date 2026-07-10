@@ -1,4 +1,5 @@
 import { EventEmitter } from "node:events";
+import { readFile } from "node:fs/promises";
 import { PassThrough } from "node:stream";
 import { describe, expect, it, vi } from "vitest";
 import { CodexAppServerClient, describeThreadNotification, getCodexAuthStatus, type TurnActivity } from "../src/server/codex.js";
@@ -123,10 +124,29 @@ describe("CodexAppServerClient", () => {
     (client as unknown as { spawnCodex: () => FakeCodexProcess }).spawnCodex = () => child;
 
     const request = client.request("account/read", {});
-    queueMicrotask(() => child.stdin.emit("error", new Error("write EPIPE")));
+    // Break the pipe on the first write so the handshake request is pending when the error fires.
+    child.stdin.once("data", () => child.stdin.emit("error", new Error("write EPIPE")));
 
     await expect(request).rejects.toThrow("Codex app-server stopped accepting input: write EPIPE");
     client.close();
+  });
+
+  it("reports the packaged version in the app-server handshake", async () => {
+    const client = new CodexAppServerClient();
+    const child = new FakeCodexProcess();
+    (client as unknown as { spawnCodex: () => FakeCodexProcess }).spawnCodex = () => child;
+    const written: string[] = [];
+    child.stdin.on("data", (chunk: Buffer) => written.push(chunk.toString("utf8")));
+
+    const request = client.request("account/read", {});
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    client.close();
+    await expect(request).rejects.toThrow("closed");
+
+    const manifest = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8")) as { version: string };
+    const initialize = JSON.parse(written.join("").split("\n")[0]) as { method: string; params: { clientInfo: { version: string } } };
+    expect(initialize.method).toBe("initialize");
+    expect(initialize.params.clientInfo.version).toBe(manifest.version);
   });
 
   it("times out a request the app-server never answers", async () => {

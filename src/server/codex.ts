@@ -1,5 +1,6 @@
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import type { AgentClient, AgentTextThread, AuthStatus, TurnActivity } from "./agent.js";
+import { packageVersion } from "./version.js";
 
 export type { TurnActivity } from "./agent.js";
 
@@ -51,7 +52,7 @@ export class CodexAppServerClient implements AgentClient {
     await this.start();
     if (!this.initialized) {
       await this.sendRequest("initialize", {
-        clientInfo: { name: "ndrstnd", title: "ndrstnd", version: "0.1.0" },
+        clientInfo: { name: "ndrstnd", title: "ndrstnd", version: await packageVersion() },
       });
       this.sendNotification("initialized", {});
       this.initialized = true;

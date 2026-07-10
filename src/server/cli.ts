@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { spawn } from "node:child_process";
-import { readFile, realpath } from "node:fs/promises";
+import { realpath } from "node:fs/promises";
 import process from "node:process";
 import { resolveReviewAgent, reviewAgents, type ReviewAgent, type ReviewAgentId, type TurnActivity } from "./agent.js";
 import { analyzeWithAgent, formatAnalysisHeartbeat, type AnalysisProgress } from "./analyze.js";
@@ -10,8 +10,9 @@ import { ReviewStore, selectReusableRevision } from "./store.js";
 import { installSkill, installedSkillIsStale } from "./skill.js";
 import { writeReviewArtifact } from "./artifact.js";
 import { browserOpenCommand } from "./cli-support.js";
-import { fileURLToPath, pathToFileURL } from "node:url";
-import { dirname, join, resolve } from "node:path";
+import { packageVersion } from "./version.js";
+import { pathToFileURL } from "node:url";
+import { join, resolve } from "node:path";
 
 const [command, ...args] = process.argv.slice(2);
 
@@ -29,10 +30,6 @@ if (command === undefined || command === "--help" || command === "-h") {
   fail(`Unknown command: ${command}`);
 }
 
-async function packageVersion(): Promise<string> {
-  const manifest = JSON.parse(await readFile(join(dirname(fileURLToPath(import.meta.url)), "../../package.json"), "utf8")) as { version?: string };
-  return manifest.version ?? "unknown";
-}
 
 /** A typo in any flag must fail loudly; silently ignoring it would run the wrong review, agent, or install. */
 function parseCommandArgs(command: string, args: string[], valueOptions: string[], booleanOptions: string[], maxPositional: number): { positional: string[]; values: Map<string, string>; flags: Set<string> } {
