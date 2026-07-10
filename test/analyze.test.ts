@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { INLINE_PATCH_BUDGET, PROSE_WORD_RANGES, analysisPrompt, buildPromptReviewInput, extractJson, parseAnalysisDocument } from "../src/server/analysis-core.js";
-import { formatAnalysisHeartbeat } from "../src/server/analyze.js";
+import { analyzeWithAgent, analysisRepairPrompt, formatAnalysisHeartbeat, parseAnalysisResponse } from "../src/server/analyze.js";
+import type { ReviewAgent } from "../src/server/agent.js";
 import type { CollectedReviewInput } from "../src/server/git.js";
 
 const input: CollectedReviewInput = {
@@ -31,6 +32,69 @@ const sourceStep = {
 };
 
 describe("analysis documents", () => {
+  it("reports the failed response phase without exposing the response body", () => {
+    let message = "";
+    try {
+      parseAnalysisResponse("{\"s\":] secret source code", input);
+    } catch (error) {
+      message = error instanceof Error ? error.message : String(error);
+    }
+    expect(message).toMatch(/JSON parsing failed:.*Response metadata: response 25 characters/);
+    expect(message).not.toContain("secret source code");
+  });
+
+  it("distinguishes wire-shape errors from review invariant errors", () => {
+    expect(() => parseAnalysisResponse(JSON.stringify({ s: "x", c: [["one", "title", "test", "synopsis", null, null, "high", "low", ["test"], ["source-hunk"]]], t: [], o: [], u: [] }), input))
+      .toThrow("wire document validation failed");
+    expect(() => parseAnalysisResponse(JSON.stringify({
+      summary: validSummary,
+      chapters: [{ id: "one", title: "Runner behavior", kind: "behavior", synopsis: validSynopsis, confidence: "high", attention: "contained", riskCategories: ["behavior"], evidenceIds: ["not-real"] }],
+      steps: [sourceStep], omittedGroups: [{ title: "Low-signal changes", reason: "Lockfile evidence is grouped.", evidenceIds: ["lock-hunk"] }], unclassifiedEvidenceIds: [],
+    }), input)).toThrow(/review invariant validation failed: Analysis referenced unknown evidence: not-real/);
+  });
+
+  it("repairs a malformed first response and accepts the corrected document", async () => {
+    const responses = ["{\"s\":]", JSON.stringify({
+      s: validSummary,
+      c: [["one", "Runner behavior", "behavior", validSynopsis, null, null, "high", "contained", ["behavior"], ["source-hunk"]]],
+      t: [["step-01", "Build runner behavior", sourceStep.goal, sourceStep.youNowHave, [], [], {}, ["one"], ["source-hunk"]]],
+      o: [["Low-signal changes", "Lockfile evidence is grouped.", ["lock-hunk"]]],
+      u: [],
+    })];
+    const repairPrompts: string[] = [];
+    const agent = {
+      id: "codex",
+      name: "Codex",
+      command: "codex",
+      loginArgs: [],
+      homeDirectory: () => "/tmp",
+      getAuthStatus: async () => ({ state: "signed-in", accountType: "test" }),
+      createClient: () => ({
+        startTextThread: async () => ({
+          send: async (prompt: string) => {
+            repairPrompts.push(prompt);
+            return responses.shift()!;
+          },
+          close: async () => undefined,
+        }),
+        close: () => undefined,
+      }),
+    } as ReviewAgent;
+
+    const document = await analyzeWithAgent(agent, input);
+    expect(document.summary).toBe(validSummary);
+    expect(repairPrompts).toHaveLength(2);
+    expect(repairPrompts[1]).toContain("position 3 is kind");
+    expect(repairPrompts[1]).toContain("position 9 is riskCategories");
+  });
+
+  it("keeps the repair prompt explicit about the compact tuple contract", () => {
+    const prompt = analysisRepairPrompt("c.0.8.0: Invalid enum value");
+    expect(prompt).toContain("return only one valid minified JSON object");
+    expect(prompt).toContain("position 3 is kind");
+    expect(prompt).toContain("position 9 is riskCategories");
+  });
+
   it("grounds the step plan with define-before-use hints and a suggested order in the manifest", () => {
     const orderedInput: CollectedReviewInput = {
       ...input,
