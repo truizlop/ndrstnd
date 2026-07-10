@@ -131,6 +131,18 @@ describe("CodexAppServerClient", () => {
     client.close();
   });
 
+  it("rejects requests immediately when the app-server never spawned", async () => {
+    const client = new CodexAppServerClient();
+    const child = new FakeCodexProcess();
+    (client as unknown as { spawnCodex: () => FakeCodexProcess }).spawnCodex = () => child;
+
+    const first = client.request("account/read", {});
+    queueMicrotask(() => child.emit("error", new Error("spawn codex ENOENT")));
+
+    await expect(first).rejects.toThrow("Codex app-server could not run: spawn codex ENOENT");
+    await expect(client.request("account/read", {})).rejects.toThrow("Codex app-server could not run: spawn codex ENOENT");
+  });
+
   it("reports the packaged version in the app-server handshake", async () => {
     const client = new CodexAppServerClient();
     const child = new FakeCodexProcess();

@@ -41,6 +41,7 @@ export class CodexAppServerClient implements AgentClient {
   private buffer = "";
   private stderrTail = "";
   private initialized = false;
+  private failure: Error | undefined;
   private nextId = 1;
   private readonly pending = new Map<number, { resolve: (value: unknown) => void; reject: (reason: Error) => void }>();
   private readonly notificationListeners = new Set<(method: string, params: Record<string, unknown>) => void>();
@@ -144,6 +145,7 @@ export class CodexAppServerClient implements AgentClient {
 
   private async start(): Promise<void> {
     if (this.process !== undefined) return;
+    this.failure = undefined;
     const process = this.spawnCodex();
     this.process = process;
     process.stdout.on("data", (chunk: Buffer) => this.handleOutput(chunk.toString("utf8")));
@@ -164,6 +166,11 @@ export class CodexAppServerClient implements AgentClient {
   private sendRequest(method: string, params: Record<string, unknown>): Promise<unknown> {
     const id = this.nextId++;
     return new Promise((resolve, reject) => {
+      // A request issued after the app-server already failed (for example, it never spawned) would otherwise write into a dead pipe and wait out the full timeout.
+      if (this.failure !== undefined) {
+        reject(this.failure);
+        return;
+      }
       // Turn progress is tracked by the notification inactivity timer; this bounds the request/response handshakes themselves, which are otherwise unbounded.
       const timeout = setTimeout(() => {
         this.pending.delete(id);
@@ -222,6 +229,7 @@ export class CodexAppServerClient implements AgentClient {
   }
 
   private fail(error: Error): void {
+    this.failure = error;
     this.rejectPending(error);
     for (const listener of [...this.failureListeners]) listener(error);
   }
