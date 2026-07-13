@@ -103,7 +103,7 @@ async function runAuth(args: string[]): Promise<void> {
       process.stdout.write(`${agent.name} authentication is already ready (${beforeLogin.accountType}).\n`);
       return;
     }
-    await runAgentLogin(agent);
+    await runAgentLogin(agent).catch((error: unknown) => fail(formatAgentLaunchError(agent, error)));
     const afterLogin = await agent.getAuthStatus();
     if (afterLogin.state === "signed-in") process.stdout.write(`${agent.name} authentication is ready (${afterLogin.accountType}).\n`);
     else fail(`${agent.name} login completed but ndrstnd could not validate an authenticated connection.`);
@@ -247,6 +247,14 @@ function openBrowser(url: string): void {
     process.stdout.write(`Could not open a browser automatically (${error.message}); open the artifact path above manually.\n`);
   });
   child.unref();
+}
+
+function formatAgentLaunchError(agent: ReviewAgent, error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  if (message.includes(`spawn ${agent.command} ENOENT`)) {
+    return `Could not start ${agent.name}: the \`${agent.command}\` CLI was not found on PATH. Install it or add its directory to PATH, then retry \`ndrstnd auth login --agent ${agent.id}\`.`;
+  }
+  return `${agent.name} login could not start: ${message}`;
 }
 
 function printHelp(): void {

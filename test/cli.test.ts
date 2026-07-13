@@ -8,9 +8,9 @@ import { browserOpenCommand } from "../src/server/cli-support.js";
 const run = promisify(execFile);
 const projectRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 
-async function runCli(args: string[]): Promise<{ stdout: string; stderr: string; code: number }> {
+async function runCli(args: string[], env?: NodeJS.ProcessEnv): Promise<{ stdout: string; stderr: string; code: number }> {
   try {
-    const { stdout, stderr } = await run(process.execPath, ["--import", "tsx", "src/server/cli.ts", ...args], { cwd: projectRoot, encoding: "utf8" });
+    const { stdout, stderr } = await run(process.execPath, ["--import", "tsx", "src/server/cli.ts", ...args], { cwd: projectRoot, encoding: "utf8", env: env === undefined ? process.env : env });
     return { stdout, stderr, code: 0 };
   } catch (error) {
     const failed = error as { stdout?: string; stderr?: string; code?: number };
@@ -67,5 +67,12 @@ describe("ndrstnd CLI", () => {
     const result = await runCli(["review", "--no-open", "--repo", "/does/not/exist"]);
     expect(result.code).toBe(1);
     expect(result.stderr.trim()).toBe("The repository path /does/not/exist does not exist.");
+  });
+
+  it("reports a missing agent CLI as an actionable one-line error", async () => {
+    const result = await runCli(["auth", "login", "--agent", "codex"], { ...process.env, PATH: "/definitely/missing" });
+    expect(result.code).toBe(1);
+    expect(result.stderr.trim()).toBe("Could not start Codex: the `codex` CLI was not found on PATH. Install it or add its directory to PATH, then retry `ndrstnd auth login --agent codex`.");
+    expect(result.stderr).not.toContain("node:internal/");
   });
 }, 30_000);
