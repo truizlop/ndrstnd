@@ -55,5 +55,10 @@ class Ndrstnd < Formula
 
   test do
     assert_match "understand agent-produced branch changes", shell_output("#{bin}/ndrstnd --help")
+    system "node", "-e", <<~JS, libexec/"lib/node_modules/ndrstnd/node_modules/better-sqlite3"
+      const Database = require(process.argv[1]);
+      const database = new Database(":memory:");
+      database.close();
+    JS
   end
 end
