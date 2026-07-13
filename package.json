@@ -16,7 +16,9 @@
     "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run --dir test",
+    "pretest": "npm run rebuild:native",
     "test:watch": "vitest --dir test",
+    "rebuild:native": "npm rebuild better-sqlite3",
     "lint": "npm run typecheck",
     "prepublishOnly": "npm run lint && npm test && npm run build",
     "preview:fixture": "tsx src/server/preview-fixture.ts"
