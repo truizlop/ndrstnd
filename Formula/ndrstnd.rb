@@ -15,8 +15,8 @@
 class Ndrstnd < Formula
   desc "Comprehension workspace for large, agent-produced branch changes"
   homepage "https://truizlop.github.io/ndrstnd/"
-  url "https://github.com/truizlop/ndrstnd/archive/refs/tags/0.1.0.tar.gz"
-  sha256 "70349e11802aacd17231e62ade492b5745a038545247d986436a746547a28706"
+  url "https://github.com/truizlop/ndrstnd/archive/refs/tags/0.1.1.tar.gz"
+  sha256 "REPLACE_WITH_RELEASE_TARBALL_SHA256"
   license "Apache-2.0"
   head "https://github.com/truizlop/ndrstnd.git", branch: "main"
 
@@ -47,7 +47,9 @@ class Ndrstnd < Formula
     # install packs the built package (dist/ plus skill assets) into libexec.
     system "npm", "install", "--no-audit", "--no-fund"
     system "npm", "run", "build"
-    system "npm", "install", *std_npm_args
+    # better-sqlite3 is a native dependency; its install script downloads or
+    # builds the .node binding required by the packaged CLI.
+    system "npm", "install", *std_npm_args(ignore_scripts: false)
     bin.install_symlink Dir["#{libexec}/bin/*"]
   end
 
