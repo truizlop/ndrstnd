@@ -37,6 +37,8 @@ The primary reading surface is a portable, self-contained HTML artifact. It must
 ## Verification
 
 - Run `npm run lint`, `npm test`, and `npm run build` for every code change.
+- `better-sqlite3` is a Node-ABI-specific native dependency. The `npm test` lifecycle automatically runs `npm rebuild better-sqlite3` for the active Node runtime; keep this hook intact so switching Node versions cannot leave tests or `npm publish` using a stale addon. If running the CLI directly after changing Node versions, run `npm run rebuild:native` first.
+- Run `npm ci` under the same Node version that will run `npm publish`; never reuse `node_modules` built by a different Node major version.
 - For artifact JavaScript, test the rendered artifact or its executed client scripts. A TypeScript build alone does not prove inline browser scripts are valid.
 - Use a real browser-sized mobile viewport when changing layout or interactions. Check console errors, tabs, zoom, disclosure, Timeline/Test Plan navigation, selection-menu dismissal, and horizontal overflow.
 
