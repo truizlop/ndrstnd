@@ -179,7 +179,7 @@ Timeline steps are a rational reconstruction of how to build this branch. They a
 
 When the review input includes conversation, it is the dialogue between the user and the coding agent that produced this branch. Treat it as primary evidence of intent: explain why changes were made, which alternatives were considered or rejected, and which incidents, requirements, or downstream consumers motivated them, weaving those stated reasons into the summary, chapter synopses, before/after, step goals, and deferred concerns instead of guessing intent from the code alone. Attribute reasons faithfully - never invent motives the conversation does not support, and never copy credentials or secrets from it. When conversation is absent, ground every claim in the diff and repository alone.
 
-You are running in the reviewed repository with a read-only sandbox. The review input below is a compact manifest. Hunks that carry a patch field include their complete diff text inline - never re-fetch those with git. For hunks without inline patch text, or when you need surrounding code, use the file paths, hunk IDs, line anchors, and suggested git commands to inspect only what you still need for a high-quality comprehension story. Prefer grouping related evidence IDs by behavior or decision instead of mirroring path order.
+You are running in the reviewed repository with a read-only sandbox. The review input below is a compact manifest. Hunks that carry a patch field include their complete diff text inline - never re-fetch those with git. For hunks without inline patch text, or when you need surrounding code, use the file paths, manifest indexes, line anchors, and suggested git commands to inspect only what you still need for a high-quality comprehension story. Prefer grouping related evidence indexes by behavior or decision instead of mirroring path order.
 
 Review input:
 ${JSON.stringify(reviewInput)}`;
@@ -372,7 +372,7 @@ function compactHunk(hunk: CollectedReviewInput["hunks"][number], path: string |
   const additions = hunk.lines.filter((line) => line.kind === "addition");
   const deletions = hunk.lines.filter((line) => line.kind === "deletion");
   const context = hunk.lines.length - additions.length - deletions.length;
-  // Samples only anchor hunk IDs to recognizable content; the agent reads the inline
+  // Samples anchor manifest indexes to recognizable content; the agent reads the inline
   // patch or inspects the real one for detail, so two short previews per hunk are enough.
   const sampleLines = deletions.length > 0 && additions.length > 0 ? [deletions[0], additions[0]] : [...deletions, ...additions].slice(0, 2);
   const changedLineSamples = sampleLines.map((line) => ({
