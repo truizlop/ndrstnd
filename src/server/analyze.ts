@@ -60,7 +60,7 @@ export function analysisRepairPrompt(problem: string): string {
 
 Problem: ${problem}
 
-The compact shape is {s,c:[[id,title,kind,synopsis,before|null,after|null,confidence,attention,riskCategories,evidenceIds]],t:[[id,title,goal,youNowHave,[[concern,resolvedByStepId|null]],dependsOn,forwardRefs,advancesChapterIds,evidenceIds]],o:[[title,reason,evidenceIds]],u:[evidenceId],f:{evidenceId:[[startLine,endLine]]},x:[[command,outcome,summary,source]]}. In c, position 3 is kind and may be feature, decision, behavior, non_functional, risk, test, or other; position 9 is riskCategories and may contain only formatting, refactor, behavior, performance, or security. Use only evidence IDs from the original review input manifest, preserve valid fields, and correct every issue named above.`;
+The compact shape is {s,c:[{id,title,kind,synopsis,before,after,confidence,attention,riskCategories,evidenceIndexes}],t:[{id,title,goal,youNowHave,deferred,dependsOn,forwardRefs,advancesChapterIds,evidenceIndexes}],o:[{title,reason,evidenceIndexes}],u:[evidenceIndex],f:{evidenceIndex:[[startLine,endLine]]},x:[[command,outcome,summary,source]]}. Chapters and steps are named objects, never positional arrays. Evidence references are zero-based integer indexes into the original review input manifest, never hunk ID strings. Use only manifest indexes, preserve valid fields, and correct every issue named above.`;
 }
 
 function responseMetadata(response: string, extracted: string): string {

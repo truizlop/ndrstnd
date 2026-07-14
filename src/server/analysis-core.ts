@@ -6,7 +6,7 @@ import type { ConversationContext } from "./conversation.js";
 import { deriveEvidenceOrder } from "./evidence-ordering.js";
 
 export function parseAnalysisDocument(value: unknown, input: CollectedReviewInput, options?: { focus?: "require" | "salvage" }): AnalysisDocument {
-  const document = parseWireAnalysisDocument(value);
+  const document = parseWireAnalysisDocument(value, input);
   const duplicateChapterIds = duplicated(document.chapters.map((chapter) => chapter.id));
   if (duplicateChapterIds.length > 0) throw new Error(`Analysis chapter ids are duplicated: ${duplicateChapterIds.join(", ")}. Give every chapter in c a unique id.`);
   const duplicateStepIds = duplicated(document.steps.map((step) => step.id));
@@ -171,11 +171,11 @@ function validateStepPlan(document: AnalysisDocument, input: CollectedReviewInpu
 
 export function analysisPrompt(input: CollectedReviewInput, conversation?: ConversationContext): string {
   const reviewInput = buildPromptReviewInput(input, conversation);
-  return `You are ndrstnd, a comprehension assistant. Explain a branch without critiquing it or proposing changes. Prioritize the implementation story and behavior changes. Return compact minified JSON only with this shape: {s,c:[[id,title,kind,synopsis,before|null,after|null,confidence,attention,riskCategories,evidenceIds]],t:[[id,title,goal,youNowHave,[[concern,resolvedByStepId|null]],dependsOn,forwardRefs,advancesChapterIds,evidenceIds]],o:[[title,reason,evidenceIds]],u:[evidenceId],f:{evidenceId:[[startLine,endLine]]},x:[[command,outcome,summary,source]]}. In each c tuple, position 3 is kind and may be exactly feature, decision, behavior, non_functional, risk, test, or other; position 9 is riskCategories and may contain only formatting, refactor, behavior, performance, or security. Confidence is high, medium, or low. Attention is low, contained, elevated, high, or critical. Use only listed evidence IDs. Every meaningful evidence ID must appear exactly once in c, o, or u, and exactly once in t. Group every low-signal evidence ID into an omitted group in o with a concise reason such as lockfile churn or generated output; u is a last resort for evidence that truly cannot be classified. f drives the Evidence zoom excerpts: for every evidence ID used in c, list 1-3 [startLine,endLine] ranges of new-file line numbers marking the exact lines a reviewer must read first - the load-bearing statements, not whole hunks, imports, or boilerplate. Each range must fall inside that hunk's new-file lines; inspect the patch to choose them precisely. x reports test or build runs that were actually observed: when the conversation or repository shows a command and its result, add [command,outcome,summary,source] with outcome passed, failed, mixed, or unknown and source conversation or repository. Omit x entirely when no run was observed - never invent execution evidence.
+  return `You are ndrstnd, a comprehension assistant. Explain a branch without critiquing it or proposing changes. Prioritize the implementation story and behavior changes. Return compact minified JSON only with this shape: {s,c:[{id,title,kind,synopsis,before,after,confidence,attention,riskCategories,evidenceIndexes}],t:[{id,title,goal,youNowHave,deferred,dependsOn,forwardRefs,advancesChapterIds,evidenceIndexes}],o:[{title,reason,evidenceIndexes}],u:[evidenceIndex],f:{evidenceIndex:[[startLine,endLine]]},x:[[command,outcome,summary,source]]}. Chapters and steps must be named objects, never positional arrays. Evidence references are zero-based integer indexes into the numbered review manifest, never hunk ID strings. Use only indexes listed in that manifest. Every meaningful evidence index must appear exactly once in c, o, or u, and exactly once in t. Group every low-signal evidence index into an omitted group in o with a concise reason such as lockfile churn or generated output; u is a last resort for evidence that truly cannot be classified. Chapter kind may be feature, decision, behavior, non_functional, risk, test, or other; riskCategories may contain only formatting, refactor, behavior, performance, or security. Confidence is high, medium, or low. Attention is low, contained, elevated, high, or critical. f drives the Evidence zoom excerpts: for every evidence index used in c, list 1-3 [startLine,endLine] ranges of new-file line numbers marking the exact lines a reviewer must read first - the load-bearing statements, not whole hunks, imports, or boilerplate. Each range must fall inside that hunk's new-file lines; inspect the patch to choose them precisely. x reports test or build runs that were actually observed: when the conversation or repository shows a command and its result, add [command,outcome,summary,source] with outcome passed, failed, mixed, or unknown and source conversation or repository. Omit x entirely when no run was observed - never invent execution evidence.
 
 Prose depth is validated and out-of-range fields are rejected, so hit these word counts: summary ${PROSE_WORD_RANGES.summary.min}-${PROSE_WORD_RANGES.summary.max} words; each synopsis ${PROSE_WORD_RANGES.synopsis.min}-${PROSE_WORD_RANGES.synopsis.max} words across two or three sentences explaining what changed, how it works, and why it matters; before and after ${PROSE_WORD_RANGES.beforeAfter.min}-${PROSE_WORD_RANGES.beforeAfter.max} words each describing concrete observable behavior; each step goal ${PROSE_WORD_RANGES.goal.min}-${PROSE_WORD_RANGES.goal.max} words stating the intent and mechanism; each youNowHave ${PROSE_WORD_RANGES.youNowHave.min}-${PROSE_WORD_RANGES.youNowHave.max} words stating the capability that now exists. Titles stay under 10 words. Name the actual functions, types, and files involved. Never answer with a single vague sentence, and never pad - every sentence must add information a reviewer can act on.
 
-Timeline steps are a rational reconstruction of how to build this branch. They are not commit chronology, file order, or the Story chapters repeated. Each step must be one capability increment; explain its intent in goal, its postcondition in youNowHave, intentionally postponed concerns in deferred, earlier step ids in dependsOn, unavoidable forward symbol uses in forwardRefs as {"Symbol":"later-step-id"}, the Story chapters it advances, and its evidence IDs. The manifest's construction.defineBeforeUse entries are hard ordering rules: each symbol must be defined in the same or an earlier step than its use, or the using step must declare it in forwardRefs. construction.suggestedEvidenceOrder is one valid linearization you may regroup into steps.
+Timeline steps are a rational reconstruction of how to build this branch. They are not commit chronology, file order, or the Story chapters repeated. Each step must be one capability increment; explain its intent in goal, its postcondition in youNowHave, intentionally postponed concerns in deferred, earlier step ids in dependsOn, unavoidable forward symbol uses in forwardRefs as {"Symbol":"later-step-id"}, the Story chapters it advances, and its evidence indexes. The manifest's construction.defineBeforeUse entries are hard ordering rules: each symbol must be defined in the same or an earlier step than its use, or the using step must declare it in forwardRefs. construction.suggestedEvidenceOrder is one valid linearization of manifest indexes you may regroup into steps.
 
 When the review input includes conversation, it is the dialogue between the user and the coding agent that produced this branch. Treat it as primary evidence of intent: explain why changes were made, which alternatives were considered or rejected, and which incidents, requirements, or downstream consumers motivated them, weaving those stated reasons into the summary, chapter synopses, before/after, step goals, and deferred concerns instead of guessing intent from the code alone. Attribute reasons faithfully - never invent motives the conversation does not support, and never copy credentials or secrets from it. When conversation is absent, ground every claim in the diff and repository alone.
 
@@ -197,7 +197,7 @@ export function buildPromptReviewInput(input: CollectedReviewInput, conversation
   const filesById = new Map(input.files.map((file) => [file.id, file]));
   const hunksByFile = new Map<string, Array<ReturnType<typeof compactHunk>>>();
   let inlinePatchBudget = INLINE_PATCH_BUDGET;
-  for (const hunk of input.hunks) {
+  for (const [index, hunk] of input.hunks.entries()) {
     const file = filesById.get(hunk.fileId);
     let patch: string | undefined;
     if (file?.signal === "meaningful" && !file.binary && hunk.lines.length > 0) {
@@ -207,7 +207,7 @@ export function buildPromptReviewInput(input: CollectedReviewInput, conversation
         patch = text;
       }
     }
-    const compact = compactHunk(hunk, file?.path, patch);
+    const compact = compactHunk(hunk, file?.path, patch, index);
     const list = hunksByFile.get(hunk.fileId) ?? [];
     list.push(compact);
     hunksByFile.set(hunk.fileId, list);
@@ -223,7 +223,7 @@ export function buildPromptReviewInput(input: CollectedReviewInput, conversation
       summaryCommand: `git diff --stat --find-renames --find-copies ${diffRange(input)}`,
       patchCommand: `git diff --no-ext-diff --unified=80 --find-renames --find-copies ${diffRange(input)} -- <path>`,
       currentFileCommand: "sed -n '<start>,<end>p' <path>",
-      note: "Hunks with a patch field carry their complete diff inline; run the patch command only for hunks without one or when surrounding code matters. For untracked working-tree files, inspect the current file directly and use the manifest hunk anchors as evidence IDs.",
+      note: "Hunks with a patch field carry their complete diff inline; run the patch command only for hunks without one or when surrounding code matters. For untracked working-tree files, inspect the current file directly. Refer to hunks by their numbered manifest index, never by inventing an identifier.",
     },
     files: input.files.map((file) => ({
       id: file.id,
@@ -236,10 +236,10 @@ export function buildPromptReviewInput(input: CollectedReviewInput, conversation
       hunks: hunksByFile.get(file.id) ?? [],
     })),
     construction: {
-      suggestedEvidenceOrder: evidenceOrder.orderedEvidenceIds,
+      suggestedEvidenceOrder: evidenceOrder.orderedEvidenceIds.map((id) => input.hunks.findIndex((hunk) => hunk.id === id)),
       defineBeforeUse: evidenceOrder.constraints
         .filter((constraint) => constraint.reason === "symbol")
-        .map((constraint) => ({ symbol: constraint.symbol, definedIn: constraint.beforeEvidenceId, usedIn: constraint.afterEvidenceId })),
+        .map((constraint) => ({ symbol: constraint.symbol, definedIn: input.hunks.findIndex((hunk) => hunk.id === constraint.beforeEvidenceId), usedIn: input.hunks.findIndex((hunk) => hunk.id === constraint.afterEvidenceId) })),
     },
     conversation: compactConversation(conversation),
   };
@@ -252,37 +252,64 @@ const CompactChapterSchema = z.tuple([
   z.string().min(1).max(80),
   z.string().min(1).max(120),
   KindSchema,
-  z.string().min(1).max(420),
-  z.string().max(300).nullable(),
-  z.string().max(300).nullable(),
+  z.string().min(1).max(1_200),
+  z.string().max(900).nullable(),
+  z.string().max(900).nullable(),
   ConfidenceSchema,
   z.enum(["low", "contained", "elevated", "high", "critical"]),
   z.array(CompactRiskCategorySchema),
-  z.array(z.string().min(1)).min(1),
+  z.array(z.union([z.number().int().min(0), z.string().min(1)])).min(1),
 ]);
 const CompactStepSchema = z.tuple([
   z.string().min(1).max(80),
   z.string().min(1).max(120),
-  z.string().min(1).max(320),
-  z.string().min(1).max(320),
-  z.array(z.tuple([z.string().min(1).max(220), z.string().min(1).max(80).nullable()])),
+  z.string().min(1).max(900),
+  z.string().min(1).max(900),
+  z.array(z.tuple([z.string().min(1).max(700), z.string().min(1).max(80).nullable()])),
   z.array(z.string().min(1).max(80)),
   z.record(z.string().min(1), z.string().min(1).max(80)),
   z.array(z.string().min(1).max(80)).min(1),
-  z.array(z.string().min(1)).min(1),
+  z.array(z.union([z.number().int().min(0), z.string().min(1)])).min(1),
 ]);
 
+const CompactEvidenceRefSchema = z.union([z.number().int().min(0), z.string().min(1)]);
+const CompactChapterObjectSchema = z.object({
+  id: z.string().min(1).max(80),
+  title: z.string().min(1).max(120),
+  kind: KindSchema,
+  synopsis: z.string().min(1).max(1_200),
+  before: z.string().max(900).nullable(),
+  after: z.string().max(900).nullable(),
+  confidence: ConfidenceSchema,
+  attention: z.enum(["low", "contained", "elevated", "high", "critical"]),
+  riskCategories: z.array(CompactRiskCategorySchema),
+  evidenceIndexes: z.array(z.number().int().min(0)).min(1),
+});
+const CompactStepObjectSchema = z.object({
+  id: z.string().min(1).max(80),
+  title: z.string().min(1).max(120),
+  goal: z.string().min(1).max(900),
+  youNowHave: z.string().min(1).max(900),
+  deferred: z.array(z.object({ concern: z.string().min(1).max(700), resolvedByStepId: z.string().min(1).max(80).nullable() })),
+  dependsOn: z.array(z.string().min(1).max(80)),
+  forwardRefs: z.record(z.string().min(1), z.string().min(1).max(80)),
+  advancesChapterIds: z.array(z.string().min(1).max(80)).min(1),
+  evidenceIndexes: z.array(z.number().int().min(0)).min(1),
+});
+const CompactOmittedGroupSchema = z.tuple([z.string().min(1).max(240), z.string().min(1).max(700), z.array(CompactEvidenceRefSchema).min(1)]);
+const CompactOmittedGroupObjectSchema = z.object({ title: z.string().min(1).max(240), reason: z.string().min(1).max(700), evidenceIndexes: z.array(z.number().int().min(0)).min(1) });
+
 const CompactAnalysisDocumentSchema = z.object({
-  s: z.string().min(1).max(560),
-  c: z.array(CompactChapterSchema),
-  t: z.array(CompactStepSchema),
-  o: z.array(z.tuple([z.string().min(1).max(120), z.string().min(1).max(220), z.array(z.string().min(1)).min(1)])),
-  u: z.array(z.string().min(1)),
+  s: z.string().min(1).max(1_600),
+  c: z.array(z.union([CompactChapterSchema, CompactChapterObjectSchema])),
+  t: z.array(z.union([CompactStepSchema, CompactStepObjectSchema])),
+  o: z.array(z.union([CompactOmittedGroupSchema, CompactOmittedGroupObjectSchema])),
+  u: z.array(CompactEvidenceRefSchema),
   f: z.record(z.string().min(1), z.array(z.tuple([z.number().int().min(1), z.number().int().min(1)])).min(1).max(5)).optional(),
   x: z.array(z.tuple([z.string().min(1).max(200), z.enum(["passed", "failed", "mixed", "unknown"]), z.string().min(1).max(300), z.enum(["conversation", "repository"])])).max(5).optional(),
 });
 
-function parseWireAnalysisDocument(value: unknown): AnalysisDocument {
+function parseWireAnalysisDocument(value: unknown, input: CollectedReviewInput): AnalysisDocument {
   const full = AnalysisDocumentSchema.safeParse(value);
   if (full.success) return full.data;
 
@@ -294,34 +321,42 @@ function parseWireAnalysisDocument(value: unknown): AnalysisDocument {
     throw new Error(`Analysis document did not match the ${shape} shape: ${error.issues.slice(0, 8).map((issue) => `${issue.path.join(".") || "document"}: ${issue.message}`).join("; ")}`);
   }
   const compact = compactResult.data;
+  const evidenceId = (reference: number | string): string => {
+    if (typeof reference === "string") {
+      if (/^\d+$/.test(reference)) return evidenceId(Number(reference));
+      return reference;
+    }
+    const hunk = input.hunks[reference];
+    if (hunk === undefined) throw new Error(`Evidence index ${reference} is outside the review input manifest.`);
+    return hunk.id;
+  };
   return AnalysisDocumentSchema.parse({
     summary: compact.s,
-    chapters: compact.c.map((chapter) => ({
-      id: chapter[0],
-      title: chapter[1],
-      kind: chapter[2],
-      synopsis: chapter[3],
-      before: chapter[4] ?? undefined,
-      after: chapter[5] ?? undefined,
-      confidence: chapter[6],
-      attention: chapter[7],
-      riskCategories: chapter[8],
-      evidenceIds: chapter[9],
-    })),
-    steps: compact.t.map((step) => ({
-      id: step[0],
-      title: step[1],
-      goal: step[2],
-      youNowHave: step[3],
+    chapters: compact.c.map((chapter) => Array.isArray(chapter) ? {
+      id: chapter[0], title: chapter[1], kind: chapter[2], synopsis: chapter[3],
+      before: chapter[4] ?? undefined, after: chapter[5] ?? undefined,
+      confidence: chapter[6], attention: chapter[7], riskCategories: chapter[8],
+      evidenceIds: chapter[9].map(evidenceId),
+    } : {
+      id: chapter.id, title: chapter.title, kind: chapter.kind, synopsis: chapter.synopsis,
+      before: chapter.before ?? undefined, after: chapter.after ?? undefined,
+      confidence: chapter.confidence, attention: chapter.attention, riskCategories: chapter.riskCategories,
+      evidenceIds: chapter.evidenceIndexes.map(evidenceId),
+    }),
+    steps: compact.t.map((step) => Array.isArray(step) ? {
+      id: step[0], title: step[1], goal: step[2], youNowHave: step[3],
       deferred: step[4].map((item) => ({ concern: item[0], resolvedByStepId: item[1] ?? undefined })),
-      dependsOn: step[5],
-      forwardRefs: step[6],
-      advancesChapterIds: step[7],
-      evidenceIds: step[8],
-    })),
-    omittedGroups: compact.o.map((group) => ({ title: group[0], reason: group[1], evidenceIds: group[2] })),
-    unclassifiedEvidenceIds: compact.u,
-    focus: compact.f === undefined ? undefined : Object.fromEntries(Object.entries(compact.f).map(([evidenceId, ranges]) => [evidenceId, ranges.map(([start, end]) => ({ start, end }))])),
+      dependsOn: step[5], forwardRefs: step[6], advancesChapterIds: step[7],
+      evidenceIds: step[8].map(evidenceId),
+    } : {
+      id: step.id, title: step.title, goal: step.goal, youNowHave: step.youNowHave,
+      deferred: step.deferred.map((item) => ({ concern: item.concern, resolvedByStepId: item.resolvedByStepId ?? undefined })),
+      dependsOn: step.dependsOn, forwardRefs: step.forwardRefs, advancesChapterIds: step.advancesChapterIds,
+      evidenceIds: step.evidenceIndexes.map(evidenceId),
+    }),
+    omittedGroups: compact.o.map((group) => Array.isArray(group) ? { title: group[0], reason: group[1], evidenceIds: group[2].map(evidenceId) } : { title: group.title, reason: group.reason, evidenceIds: group.evidenceIndexes.map(evidenceId) }),
+    unclassifiedEvidenceIds: compact.u.map(evidenceId),
+    focus: compact.f === undefined ? undefined : Object.fromEntries(Object.entries(compact.f).map(([reference, ranges]) => [evidenceId(reference), ranges.map(([start, end]) => ({ start, end }))])),
     testExecution: compact.x === undefined ? undefined : compact.x.map(([command, outcome, summary, source]) => ({ command, outcome, summary, source })),
   });
 }
@@ -333,7 +368,7 @@ function hunkPatchText(hunk: CollectedReviewInput["hunks"][number]): string {
   return [`@@ -${hunk.oldStart},${oldCount} +${hunk.newStart},${newCount} @@`, ...hunk.lines.map((line) => `${markers[line.kind]}${line.content}`)].join("\n");
 }
 
-function compactHunk(hunk: CollectedReviewInput["hunks"][number], path: string | undefined, patch?: string) {
+function compactHunk(hunk: CollectedReviewInput["hunks"][number], path: string | undefined, patch: string | undefined, index: number) {
   const additions = hunk.lines.filter((line) => line.kind === "addition");
   const deletions = hunk.lines.filter((line) => line.kind === "deletion");
   const context = hunk.lines.length - additions.length - deletions.length;
@@ -347,7 +382,7 @@ function compactHunk(hunk: CollectedReviewInput["hunks"][number], path: string |
     preview: line.content.trim().slice(0, 100),
   }));
   return {
-    id: hunk.id,
+    index,
     fileId: hunk.fileId,
     path,
     oldStart: hunk.oldStart,

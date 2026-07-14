@@ -7,9 +7,9 @@ export const ChapterSchema = z.object({
   id: z.string().min(1).max(80),
   title: z.string().min(1).max(120),
   kind: z.enum(["feature", "decision", "behavior", "non_functional", "risk", "test", "other"]),
-  synopsis: z.string().min(1).max(420),
-  before: z.string().max(300).optional(),
-  after: z.string().max(300).optional(),
+  synopsis: z.string().min(1).max(1_200),
+  before: z.string().max(900).optional(),
+  after: z.string().max(900).optional(),
   confidence: z.enum(["high", "medium", "low"]),
   attention: AttentionSchema,
   riskCategories: z.array(RiskCategorySchema),
@@ -19,10 +19,10 @@ export const ChapterSchema = z.object({
 export const AnalysisStepSchema = z.object({
   id: z.string().min(1).max(80),
   title: z.string().min(1).max(120),
-  goal: z.string().min(1).max(320),
-  youNowHave: z.string().min(1).max(320),
+  goal: z.string().min(1).max(900),
+  youNowHave: z.string().min(1).max(900),
   deferred: z.array(z.object({
-    concern: z.string().min(1).max(220),
+    concern: z.string().min(1).max(700),
     resolvedByStepId: z.string().min(1).max(80).optional(),
   })),
   dependsOn: z.array(z.string().min(1).max(80)),
@@ -41,10 +41,10 @@ export const TestExecutionSchema = z.object({
 });
 
 export const AnalysisDocumentSchema = z.object({
-  summary: z.string().min(1).max(560),
+  summary: z.string().min(1).max(1_600),
   chapters: z.array(ChapterSchema),
   steps: z.array(AnalysisStepSchema),
-  omittedGroups: z.array(z.object({ title: z.string().min(1).max(120), reason: z.string().min(1).max(220), evidenceIds: z.array(z.string().min(1)).min(1) })),
+  omittedGroups: z.array(z.object({ title: z.string().min(1).max(240), reason: z.string().min(1).max(700), evidenceIds: z.array(z.string().min(1)).min(1) })),
   unclassifiedEvidenceIds: z.array(z.string().min(1)),
   /** Reviewer-critical new-file line ranges per evidence ID; they drive the focused excerpts at the Evidence zoom. */
   focus: z.record(z.string().min(1), z.array(FocusRangeSchema).min(1).max(5)).optional(),

@@ -84,15 +84,15 @@ describe("analysis documents", () => {
     const document = await analyzeWithAgent(agent, input);
     expect(document.summary).toBe(validSummary);
     expect(repairPrompts).toHaveLength(2);
-    expect(repairPrompts[1]).toContain("position 3 is kind");
-    expect(repairPrompts[1]).toContain("position 9 is riskCategories");
+    expect(repairPrompts[1]).toContain("Chapters and steps are named objects");
+    expect(repairPrompts[1]).toContain("Evidence references are zero-based integer indexes");
   });
 
   it("keeps the repair prompt explicit about the compact tuple contract", () => {
     const prompt = analysisRepairPrompt("c.0.8.0: Invalid enum value");
     expect(prompt).toContain("return only one valid minified JSON object");
-    expect(prompt).toContain("position 3 is kind");
-    expect(prompt).toContain("position 9 is riskCategories");
+    expect(prompt).toContain("Chapters and steps are named objects");
+    expect(prompt).toContain("Evidence references are zero-based integer indexes");
   });
 
   it("grounds the step plan with define-before-use hints and a suggested order in the manifest", () => {
@@ -110,8 +110,8 @@ describe("analysis documents", () => {
 
     const manifest = buildPromptReviewInput(orderedInput);
 
-    expect(manifest.construction.defineBeforeUse).toContainEqual({ symbol: "runJob", definedIn: "def-hunk", usedIn: "use-hunk" });
-    expect(manifest.construction.suggestedEvidenceOrder.indexOf("def-hunk")).toBeLessThan(manifest.construction.suggestedEvidenceOrder.indexOf("use-hunk"));
+    expect(manifest.construction.defineBeforeUse).toContainEqual({ symbol: "runJob", definedIn: 1, usedIn: 0 });
+    expect(manifest.construction.suggestedEvidenceOrder.indexOf(1)).toBeLessThan(manifest.construction.suggestedEvidenceOrder.indexOf(0));
     expect(analysisPrompt(orderedInput)).toContain("construction.defineBeforeUse");
   });
 
@@ -127,7 +127,7 @@ describe("analysis documents", () => {
     const chapter = { id: "one", title: "Runner behavior", kind: "behavior" as const, synopsis: validSynopsis, confidence: "high" as const, attention: "contained" as const, riskCategories: ["behavior" as const], evidenceIds: ["source-hunk"] };
     expect(() => parseAnalysisDocument({ summary: validSummary, chapters: [chapter], steps: [sourceStep], omittedGroups: [], unclassifiedEvidenceIds: ["lock-hunk"] }, input)).toThrow("Low-signal evidence was left ungrouped");
     expect(() => parseAnalysisDocument({ summary: validSummary, chapters: [chapter], steps: [sourceStep], omittedGroups: [], unclassifiedEvidenceIds: [] }, input)).toThrow("Low-signal evidence was left ungrouped");
-    expect(analysisPrompt(input)).toContain("Group every low-signal evidence ID into an omitted group in o");
+    expect(analysisPrompt(input)).toContain("Group every low-signal evidence index into an omitted group in o");
   });
 
   it("states the same prose word ranges the validator enforces", () => {
@@ -314,6 +314,31 @@ describe("analysis documents", () => {
     });
   });
 
+  it("accepts named compact objects with manifest indexes and resolves trusted hunk IDs", () => {
+    const longSynopsis = Array.from({ length: 50 }, () => "mechanism").join(" ");
+    expect(parseAnalysisDocument({
+      s: validSummary,
+      c: [{ id: "one", title: "Runner behavior", kind: "behavior", synopsis: longSynopsis, before: null, after: null, confidence: "high", attention: "contained", riskCategories: ["behavior"], evidenceIndexes: [0] }],
+      t: [{ id: "step-01", title: "Build runner behavior", goal: sourceStep.goal, youNowHave: sourceStep.youNowHave, deferred: [], dependsOn: [], forwardRefs: {}, advancesChapterIds: ["one"], evidenceIndexes: [0] }],
+      o: [{ title: "Low-signal changes", reason: "Lockfile evidence is grouped.", evidenceIndexes: [1] }],
+      u: [],
+    }, input)).toMatchObject({
+      chapters: [{ synopsis: longSynopsis, evidenceIds: ["source-hunk"] }],
+      steps: [{ evidenceIds: ["source-hunk"] }],
+      omittedGroups: [{ evidenceIds: ["lock-hunk"] }],
+    });
+  });
+
+  it("rejects a compact evidence index outside the manifest", () => {
+    expect(() => parseAnalysisDocument({
+      s: validSummary,
+      c: [{ id: "one", title: "Runner behavior", kind: "behavior", synopsis: validSynopsis, before: null, after: null, confidence: "high", attention: "contained", riskCategories: ["behavior"], evidenceIndexes: [99] }],
+      t: [{ id: sourceStep.id, title: sourceStep.title, goal: sourceStep.goal, youNowHave: sourceStep.youNowHave, deferred: [], dependsOn: [], forwardRefs: {}, advancesChapterIds: ["one"], evidenceIndexes: [0] }],
+      o: [{ title: "Low-signal changes", reason: "Lockfile evidence is grouped.", evidenceIndexes: [1] }],
+      u: [],
+    }, input)).toThrow("Evidence index 99 is outside the review input manifest");
+  });
+
   it("rejects overly verbose Codex prose before it reaches the artifact", () => {
     expect(() => parseAnalysisDocument({
       summary: "summary",
@@ -455,7 +480,7 @@ describe("analysis documents", () => {
       unclassifiedEvidenceIds: compactDocument.u,
     };
 
-    expect(analysisPrompt(input)).toContain("{s,c:[[id,title,kind,synopsis,before|null,after|null,confidence,attention,riskCategories,evidenceIds]],t:[[id,title,goal,youNowHave,[[concern,resolvedByStepId|null]],dependsOn,forwardRefs,advancesChapterIds,evidenceIds]],o:[[title,reason,evidenceIds]],u:[evidenceId],f:{evidenceId:[[startLine,endLine]]},x:[[command,outcome,summary,source]]}");
+    expect(analysisPrompt(input)).toContain("{s,c:[{id,title,kind,synopsis,before,after,confidence,attention,riskCategories,evidenceIndexes}],t:[{id,title,goal,youNowHave,deferred,dependsOn,forwardRefs,advancesChapterIds,evidenceIndexes}],o:[{title,reason,evidenceIndexes}],u:[evidenceIndex]");
     expect(JSON.stringify(compactDocument).length).toBeLessThan(JSON.stringify(fullDocument).length * 0.7);
   });
 
