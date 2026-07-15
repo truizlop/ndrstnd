@@ -7,15 +7,19 @@ import { installSkill, installedSkillIsStale } from "../src/server/skill.js";
 describe("installSkill", () => {
   let codexHome: string;
   let claudeHome: string;
+  let piHome: string;
   const previousCodexHome = process.env.CODEX_HOME;
   const previousClaudeHome = process.env.CLAUDE_CONFIG_DIR;
+  const previousPiHome = process.env.PI_CODING_AGENT_DIR;
 
   beforeEach(async () => {
     // Both agent homes must point at temp directories so tests never touch a real installation.
     codexHome = await mkdtemp(join(tmpdir(), "ndrstnd-skill-codex-"));
     claudeHome = await mkdtemp(join(tmpdir(), "ndrstnd-skill-claude-"));
+    piHome = await mkdtemp(join(tmpdir(), "ndrstnd-skill-pi-"));
     process.env.CODEX_HOME = codexHome;
     process.env.CLAUDE_CONFIG_DIR = claudeHome;
+    process.env.PI_CODING_AGENT_DIR = piHome;
   });
 
   afterEach(async () => {
@@ -23,13 +27,16 @@ describe("installSkill", () => {
     else process.env.CODEX_HOME = previousCodexHome;
     if (previousClaudeHome === undefined) delete process.env.CLAUDE_CONFIG_DIR;
     else process.env.CLAUDE_CONFIG_DIR = previousClaudeHome;
+    if (previousPiHome === undefined) delete process.env.PI_CODING_AGENT_DIR;
+    else process.env.PI_CODING_AGENT_DIR = previousPiHome;
     await rm(codexHome, { recursive: true, force: true });
     await rm(claudeHome, { recursive: true, force: true });
+    await rm(piHome, { recursive: true, force: true });
   });
 
   it("installs the bundled skill for every agent whose home exists", async () => {
     const installations = await installSkill();
-    expect(installations.map((installation) => [installation.agent.id, installation.status])).toEqual([["codex", "installed"], ["claude", "installed"]]);
+    expect(installations.map((installation) => [installation.agent.id, installation.status])).toEqual([["codex", "installed"], ["claude", "installed"], ["pi", "installed"]]);
     for (const installation of installations) {
       const skill = await readFile(join(installation.destination, "SKILL.md"), "utf8");
       expect(skill).toContain("evidence-led ndrstnd workspace");
@@ -38,14 +45,16 @@ describe("installSkill", () => {
       expect(skill).toContain('"help me understand these changes"');
       expect(skill).toContain("heartbeat");
       expect(skill).toContain("never kill or restart it mid-analysis");
-      expect(skill).toContain("`codex` for Codex, `claude` for Claude Code");
+      expect(skill).toContain("`codex` for Codex, `claude` for Claude Code, `pi` for Pi");
     }
     expect(installations[0].destination).toBe(join(codexHome, "skills", "ndrstnd"));
     expect(installations[1].destination).toBe(join(claudeHome, "skills", "ndrstnd"));
+    expect(installations[2].destination).toBe(join(piHome, "skills", "ndrstnd"));
   });
 
   it("only targets agents that are set up when none is requested explicitly", async () => {
     await rm(claudeHome, { recursive: true, force: true });
+    await rm(piHome, { recursive: true, force: true });
     const installations = await installSkill();
     expect(installations.map((installation) => installation.agent.id)).toEqual(["codex"]);
   });
@@ -53,6 +62,7 @@ describe("installSkill", () => {
   it("fails when no agent is set up instead of guessing a destination", async () => {
     await rm(codexHome, { recursive: true, force: true });
     await rm(claudeHome, { recursive: true, force: true });
+    await rm(piHome, { recursive: true, force: true });
     await expect(installSkill()).rejects.toThrow("No supported agent is set up");
   });
 
@@ -62,6 +72,12 @@ describe("installSkill", () => {
     expect(installations).toHaveLength(1);
     expect(installations[0].status).toBe("installed");
     expect(installations[0].destination).toBe(join(claudeHome, "skills", "ndrstnd"));
+  });
+
+  it("installs Pi explicitly into its native skill directory", async () => {
+    await rm(piHome, { recursive: true, force: true });
+    const installations = await installSkill(false, "pi");
+    expect(installations).toMatchObject([{ agent: { id: "pi" }, status: "installed", destination: join(piHome, "skills", "ndrstnd") }]);
   });
 
   it("skips an existing installation unless forced", async () => {

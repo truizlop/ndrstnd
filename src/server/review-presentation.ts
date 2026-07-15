@@ -1,3 +1,4 @@
+import { reviewAgentById } from "./agent.js";
 import type { AnalysisRevision, StoredReviewSession } from "./store.js";
 import type { ReviewPresentationData } from "../web/review-data.js";
 
@@ -11,6 +12,6 @@ export function createReviewPresentationData(session: StoredReviewSession, revis
     files: session.input.files,
     hunks: session.input.hunks,
     document: revision.document,
-    agentName: revision.source === "claude" ? "Claude Code" : "Codex",
+    agentName: reviewAgentById(revision.source)?.name ?? "ndrstnd",
   };
 }

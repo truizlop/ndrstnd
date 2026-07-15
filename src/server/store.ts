@@ -6,6 +6,7 @@ import Database from "better-sqlite3";
 import type { ConversationContext } from "./conversation.js";
 import { ANALYSIS_DOCUMENT_VERSION, AnalysisDocumentSchema, type AnalysisDocument } from "../shared/analysis-schema.js";
 import type { CollectedReviewInput } from "./git.js";
+import type { ReviewAgentId } from "./agent.js";
 
 export interface StoredReviewSession {
   id: string;
@@ -24,7 +25,7 @@ export interface AnalysisRevision {
   sessionId: string;
   status: "partial" | "complete" | "failed";
   // "fallback" only survives in databases written before fallback analysis was removed.
-  source: "fallback" | "codex" | "claude";
+  source: "fallback" | ReviewAgentId;
   document: AnalysisDocument;
   createdAt: string;
 }

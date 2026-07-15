@@ -35,6 +35,7 @@ describe("ndrstnd CLI", () => {
     expect(result.code).toBe(0);
     expect(result.stdout).toContain("understand agent-produced branch changes");
     expect(result.stdout).toContain("--fresh");
+    expect(result.stdout).toContain("--agent <codex|claude|pi>");
   });
 
   it("rejects unknown review options loudly", async () => {
@@ -74,5 +75,10 @@ describe("ndrstnd CLI", () => {
     expect(result.code).toBe(1);
     expect(result.stderr.trim()).toBe("Could not start Codex: the `codex` CLI was not found on PATH. Install it or add its directory to PATH, then retry `ndrstnd auth login --agent codex`.");
     expect(result.stderr).not.toContain("node:internal/");
+
+    const pi = await runCli(["auth", "login", "--agent", "pi"], { ...process.env, PATH: "/definitely/missing" });
+    expect(pi.code).toBe(1);
+    expect(pi.stdout).toContain("Pi will open. Run /login, configure a provider, then run /quit.");
+    expect(pi.stderr.trim()).toBe("Could not start Pi: the `pi` CLI was not found on PATH. Install it or add its directory to PATH, then retry `ndrstnd auth login --agent pi`.");
   });
 }, 30_000);
