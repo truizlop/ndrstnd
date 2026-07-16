@@ -29,6 +29,9 @@ describe("renderArtifact", () => {
     const codexPage = await renderArtifact(createReviewPresentationData(session, { id: "revision", sessionId: "session", source: "codex", status: "complete", document: buildTestAnalysis(session.input), createdAt: "now" }));
     expect(codexPage).toContain('<body data-agent="Codex">');
     expect(codexPage).toContain("Copy Codex prompt");
+    const piPage = await renderArtifact(createReviewPresentationData(session, { id: "revision", sessionId: "session", source: "pi", status: "complete", document: buildTestAnalysis(session.input), createdAt: "now" }));
+    expect(piPage).toContain('<body data-agent="Pi">');
+    expect(piPage).toContain("Copy Pi prompt");
   });
 
   it("has a touch-first mobile layout without page-level horizontal overflow", () => {

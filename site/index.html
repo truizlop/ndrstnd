@@ -496,7 +496,7 @@ h2.display{margin:0 0 14px;font:600 clamp(28px,4.4vw,42px)/1.15 var(--serif);let
     <!-- Hero product shot: faithful recreation of the Story view -->
     <div class="reveal" style="--d:300ms">
     <div class="shot" role="img" aria-label="The ndrstnd Story view: a review summary, five semantic chapters with color-coded attention levels, and an at-a-glance inspector.">
-      <div class="shot-bar" aria-hidden="true"><span class="shot-dots"><i></i><i></i><i></i></span><span class="shot-url" data-codex=".ndrstnd/codex-checkout-retry-hardening.html" data-claude=".ndrstnd/claude-checkout-retry-hardening.html">.ndrstnd/codex-checkout-retry-hardening.html</span><span style="width:46px"></span></div>
+      <div class="shot-bar" aria-hidden="true"><span class="shot-dots"><i></i><i></i><i></i></span><span class="shot-url" data-codex=".ndrstnd/codex-checkout-retry-hardening.html" data-claude=".ndrstnd/claude-checkout-retry-hardening.html" data-pi=".ndrstnd/pi-checkout-retry-hardening.html">.ndrstnd/codex-checkout-retry-hardening.html</span><span style="width:46px"></span></div>
       <div class="am" aria-hidden="true">
         <aside class="am-side">
           <div class="am-brand"><svg viewBox="0 0 20 22"><path d="M4.4 3.4 10 7.6l5.6-4.2"/><path d="M4.4 8.9 10 13.1l5.6-4.2"/><path class="mark-deep" d="M4.4 14.4 10 18.6l5.6-4.2"/></svg><b>ndrstnd</b></div>
@@ -511,7 +511,7 @@ h2.display{margin:0 0 14px;font:600 clamp(28px,4.4vw,42px)/1.15 var(--serif);let
           <div class="am-masthead">
             <div>
               <p class="am-overline">Change review</p>
-              <p class="am-ref" data-codex="codex/checkout-retry-hardening" data-claude="claude/checkout-retry-hardening">codex/checkout-retry-hardening</p>
+              <p class="am-ref" data-codex="codex/checkout-retry-hardening" data-claude="claude/checkout-retry-hardening" data-pi="pi/checkout-retry-hardening">codex/checkout-retry-hardening</p>
               <div class="am-crumbs"><span>against <strong>main</strong></span><span>merge base <code>f3a91c02</code></span></div>
             </div>
             <div class="dial" style="width:150px;height:24px;flex:none" aria-hidden="true">
@@ -547,7 +547,7 @@ h2.display{margin:0 0 14px;font:600 clamp(28px,4.4vw,42px)/1.15 var(--serif);let
           <section>
             <h5>Actions</h5>
             <div class="am-action"><svg viewBox="0 0 16 16"><path d="M8 9.8V2.6M5.2 5.2L8 2.4l2.8 2.8"/><path d="M2.8 9.6v2.6a1.2 1.2 0 0 0 1.2 1.2h8a1.2 1.2 0 0 0 1.2-1.2V9.6"/></svg>Export review…</div>
-            <div class="am-action"><svg viewBox="0 0 16 16"><rect x="5.4" y="5.4" width="7.8" height="8.6" rx="1.6"/><path d="M2.8 10.6V4.2a1.4 1.4 0 0 1 1.4-1.4h5.4"/></svg>Copy <span data-codex="Codex" data-claude="Claude Code">Codex</span> prompt</div>
+            <div class="am-action"><svg viewBox="0 0 16 16"><rect x="5.4" y="5.4" width="7.8" height="8.6" rx="1.6"/><path d="M2.8 10.6V4.2a1.4 1.4 0 0 1 1.4-1.4h5.4"/></svg>Copy <span data-codex="Codex" data-claude="Claude Code" data-pi="Pi">Codex</span> prompt</div>
           </section>
         </aside>
       </div>
@@ -587,7 +587,7 @@ h2.display{margin:0 0 14px;font:600 clamp(28px,4.4vw,42px)/1.15 var(--serif);let
       <div class="why-copy reveal" style="--d:120ms">
         <p>Coding agents produce more change per hour than anyone can absorb in file-path order. The diff is <strong>complete</strong>, but completeness isn't comprehension: a lockfile and a payment-critical retry loop get equal billing.</p>
         <p>ndrstnd reads the branch the way you'd want a colleague to walk you through it: <strong>claims first, meaning second, evidence on demand.</strong> Every sentence in the story links to the hunks that prove it.</p>
-        <p class="footnote">It compares the branch to its merge-base and asks your agent, Codex or Claude Code, for the narrative. If the analysis fails, it tells you so: it never fabricates a story it can't back with evidence.</p>
+        <p class="footnote">It compares the branch to its merge-base and asks your agent—Codex, Claude Code, or Pi—for the narrative. If the analysis fails, it tells you so: it never fabricates a story it can't back with evidence.</p>
       </div>
       <div class="panels reveal" style="--d:180ms" role="img" aria-label="Side by side: a flat alphabetical file list versus five semantic story chapters.">
         <div class="panel" aria-hidden="true">
@@ -815,31 +815,31 @@ h2.display{margin:0 0 14px;font:600 clamp(28px,4.4vw,42px)/1.15 var(--serif);let
 <section class="codex" id="agents">
   <div class="wrap">
     <div class="reveal" style="display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:14px">
-      <p class="overline" style="margin:0">Codex &amp; Claude Code integration</p>
-      <div class="agent-switch" role="group" aria-label="Show the example for"><button class="active" data-agent="codex" type="button">Codex</button><button data-agent="claude" type="button">Claude Code</button></div>
+      <p class="overline" style="margin:0">Codex, Claude Code &amp; Pi integration</p>
+      <div class="agent-switch" role="group" aria-label="Show the example for"><button class="active" data-agent="codex" type="button">Codex</button><button data-agent="claude" type="button">Claude Code</button><button data-agent="pi" type="button">Pi</button></div>
     </div>
     <h2 class="display reveal" style="--d:60ms">Your agent hands you the review.</h2>
     <div class="cx-grid">
       <div class="reveal" style="--d:120ms">
-        <p class="lede">ndrstnd ships as a skill for Codex and Claude Code, plus a CLI. Install the skill once, and your agent can end its coding tasks by preparing an ndrstnd workspace for the human, instead of a wall of diff.</p>
+        <p class="lede">ndrstnd ships as a skill for Codex, Claude Code, and Pi, plus a CLI. Install the skill once, and your agent can end its coding tasks by preparing an ndrstnd workspace for the human, instead of a wall of diff.</p>
         <ul class="cx-points">
-          <li><span class="n">1</span><div><b>Skill-aware</b><p>After finishing a task, Codex or Claude Code runs ndrstnd on the branch (the analysis runs on the same agent that asked) and links the artifact in its reply, ready to read on desktop or mobile.</p></div></li>
-          <li><span class="n">2</span><div><b>Read it without leaving your agent</b><p>Ask Codex or Claude Code to use ndrstnd and open the artifact right in the app's side panel. And when your agent runs remotely, the same review reads comfortably from your phone.</p></div></li>
+          <li><span class="n">1</span><div><b>Skill-aware</b><p>After finishing a task, Codex, Claude Code, or Pi runs ndrstnd on the branch (the analysis runs on the same agent that asked) and links the artifact in its reply, ready to read on desktop or mobile.</p></div></li>
+          <li><span class="n">2</span><div><b>Read it anywhere</b><p>Ask Codex, Claude Code, or Pi to use ndrstnd, then open the portable HTML artifact in a browser. When your agent runs remotely, the same review reads comfortably from your phone.</p></div></li>
           <li><span class="n">3</span><div><b>Conversation-informed</b><p>Pass <code>--conversation</code> and the implementation dialogue becomes part of the story: the decisions, not just the diff.</p></div></li>
           <li><span class="n">4</span><div><b>Zero token custody</b><p>ndrstnd rides your agent's existing authenticated session, whichever one drafts the narrative. It never stores a credential of its own.</p></div></li>
         </ul>
       </div>
-      <div class="term reveal" style="--d:180ms" role="img" aria-label="Terminal session: installing the ndrstnd skill for Codex and Claude Code and reviewing a branch.">
+      <div class="term reveal" style="--d:180ms" role="img" aria-label="Terminal session: installing the ndrstnd skill for Codex, Claude Code, and Pi and reviewing a branch.">
         <div class="term-bar" aria-hidden="true"><i></i><i></i><i></i><em>zsh · ~/work/checkout</em></div>
         <pre aria-hidden="true"><span class="ps1">$</span> <span class="cmd">ndrstnd skill install</span>
 <span class="out">Installed the ndrstnd skill for Codex at ~/.codex/skills/ndrstnd.</span>
 <span class="out">Installed the ndrstnd skill for Claude Code at ~/.claude/skills/ndrstnd.</span>
 
-<span class="ps1">$</span> <span class="cmd">ndrstnd review <span data-codex="codex/checkout-retry-hardening" data-claude="claude/checkout-retry-hardening">codex/checkout-retry-hardening</span> --repo .</span>
-<span class="out">Drafting the review narrative with <span data-codex="Codex" data-claude="Claude Code">Codex</span>…</span>
+<span class="ps1">$</span> <span class="cmd">ndrstnd review <span data-codex="codex/checkout-retry-hardening" data-claude="claude/checkout-retry-hardening" data-pi="pi/checkout-retry-hardening">codex/checkout-retry-hardening</span> --repo .</span>
+<span class="out">Drafting the review narrative with <span data-codex="Codex" data-claude="Claude Code" data-pi="Pi">Codex</span>…</span>
 <span class="out">merge-base=f3a91c02b7d4 files=12 meaningful-files=7</span>
 <span class="out">hunks=31 conversation=42</span>
-<span class="out">ndrstnd artifact: <span class="hl" data-codex=".ndrstnd/codex-checkout-retry-hardening.html" data-claude=".ndrstnd/claude-checkout-retry-hardening.html">.ndrstnd/codex-checkout-retry-hardening.html</span></span></pre>
+<span class="out">ndrstnd artifact: <span class="hl" data-codex=".ndrstnd/codex-checkout-retry-hardening.html" data-claude=".ndrstnd/claude-checkout-retry-hardening.html" data-pi=".ndrstnd/pi-checkout-retry-hardening.html">.ndrstnd/codex-checkout-retry-hardening.html</span></span></pre>
       </div>
     </div>
   </div>
@@ -851,7 +851,7 @@ h2.display{margin:0 0 14px;font:600 clamp(28px,4.4vw,42px)/1.15 var(--serif);let
     <div class="inst-head reveal">
       <p class="overline" style="margin:0">Get started</p>
       <span class="soon">Homebrew · shipping soon</span>
-      <div class="agent-switch" role="group" aria-label="Show the example for"><button class="active" data-agent="codex" type="button">Codex</button><button data-agent="claude" type="button">Claude Code</button></div>
+      <div class="agent-switch" role="group" aria-label="Show the example for"><button class="active" data-agent="codex" type="button">Codex</button><button data-agent="claude" type="button">Claude Code</button><button data-agent="pi" type="button">Pi</button></div>
     </div>
     <h2 class="display reveal" style="--d:60ms">Four commands to your first story.</h2>
     <p class="lede reveal" style="--d:120ms">The repository doubles as a Homebrew tap, so the whole setup is:</p>
@@ -870,15 +870,15 @@ h2.display{margin:0 0 14px;font:600 clamp(28px,4.4vw,42px)/1.15 var(--serif);let
         <span class="step-n">2</span>
         <div>
           <h3>Connect your agent</h3>
-          <p>ndrstnd reuses your existing Codex or Claude Code session. It never stores a token itself.</p>
-          <div class="codeblock"><pre><span class="ps1">$ </span><span data-codex="ndrstnd auth login" data-claude="ndrstnd auth login --agent claude">ndrstnd auth login</span></pre><button class="copy-btn" data-copy="ndrstnd auth login" data-copy-codex="ndrstnd auth login" data-copy-claude="ndrstnd auth login --agent claude" aria-label="Copy auth command"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5.4" y="5.4" width="7.8" height="8.6" rx="1.6"/><path d="M2.8 10.6V4.2a1.4 1.4 0 0 1 1.4-1.4h5.4"/></svg></button></div>
+          <p>ndrstnd reuses your existing Codex, Claude Code, or Pi session. It never stores a token itself; select Pi with <code style="font:500 12px var(--mono)">--agent pi</code> or <code style="font:500 12px var(--mono)">NDRSTND_AGENT=pi</code>.</p>
+          <div class="codeblock"><pre><span class="ps1">$ </span><span data-codex="ndrstnd auth login" data-claude="ndrstnd auth login --agent claude" data-pi="ndrstnd auth login --agent pi">ndrstnd auth login</span></pre><button class="copy-btn" data-copy="ndrstnd auth login" data-copy-codex="ndrstnd auth login" data-copy-claude="ndrstnd auth login --agent claude" data-copy-pi="ndrstnd auth login --agent pi" aria-label="Copy auth command"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5.4" y="5.4" width="7.8" height="8.6" rx="1.6"/><path d="M2.8 10.6V4.2a1.4 1.4 0 0 1 1.4-1.4h5.4"/></svg></button></div>
         </div>
       </div>
       <div class="step reveal" style="--d:120ms">
         <span class="step-n">3</span>
         <div>
           <h3>Teach your agent</h3>
-          <p>Install the skill for Codex and Claude Code so finished tasks arrive as ndrstnd workspaces.</p>
+          <p>Install the skill for Codex, Claude Code, and Pi so finished tasks arrive as ndrstnd workspaces.</p>
           <div class="codeblock"><pre><span class="ps1">$ </span>ndrstnd skill install</pre><button class="copy-btn" data-copy="ndrstnd skill install" aria-label="Copy skill install command"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="5.4" y="5.4" width="7.8" height="8.6" rx="1.6"/><path d="M2.8 10.6V4.2a1.4 1.4 0 0 1 1.4-1.4h5.4"/></svg></button></div>
         </div>
       </div>
@@ -979,7 +979,7 @@ h2.display{margin:0 0 14px;font:600 clamp(28px,4.4vw,42px)/1.15 var(--serif);let
   let demoUserPaused = false;
   const demoPlay = () => demoVideo.play().catch(() => {});
   const swapDemoVideo = (agent) => {
-    if (!demoVideo || demoVideo.dataset.agent === agent) return;
+    if (!demoVideo || demoVideo.dataset.agent === agent || !demoVideo.getAttribute('data-video-' + agent)) return;
     const at = demoVideo.currentTime;
     const resume = !demoVideo.paused;
     demoVideo.dataset.agent = agent;

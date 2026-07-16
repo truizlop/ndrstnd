@@ -92,7 +92,7 @@ function formatCount(count: number): string {
   return count < 1_000 ? String(count) : `${(count / 1_000).toFixed(1)}k`;
 }
 
-const TRANSIENT_AGENT_FAILURE = /stalled|timed out|exited with status|app-server closed|could not run|not running/i;
+const TRANSIENT_AGENT_FAILURE = /stalled|timed out|did not answer|stopped accepting input|exited with status|app-server closed|could not run|not running/i;
 
 async function withFreshClientRetry<T>(agent: ReviewAgent, run: (client: AgentClient) => Promise<T>): Promise<T> {
   const attempt = async (): Promise<T> => {

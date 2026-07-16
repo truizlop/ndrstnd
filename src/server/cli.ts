@@ -14,6 +14,7 @@ import { packageVersion } from "./version.js";
 import { pathToFileURL } from "node:url";
 import { join, resolve } from "node:path";
 
+const reviewAgentOption = reviewAgents.map((agent) => agent.id).join("|");
 const [command, ...args] = process.argv.slice(2);
 
 if (command === undefined || command === "--help" || command === "-h") {
@@ -70,7 +71,7 @@ function agentOptionFrom(values: Map<string, string>): ReviewAgentId | undefined
 async function runSkill(args: string[]): Promise<void> {
   if (wantsHelp(args)) return printHelp();
   const { positional, values, flags } = parseCommandArgs("skill", args, ["--agent"], ["--force"], 1);
-  if (positional[0] !== "install") fail("Usage: ndrstnd skill install [--force] [--agent <codex|claude>]");
+  if (positional[0] !== "install") fail(`Usage: ndrstnd skill install [--force] [--agent <${reviewAgentOption}>]`);
   const installations = await installSkill(flags.has("--force"), agentOptionFrom(values)).catch((error: unknown) => fail(error instanceof Error ? error.message : String(error)));
   for (const installation of installations) {
     if (installation.status === "installed") process.stdout.write(`Installed the ndrstnd skill for ${installation.agent.name} at ${installation.destination}.\n`);
@@ -113,6 +114,7 @@ async function runAuth(args: string[]): Promise<void> {
 }
 
 async function runAgentLogin(agent: ReviewAgent): Promise<void> {
+  if (agent.loginInstructions !== undefined) process.stdout.write(`${agent.loginInstructions}\n`);
   const child = spawn(agent.command, agent.loginArgs, { stdio: "inherit" });
   const exitCode = await new Promise<number | null>((resolve, reject) => {
     child.once("error", reject);
@@ -258,7 +260,7 @@ function formatAgentLaunchError(agent: ReviewAgent, error: unknown): string {
 }
 
 function printHelp(): void {
-  process.stdout.write(`ndrstnd: understand agent-produced branch changes\n\nUsage:\n  ndrstnd auth <status|login> [--agent <codex|claude>]\n  ndrstnd skill install [--force] [--agent <codex|claude>]\n  ndrstnd review [branch] [--base <branch>] [--uncommitted] [--repo <path>] [--conversation <path>] [--agent <codex|claude>] [--fresh] [--no-open]\n  ndrstnd --version\n\nWithout a branch, ndrstnd reviews the checked-out branch including uncommitted changes.\n--uncommitted reviews only the uncommitted working-tree changes (an alias for --base HEAD).\n--agent picks the analysis agent; without it ndrstnd uses NDRSTND_AGENT, then the Codex or Claude Code session it runs inside, then the first installed CLI, preferring Codex.\n--fresh re-analyzes even when a cached analysis exists for the same input.\n`);
+  process.stdout.write(`ndrstnd: understand agent-produced branch changes\n\nUsage:\n  ndrstnd auth <status|login> [--agent <${reviewAgentOption}>]\n  ndrstnd skill install [--force] [--agent <${reviewAgentOption}>]\n  ndrstnd review [branch] [--base <branch>] [--uncommitted] [--repo <path>] [--conversation <path>] [--agent <${reviewAgentOption}>] [--fresh] [--no-open]\n  ndrstnd --version\n\nWithout a branch, ndrstnd reviews the checked-out branch including uncommitted changes.\n--uncommitted reviews only the uncommitted working-tree changes (an alias for --base HEAD).\n--agent picks the analysis agent; without it ndrstnd uses NDRSTND_AGENT, then the hosting agent session, then the first installed CLI, preferring Codex.\n--fresh re-analyzes even when a cached analysis exists for the same input.\n`);
 }
 
 function fail(message: string): never {

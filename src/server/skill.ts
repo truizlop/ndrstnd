@@ -57,7 +57,7 @@ export async function installSkill(force = false, agentId?: ReviewAgentId): Prom
   const source = bundledSkillDirectory();
   const targets = agentId === undefined ? await detectedAgents() : [requireAgent(agentId)];
   if (targets.length === 0) {
-    throw new Error(`No supported agent is set up: none of ${reviewAgents.map((agent) => agent.homeDirectory()).join(", ")} exists. Install Codex or Claude Code first, or pass --agent to choose one explicitly.`);
+    throw new Error(`No supported agent is set up: none of ${reviewAgents.map((agent) => agent.homeDirectory()).join(", ")} exists. Install one of ${reviewAgents.map((agent) => agent.name).join(", ")} first, or pass --agent to choose one explicitly.`);
   }
   const installations: SkillInstallation[] = [];
   for (const agent of targets) {

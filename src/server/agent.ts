@@ -4,6 +4,7 @@ import { homedir } from "node:os";
 import { delimiter, join } from "node:path";
 import { CodexAppServerClient, getCodexAuthStatus } from "./codex.js";
 import { ClaudeCodeClient, getClaudeAuthStatus } from "./claude.js";
+import { PiRpcClient, getPiAuthStatus } from "./pi.js";
 
 export type AuthStatus =
   | { state: "signed-in"; accountType: string }
@@ -27,7 +28,8 @@ export interface AgentClient {
   close(): void;
 }
 
-export type ReviewAgentId = "codex" | "claude";
+/** Stable identifier accepted by CLI, persistence, and presentation boundaries for a review agent. */
+export type ReviewAgentId = "codex" | "claude" | "pi";
 
 export interface ReviewAgent {
   id: ReviewAgentId;
@@ -37,6 +39,8 @@ export interface ReviewAgent {
   command: string;
   /** Arguments after the command that start the interactive sign-in flow. */
   loginArgs: string[];
+  /** Instructions printed before an agent-specific interactive sign-in flow. */
+  loginInstructions?: string;
   /** The agent's configuration directory, whose skills/ subdirectory receives the ndrstnd skill. */
   homeDirectory(): string;
   createClient(): AgentClient;
@@ -63,8 +67,20 @@ export const claudeAgent: ReviewAgent = {
   getAuthStatus: getClaudeAuthStatus,
 };
 
-/** Codex stays first: it was ndrstnd's original agent, so it remains the default when both CLIs are installed. */
-export const reviewAgents: readonly ReviewAgent[] = [codexAgent, claudeAgent];
+/** Pi agent configuration backed by one ephemeral RPC session per analysis attempt. */
+export const piAgent: ReviewAgent = {
+  id: "pi",
+  name: "Pi",
+  command: "pi",
+  loginArgs: [],
+  loginInstructions: "Pi will open. Run /login, configure a provider, then run /quit.",
+  homeDirectory: () => process.env.PI_CODING_AGENT_DIR ?? join(homedir(), ".pi", "agent"),
+  createClient: () => new PiRpcClient(),
+  getAuthStatus: getPiAuthStatus,
+};
+
+/** Codex stays first: it was ndrstnd's original agent, so it remains the default when multiple CLIs are installed. */
+export const reviewAgents: readonly ReviewAgent[] = [codexAgent, claudeAgent, piAgent];
 
 export function reviewAgentById(id: string): ReviewAgent | undefined {
   return reviewAgents.find((agent) => agent.id === id);
@@ -72,11 +88,12 @@ export function reviewAgentById(id: string): ReviewAgent | undefined {
 
 /**
  * The agent whose session this process was launched from, if any. Each CLI marks
- * the shell commands it runs: Claude Code sets CLAUDECODE, and Codex sets
- * CODEX_SANDBOX for sandboxed commands. Claude Code wins when both appear,
- * because its marker is set unconditionally and so names the innermost host.
+ * the shell commands it runs: Pi sets PI_CODING_AGENT, Claude Code sets
+ * CLAUDECODE, and Codex sets CODEX_SANDBOX for sandboxed commands. Pi wins
+ * because its marker names the innermost Pi process even when outer markers remain.
  */
 export function hostAgent(env: NodeJS.ProcessEnv = process.env): ReviewAgent | undefined {
+  if (env["PI_CODING_AGENT"] !== undefined && env["PI_CODING_AGENT"] !== "") return piAgent;
   if (env["CLAUDECODE"] !== undefined && env["CLAUDECODE"] !== "") return claudeAgent;
   if (env["CODEX_SANDBOX"] !== undefined && env["CODEX_SANDBOX"] !== "") return codexAgent;
   return undefined;

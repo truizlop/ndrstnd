@@ -15,16 +15,16 @@ ndrstnd is a local comprehension workspace for large, agent-produced branch chan
 
 The command prints the review scope (base, changed files, whether uncommitted changes are included), drafts the narrative with your analysis agent (printing a heartbeat line every 15 seconds naming what the agent is doing, so a long analysis is never mistaken for a hang), then writes and opens a self-contained HTML review artifact. Artifacts live under the reviewed repository’s Git-ignored `.ndrstnd/` directory, are private to the local working copy, and are meant to be short-lived; delete them when the review is done.
 
-ndrstnd analyzes with Codex or Claude Code and uses the agent’s existing authenticated session. It never stores a token itself.
+ndrstnd analyzes with Codex, Claude Code, or Pi and uses the agent’s existing authenticated session. It never stores a token itself.
 
 ## Choosing the agent
 
-Every command accepts `--agent codex` or `--agent claude`:
+Every command accepts `--agent codex`, `--agent claude`, or `--agent pi`:
 
-    ndrstnd auth login --agent claude
-    ndrstnd review feature/my-change --base main --agent claude
+    ndrstnd auth login --agent pi
+    ndrstnd review feature/my-change --base main --agent pi
 
-Without `--agent`, ndrstnd honors the `NDRSTND_AGENT` environment variable; then, when the command runs inside a Codex or Claude Code session (as it does when the installed skill triggers it), it uses that hosting agent; otherwise it falls back to the first installed CLI, preferring Codex. `ndrstnd auth status` reports both agents, and `ndrstnd skill install` installs the skill for every agent that is set up on the machine.
+The same value can be set with `NDRSTND_AGENT=pi`. Without an explicit agent, ndrstnd uses the agent hosting the command when it runs inside Codex, Claude Code, or Pi (as it does when the installed skill triggers it); otherwise it falls back to the first installed CLI, preferring Codex. `ndrstnd auth status` reports all three agents, and `ndrstnd skill install` installs the skill for every agent that is set up on the machine.
 
 ## Choosing the scope
 
@@ -50,7 +50,7 @@ ndrstnd is for understanding code: it explains the implementation story, evidenc
 ndrstnd keeps deterministic transformation logic in small core modules and side effects at the boundary:
 
 - `src/server/git-model.ts` parses Git output and classifies files; `src/server/git.ts` runs Git commands.
-- `src/server/analysis-core.ts` builds prompts and validates the analysis contract; `src/server/analyze.ts` runs the analysis through the selected agent, which `src/server/agent.ts` resolves and `src/server/codex.ts` / `src/server/claude.ts` implement.
+- `src/server/analysis-core.ts` builds prompts and validates the analysis contract; `src/server/analyze.ts` runs the analysis through the selected agent, which `src/server/agent.ts` resolves and `src/server/codex.ts`, `src/server/claude.ts`, and `src/server/pi.ts` implement.
 - `src/web/evidence-model.ts`, `src/web/test-plan-model.ts`, and `src/web/language.ts` derive presentation data; `src/web/page.ts` renders the self-contained artifact.
 
 Run `npm run lint`, `npm test`, and `npm run build` before committing. The test suite includes pure unit tests, Git/HTTP/store integration tests, rendered artifact and browser-script UI tests, and an end-to-end artifact pipeline test.

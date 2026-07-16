@@ -49,11 +49,13 @@ describe("ReviewStore", () => {
     const revisions: AnalysisRevision[] = [
       { ...base, id: "codex-partial", source: "codex", status: "partial" },
       { ...base, id: "claude-complete", source: "claude", status: "complete" },
+      { ...base, id: "pi-complete", source: "pi", status: "complete" },
       { ...base, id: "codex-complete", source: "codex", status: "complete" },
     ];
 
     expect(selectReusableRevision(revisions, "codex")?.id).toBe("codex-complete");
     expect(selectReusableRevision(revisions, "claude")?.id).toBe("claude-complete");
+    expect(selectReusableRevision(revisions, "pi")?.id).toBe("pi-complete");
     expect(selectReusableRevision(revisions.slice(0, 1), "codex")).toBeUndefined();
   });
 

@@ -25,8 +25,8 @@ class Ndrstnd < Formula
   def caveats
     data_dir = OS.mac? ? "~/Library/Application Support/ndrstnd" : "$XDG_DATA_HOME/ndrstnd (default ~/.local/share/ndrstnd)"
     <<~EOS
-      ndrstnd analyzes with an installed Codex or Claude Code CLI and uses its
-      authenticated session; it never stores a token itself.
+      ndrstnd analyzes with an installed Codex, Claude Code, or Pi CLI and uses
+      its authenticated session; it never stores a token itself.
 
       ndrstnd stores local state under:
         #{data_dir}/ndrstnd.sqlite
@@ -38,7 +38,7 @@ class Ndrstnd < Formula
         ndrstnd skill install
         ndrstnd review feature/my-change --base main
 
-      Every command accepts --agent codex or --agent claude.
+      Every command accepts --agent codex, --agent claude, or --agent pi.
     EOS
   end
 
