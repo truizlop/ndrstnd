@@ -31,6 +31,15 @@ const sourceStep = {
   evidenceIds: ["source-hunk"],
 };
 
+const manyStepInput: CollectedReviewInput = {
+  repoPath: "/repo",
+  targetRef: "agent",
+  baseRef: "main",
+  mergeBase: "base",
+  files: Array.from({ length: 8 }, (_, index) => ({ id: `file-${index}`, path: `app-${index}.ts`, status: "modified" as const, binary: false, signal: "meaningful" as const })),
+  hunks: Array.from({ length: 8 }, (_, index) => ({ id: `hunk-${index}`, fileId: `file-${index}`, oldStart: 1, newStart: 1, lines: [] })),
+};
+
 describe("analysis documents", () => {
   it("reports the failed response phase without exposing the response body", () => {
     let message = "";
@@ -51,6 +60,16 @@ describe("analysis documents", () => {
       chapters: [{ id: "one", title: "Runner behavior", kind: "behavior", synopsis: validSynopsis, confidence: "high", attention: "contained", riskCategories: ["behavior"], evidenceIds: ["not-real"] }],
       steps: [sourceStep], omittedGroups: [{ title: "Low-signal changes", reason: "Lockfile evidence is grouped.", evidenceIds: ["lock-hunk"] }], unclassifiedEvidenceIds: [],
     }), input)).toThrow(/review invariant validation failed: Analysis referenced unknown evidence: not-real/);
+  });
+
+  it("reports the failing property inside an explicit agent document", () => {
+    expect(() => parseAnalysisResponse(JSON.stringify({
+      summary: validSummary,
+      chapters: [],
+      steps: [{ id: "step-01", title: "Build runner behavior", goal: sourceStep.goal, youNowHave: sourceStep.youNowHave, deferred: [], dependsOn: [], forwardRefs: [], advancesChapterIds: ["one"] }],
+      omittedGroups: [],
+      unclassifiedEvidenceIndexes: [],
+    }), input)).toThrow("steps.0.evidenceIndexes: Required");
   });
 
   it("repairs a malformed first response and accepts the corrected document", async () => {
@@ -84,14 +103,15 @@ describe("analysis documents", () => {
     const document = await analyzeWithAgent(agent, input);
     expect(document.summary).toBe(validSummary);
     expect(repairPrompts).toHaveLength(2);
-    expect(repairPrompts[1]).toContain("Chapters and steps are named objects");
-    expect(repairPrompts[1]).toContain("Evidence references are zero-based integer indexes");
+    expect(repairPrompts[1]).toContain("explicit named-object format");
+    expect(repairPrompts[1]).toContain("forwardRefs is [{symbol,introducedByStepId}]");
   });
 
-  it("keeps the repair prompt explicit about the compact tuple contract", () => {
+  it("keeps the repair prompt explicit about the named-object contract", () => {
     const prompt = analysisRepairPrompt("c.0.8.0: Invalid enum value");
-    expect(prompt).toContain("return only one valid minified JSON object");
-    expect(prompt).toContain("Chapters and steps are named objects");
+    expect(prompt).toContain("return only one valid JSON object in the explicit named-object format");
+    expect(prompt).toContain("A step's deferred items are {concern,resolvedByStepId}");
+    expect(prompt).toContain("forwardRefs is [{symbol,introducedByStepId}]");
     expect(prompt).toContain("Evidence references are zero-based integer indexes");
   });
 
@@ -127,7 +147,7 @@ describe("analysis documents", () => {
     const chapter = { id: "one", title: "Runner behavior", kind: "behavior" as const, synopsis: validSynopsis, confidence: "high" as const, attention: "contained" as const, riskCategories: ["behavior" as const], evidenceIds: ["source-hunk"] };
     expect(() => parseAnalysisDocument({ summary: validSummary, chapters: [chapter], steps: [sourceStep], omittedGroups: [], unclassifiedEvidenceIds: ["lock-hunk"] }, input)).toThrow("Low-signal evidence was left ungrouped");
     expect(() => parseAnalysisDocument({ summary: validSummary, chapters: [chapter], steps: [sourceStep], omittedGroups: [], unclassifiedEvidenceIds: [] }, input)).toThrow("Low-signal evidence was left ungrouped");
-    expect(analysisPrompt(input)).toContain("Group every low-signal evidence index into an omitted group in o");
+    expect(analysisPrompt(input)).toContain("Group every low-signal evidence index into an omitted group with a short reason");
   });
 
   it("states the same prose word ranges the validator enforces", () => {
@@ -241,7 +261,7 @@ describe("analysis documents", () => {
     expect(() => parseAnalysisDocument({ ...document, focus: { "source-hunk": [{ start: 10, end: 9 }] } }, focusInput)).toThrow("inverted");
     expect(() => parseAnalysisDocument({ ...document, focus: { "source-hunk": [{ start: 9, end: 9 }], "not-real": [{ start: 1, end: 1 }] } }, focusInput)).toThrow("Focus referenced unknown evidence");
     expect(parseAnalysisDocument({ ...document, focus: { "source-hunk": [{ start: 9, end: 9 }] } }, focusInput).focus).toEqual({ "source-hunk": [{ start: 9, end: 9 }] });
-    expect(analysisPrompt(focusInput)).toContain("f drives the Evidence zoom excerpts");
+    expect(analysisPrompt(focusInput)).toContain("Focus drives the Evidence zoom excerpts");
   });
 
   it("salvages valid focus and tolerates missing focus on the final repair attempt", () => {
@@ -327,6 +347,33 @@ describe("analysis documents", () => {
       steps: [{ evidenceIds: ["source-hunk"] }],
       omittedGroups: [{ evidenceIds: ["lock-hunk"] }],
     });
+  });
+
+  it("accepts eight explicit timeline objects with unresolved deferred concerns", () => {
+    const wireDocument = {
+      summary: validSummary,
+      chapters: [{ id: "one", title: "Runner behavior", kind: "behavior", synopsis: validSynopsis, before: null, after: null, confidence: "high", attention: "contained", riskCategories: ["behavior"], evidenceIndexes: Array.from({ length: 8 }, (_, index) => index) }],
+      steps: Array.from({ length: 8 }, (_, index) => ({
+        id: `step-${index + 1}`,
+        title: `Build capability ${index + 1}`,
+        goal: sourceStep.goal,
+        youNowHave: sourceStep.youNowHave,
+        deferred: [{ concern: "A later capability still needs to resolve this concern." }],
+        dependsOn: index === 0 ? [] : [`step-${index}`],
+        forwardRefs: index === 1 ? [{ symbol: "Runner", introducedByStepId: "step-1" }] : [],
+        advancesChapterIds: ["one"],
+        evidenceIndexes: [index],
+      })),
+      omittedGroups: [],
+      unclassifiedEvidenceIndexes: [],
+    };
+
+    const document = parseAnalysisResponse(JSON.stringify(wireDocument), manyStepInput);
+
+    expect(document.steps).toHaveLength(8);
+    expect(document.steps[0].deferred).toEqual([{ concern: "A later capability still needs to resolve this concern.", resolvedByStepId: undefined }]);
+    expect(document.steps[1].forwardRefs).toEqual({ Runner: "step-1" });
+    expect(document.steps[7].evidenceIds).toEqual(["hunk-7"]);
   });
 
   it("rejects a compact evidence index outside the manifest", () => {
@@ -480,7 +527,9 @@ describe("analysis documents", () => {
       unclassifiedEvidenceIds: compactDocument.u,
     };
 
-    expect(analysisPrompt(input)).toContain("{s,c:[{id,title,kind,synopsis,before,after,confidence,attention,riskCategories,evidenceIndexes}],t:[{id,title,goal,youNowHave,deferred,dependsOn,forwardRefs,advancesChapterIds,evidenceIndexes}],o:[{title,reason,evidenceIndexes}],u:[evidenceIndex]");
+    expect(analysisPrompt(input)).toContain("never use the short keys s, c, t, o, u, f, or x");
+    expect(analysisPrompt(input)).toContain("Each forward reference is an object with symbol and introducedByStepId");
+    expect(analysisPrompt(input)).toContain("Each deferred item is an object with concern and optional resolvedByStepId");
     expect(JSON.stringify(compactDocument).length).toBeLessThan(JSON.stringify(fullDocument).length * 0.7);
   });
 

@@ -56,11 +56,11 @@ export function parseAnalysisResponse(response: string, input: CollectedReviewIn
 }
 
 export function analysisRepairPrompt(problem: string): string {
-  return `Your prior response failed during analysis document validation. Fix the specific problem below and return only one valid minified JSON object; do not return Markdown, commentary, or a partial document.
+  return `Your prior response failed during analysis document validation. Fix the specific problem below and return only one valid JSON object in the explicit named-object format; do not return Markdown, commentary, short keys, positional arrays, or a partial document.
 
 Problem: ${problem}
 
-The compact shape is {s,c:[{id,title,kind,synopsis,before,after,confidence,attention,riskCategories,evidenceIndexes}],t:[{id,title,goal,youNowHave,deferred,dependsOn,forwardRefs,advancesChapterIds,evidenceIndexes}],o:[{title,reason,evidenceIndexes}],u:[evidenceIndex],f:{evidenceIndex:[[startLine,endLine]]},x:[[command,outcome,summary,source]]}. Chapters and steps are named objects, never positional arrays. Evidence references are zero-based integer indexes into the original review input manifest, never hunk ID strings. Use only manifest indexes, preserve valid fields, and correct every issue named above.`;
+Use these top-level properties: summary, chapters, steps, omittedGroups, unclassifiedEvidenceIndexes, and optional focus and testExecution. Every chapter, step, omitted group, focus entry, and test execution is an object with the explicit property names described in the initial prompt. A step's deferred items are {concern,resolvedByStepId}, where resolvedByStepId may be null or omitted; forwardRefs is [{symbol,introducedByStepId}]; focus is [{evidenceIndex,ranges:[{startLine,endLine}]}]. Evidence references are zero-based integer indexes into the original review input manifest, never hunk ID strings. Use only manifest indexes, preserve valid fields, and correct every issue named above.`;
 }
 
 function responseMetadata(response: string, extracted: string): string {
