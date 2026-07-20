@@ -35,6 +35,7 @@ describe("ndrstnd CLI", () => {
     expect(result.code).toBe(0);
     expect(result.stdout).toContain("understand agent-produced branch changes");
     expect(result.stdout).toContain("--fresh");
+    expect(result.stdout).toContain("--diagnostic-include-agent-output");
   });
 
   it("rejects unknown review options loudly", async () => {
@@ -63,16 +64,20 @@ describe("ndrstnd CLI", () => {
     expect(skill.stderr).toContain("Unknown skill option: --forse");
   });
 
-  it("reports a missing repository path as a one-line error without a stack trace", async () => {
+  it("reports a missing repository path with failure-reporting steps and no stack trace", async () => {
     const result = await runCli(["review", "--no-open", "--repo", "/does/not/exist"]);
     expect(result.code).toBe(1);
-    expect(result.stderr.trim()).toBe("The repository path /does/not/exist does not exist.");
+    expect(result.stderr).toContain("The repository path /does/not/exist does not exist.");
+    expect(result.stderr).toContain("To report this problem:");
+    expect(result.stderr).toContain("no diagnostic artifact could be written");
+    expect(result.stderr).not.toContain("node:internal/");
   });
 
   it("reports a missing agent CLI as an actionable one-line error", async () => {
     const result = await runCli(["auth", "login", "--agent", "codex"], { ...process.env, PATH: "/definitely/missing" });
     expect(result.code).toBe(1);
-    expect(result.stderr.trim()).toBe("Could not start Codex: the `codex` CLI was not found on PATH. Install it or add its directory to PATH, then retry `ndrstnd auth login --agent codex`.");
+    expect(result.stderr).toContain("Could not start Codex: the `codex` CLI was not found on PATH. Install it or add its directory to PATH, then retry `ndrstnd auth login --agent codex`.");
+    expect(result.stderr).toContain("To report this problem:");
     expect(result.stderr).not.toContain("node:internal/");
   });
 }, 30_000);

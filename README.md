@@ -41,6 +41,12 @@ Without a branch, ndrstnd reviews the checked-out branch including staged, unsta
 
 Add `--conversation path/to/ndrstnd-conversation-v1.json` to ground the narrative in the dialogue that produced the branch: motives, rejected alternatives, constraints, and any observed test runs feed the Story and the Test plan.
 
+## When a review fails
+
+ndrstnd never creates a partial or invented HTML review. If a review reaches the repository and fails during collection, agent analysis, validation, or artifact writing, it writes a shareable diagnostic JSON file under that repository’s `.ndrstnd/` directory and prints numbered reporting steps. Keep the file unchanged and share it with the exact command, selected agent, and intended base/target scope. It contains environment and scope metadata plus hashed prompt/response metadata, but excludes prompts, diffs, environment variables, and raw agent responses by default.
+
+If the maintainer needs to inspect the agent’s response, rerun the same command with `--diagnostic-include-agent-output` and share that diagnostic only through a private channel; it is explicitly marked as sensitive. If ndrstnd cannot write the diagnostic file, preserve the complete terminal output instead. Do not attach credentials, tokens, or repository contents unless requested through a secure channel.
+
 ## Scope
 
 ndrstnd is for understanding code: it explains the implementation story, evidence, risk signals, and selected lines. It deliberately does not critique the change, submit review comments, or edit the branch.

@@ -2,6 +2,8 @@ import type { CollectedReviewInput } from "./git.js";
 import type { ConversationContext } from "./conversation.js";
 import type { AgentClient, ReviewAgent, TurnActivity } from "./agent.js";
 import { analysisPrompt, extractJson, parseAnalysisDocument } from "./analysis-core.js";
+import { activitySnapshot, responseMetadata as makeResponseMetadata, textMetadata, type AnalysisAttemptTrace, type AnalysisFailureTrace } from "./diagnostic.js";
+import type { DiagnosticResponseMetadata, DiagnosticValidation } from "../shared/diagnostic-schema.js";
 
 export { analysisPrompt, buildPromptReviewInput, parseAnalysisDocument } from "./analysis-core.js";
 
@@ -12,46 +14,118 @@ export interface AnalysisProgress {
   onRepair?: (attempt: number, attempts: number, problem: string) => void;
 }
 
+export class AnalysisFailure extends Error {
+  constructor(message: string, readonly trace: AnalysisFailureTrace) {
+    super(message);
+    this.name = "AnalysisFailure";
+  }
+}
+
+export class AnalysisResponseError extends Error {
+  constructor(
+    readonly phase: DiagnosticValidation["phase"],
+    readonly response: string,
+    readonly extracted: string,
+    readonly metadata: DiagnosticResponseMetadata,
+    message: string,
+  ) {
+    super(message);
+    this.name = "AnalysisResponseError";
+  }
+}
+
 export async function analyzeWithAgent(agent: ReviewAgent, input: CollectedReviewInput, conversation?: ConversationContext, progress?: AnalysisProgress) {
   const prompt = analysisPrompt(input, conversation);
-  return withFreshClientRetry(agent, async (client) => {
-    const thread = await client.startTextThread(input.repoPath);
-    try {
-      let response = await thread.send(prompt, progress?.onActivity);
-      let lastError = "";
-      for (let attempt = 0; attempt <= REPAIR_ATTEMPTS; attempt += 1) {
-        try {
-          return parseAnalysisResponse(response, input, attempt === REPAIR_ATTEMPTS ? "salvage" : "require");
-        } catch (error) {
-          lastError = error instanceof Error ? error.message : String(error);
-          if (attempt === REPAIR_ATTEMPTS) break;
-          progress?.onRepair?.(attempt + 1, REPAIR_ATTEMPTS, lastError);
-          response = await thread.send(analysisRepairPrompt(lastError), progress?.onActivity);
+  const attempts: AnalysisAttemptTrace[] = [];
+  try {
+    return await withFreshClientRetry(agent, async (client) => {
+      const thread = await client.startTextThread(input.repoPath);
+      try {
+        let response = await sendAnalysisTurn(thread, prompt, "initial", attempts, progress);
+        let lastError = "";
+        for (let attempt = 0; attempt <= REPAIR_ATTEMPTS; attempt += 1) {
+          try {
+            return parseAnalysisResponse(response, input, attempt === REPAIR_ATTEMPTS ? "salvage" : "require");
+          } catch (error) {
+            lastError = error instanceof Error ? error.message : String(error);
+            recordValidationFailure(attempts.at(-1), error);
+            if (attempt === REPAIR_ATTEMPTS) break;
+            progress?.onRepair?.(attempt + 1, REPAIR_ATTEMPTS, lastError);
+            response = await sendAnalysisTurn(thread, analysisRepairPrompt(lastError), "repair", attempts, progress);
+          }
         }
+        throw new AnalysisFailure(`${agent.name} produced an analysis that still failed validation after ${REPAIR_ATTEMPTS} repair turns: ${lastError}`, {
+          phase: "analysis",
+          message: lastError,
+          attempts,
+        });
+      } finally {
+        await thread.close();
       }
-      throw new Error(`${agent.name} produced an analysis that still failed validation after ${REPAIR_ATTEMPTS} repair turns: ${lastError}`);
-    } finally {
-      await thread.close();
-    }
-  });
+    });
+  } catch (error) {
+    if (error instanceof AnalysisFailure) throw error;
+    const message = error instanceof Error ? error.message : String(error);
+    throw new AnalysisFailure(`${agent.name} analysis failed: ${message}`, { phase: "analysis", message, attempts });
+  }
+}
+
+async function sendAnalysisTurn(
+  thread: Awaited<ReturnType<AgentClient["startTextThread"]>>,
+  prompt: string,
+  kind: AnalysisAttemptTrace["kind"],
+  attempts: AnalysisAttemptTrace[],
+  progress: AnalysisProgress | undefined,
+): Promise<string> {
+  const trace: AnalysisAttemptTrace = { kind, durationMs: 0, prompt: textMetadata(prompt) };
+  attempts.push(trace);
+  const startedAt = Date.now();
+  let latestActivity: TurnActivity | undefined;
+  try {
+    const response = await thread.send(prompt, (activity) => {
+      latestActivity = activity;
+      progress?.onActivity?.(activity);
+    });
+    trace.durationMs = Date.now() - startedAt;
+    trace.activity = activitySnapshot(latestActivity);
+    trace.response = makeResponseMetadata(response, extractJson(response));
+    trace.rawResponse = response;
+    return response;
+  } catch (error) {
+    trace.durationMs = Date.now() - startedAt;
+    trace.activity = activitySnapshot(latestActivity);
+    trace.error = error instanceof Error ? error.message : String(error);
+    throw error;
+  }
+}
+
+function recordValidationFailure(trace: AnalysisAttemptTrace | undefined, error: unknown): void {
+  if (trace === undefined) return;
+  if (error instanceof AnalysisResponseError) {
+    trace.validation = { phase: error.phase, message: error.message };
+  } else {
+    trace.error = error instanceof Error ? error.message : String(error);
+  }
 }
 
 /** Parses one complete agent response while retaining which boundary failed for repair and CLI diagnostics. */
 export function parseAnalysisResponse(response: string, input: CollectedReviewInput, focus: "require" | "salvage" = "require") {
   const extracted = extractJson(response);
+  const metadata = makeResponseMetadata(response, extracted);
   let value: unknown;
   try {
     value = JSON.parse(extracted);
   } catch (error) {
-    throw new Error(`JSON parsing failed: ${jsonParseDiagnostic(error)} Response metadata: ${responseMetadata(response, extracted)}.`);
+    throw new AnalysisResponseError("json-parsing", response, extracted, metadata, `JSON parsing failed: ${jsonParseDiagnostic(error)} Response metadata: ${responseMetadataSummary(metadata)}.`);
   }
 
   try {
     return parseAnalysisDocument(value, input, { focus });
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
-    const phase = reason.startsWith("Analysis document did not match") ? "wire document validation" : "review invariant validation";
-    throw new Error(`${phase} failed: ${reason} Response metadata: ${responseMetadata(response, extracted)}.`);
+    const validationPhase = reason.startsWith("Analysis document did not match") ? "wire-validation" : "review-validation";
+    const phase = validationPhase === "wire-validation" ? "wire document validation" : "review invariant validation";
+    throw new AnalysisResponseError(validationPhase, response, extracted, metadata, `${phase} failed: ${reason} Response metadata: ${responseMetadataSummary(metadata)}.`);
   }
 }
 
@@ -63,8 +137,8 @@ Problem: ${problem}
 Use these top-level properties: summary, chapters, steps, omittedGroups, unclassifiedEvidenceIndexes, and optional focus and testExecution. Every chapter, step, omitted group, focus entry, and test execution is an object with the explicit property names described in the initial prompt. A step's deferred items are {concern,resolvedByStepId}, where resolvedByStepId may be null or omitted; forwardRefs is [{symbol,introducedByStepId}]; focus is [{evidenceIndex,ranges:[{startLine,endLine}]}]. Evidence references are zero-based integer indexes into the original review input manifest, never hunk ID strings. Use only manifest indexes, preserve valid fields, and correct every issue named above.`;
 }
 
-function responseMetadata(response: string, extracted: string): string {
-  return `response ${response.length} characters; extracted candidate ${extracted.length} characters; fenced=${response.includes("```")}; candidateStartsWithObject=${extracted.trimStart().startsWith("{")}`;
+function responseMetadataSummary(metadata: DiagnosticResponseMetadata): string {
+  return `response ${metadata.length} characters; extracted candidate ${metadata.extractedLength} characters; fenced=${metadata.fenced}; candidateStartsWithObject=${metadata.candidateStartsWithObject}`;
 }
 
 function jsonParseDiagnostic(error: unknown): string {
@@ -106,6 +180,7 @@ async function withFreshClientRetry<T>(agent: ReviewAgent, run: (client: AgentCl
   try {
     return await attempt();
   } catch (error) {
+    if (error instanceof AnalysisFailure) throw error;
     if (!TRANSIENT_AGENT_FAILURE.test(error instanceof Error ? error.message : String(error))) throw error;
     try {
       return await attempt();

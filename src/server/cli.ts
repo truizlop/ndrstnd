@@ -3,12 +3,13 @@ import { spawn } from "node:child_process";
 import { realpath } from "node:fs/promises";
 import process from "node:process";
 import { resolveReviewAgent, reviewAgents, type ReviewAgent, type ReviewAgentId, type TurnActivity } from "./agent.js";
-import { analyzeWithAgent, formatAnalysisHeartbeat, type AnalysisProgress } from "./analyze.js";
+import { AnalysisFailure, analyzeWithAgent, formatAnalysisHeartbeat, type AnalysisProgress } from "./analyze.js";
 import { importConversation } from "./conversation.js";
-import { GitReader, describeReviewScope, ensureArtifactDirectoryIgnored } from "./git.js";
+import { GitReader, describeReviewScope, ensureArtifactDirectoryIgnored, type CollectedReviewInput } from "./git.js";
 import { ReviewStore, selectReusableRevision } from "./store.js";
 import { installSkill, installedSkillIsStale } from "./skill.js";
 import { writeReviewArtifact } from "./artifact.js";
+import { formatDiagnosticInstructions, writeDiagnosticArtifact } from "./diagnostic.js";
 import { browserOpenCommand } from "./cli-support.js";
 import { packageVersion } from "./version.js";
 import { pathToFileURL } from "node:url";
@@ -125,7 +126,7 @@ async function runAgentLogin(agent: ReviewAgent): Promise<void> {
 
 async function runReview(args: string[]): Promise<void> {
   if (wantsHelp(args)) return printHelp();
-  const { positional, values, flags } = parseCommandArgs("review", args, ["--base", "--repo", "--conversation", "--agent"], ["--uncommitted", "--no-open", "--fresh"], 1);
+  const { positional, values, flags } = parseCommandArgs("review", args, ["--base", "--repo", "--conversation", "--agent"], ["--uncommitted", "--no-open", "--fresh", "--diagnostic-include-agent-output"], 1);
   const targetArg = positional[0];
   const uncommitted = flags.has("--uncommitted");
   const explicitBase = values.get("--base");
@@ -137,10 +138,11 @@ async function runReview(args: string[]): Promise<void> {
   const agent = await resolveReviewAgent(values.get("--agent")).catch((error: unknown) => fail(error instanceof Error ? error.message : String(error)));
   const conversationPath = values.get("--conversation");
   const store = openReviewStore();
+  let input: CollectedReviewInput | undefined;
   try {
     const conversation = conversationPath === undefined ? undefined : await importConversation(conversationPath);
     await ensureArtifactDirectoryIgnored(repoPath);
-    const input = await new GitReader().collectReviewInput(repoPath, targetArg, baseRef);
+    input = await new GitReader().collectReviewInput(repoPath, targetArg, baseRef);
     const meaningfulFiles = input.files.filter((file) => file.signal === "meaningful").length;
     const scope = await describeReviewScope(repoPath, input);
     process.stdout.write(`Reviewing ${scope.targetLabel} against ${input.baseRef}${input.includesWorkingTree ? ", including uncommitted changes" : ""}: ${input.files.length} changed file${input.files.length === 1 ? "" : "s"} (${meaningfulFiles} meaningful).\n`);
@@ -164,8 +166,6 @@ async function runReview(args: string[]): Promise<void> {
       try {
         const document = await analyzeWithAgent(agent, input, conversation, heartbeat.progress);
         revision = store.createRevision(session.id, agent.id, "complete", document);
-      } catch (error) {
-        throw new Error(`${agent.name} analysis failed, so no review artifact was written: ${error instanceof Error ? error.message : String(error)} Nothing was persisted; re-run the same ndrstnd review command to retry.`);
       } finally {
         heartbeat.stop();
       }
@@ -176,11 +176,37 @@ async function runReview(args: string[]): Promise<void> {
     process.stdout.write("This self-contained file is in the Git-ignored .ndrstnd directory; delete it when the review is done.\n");
     if (!noOpen) openBrowser(pathToFileURL(artifactPath).href);
   } catch (error) {
+    const message = error instanceof AnalysisFailure
+      ? `${agent.name} analysis failed, so no review artifact was written: ${error.message} Nothing was persisted; re-run the same ndrstnd review command to retry.`
+      : error instanceof Error ? error.message : String(error);
+    let diagnosticPath: string | undefined;
+    let diagnosticWriteError: string | undefined;
+    try {
+      diagnosticPath = await writeDiagnosticArtifact({
+        directory: join(repoPath, ".ndrstnd"),
+        toolVersion: await packageVersion().catch(() => "unknown"),
+        commandArgs: ["review", ...args],
+        agent,
+        input,
+        failure: error instanceof AnalysisFailure ? error.trace : { phase: classifyDiagnosticPhase(message), message, attempts: [] },
+        includeAgentOutput: flags.has("--diagnostic-include-agent-output"),
+      });
+    } catch (diagnosticError) {
+      diagnosticWriteError = diagnosticError instanceof Error ? diagnosticError.message : String(diagnosticError);
+    }
     // fail() exits the process immediately, so the store must close first rather than in a finally.
     store.close();
-    fail(error instanceof Error ? error.message : String(error));
+    fail(`${message}`, formatDiagnosticInstructions(diagnosticPath, diagnosticWriteError));
   }
   store.close();
+}
+
+function classifyDiagnosticPhase(message: string): "setup" | "authentication" | "collection" | "analysis" | "artifact-writing" | "unknown" {
+  if (/not signed|authentication|login/i.test(message)) return "authentication";
+  if (/Git could not|repository|merge-base|base|branch|working-tree/i.test(message)) return "collection";
+  if (/artifact|\.ndrstnd/i.test(message)) return "artifact-writing";
+  if (/agent|analysis/i.test(message)) return "analysis";
+  return "unknown";
 }
 
 /** Resolving and de-symlinking the repository path keeps session identity independent of how the path was spelled. */
@@ -258,10 +284,10 @@ function formatAgentLaunchError(agent: ReviewAgent, error: unknown): string {
 }
 
 function printHelp(): void {
-  process.stdout.write(`ndrstnd: understand agent-produced branch changes\n\nUsage:\n  ndrstnd auth <status|login> [--agent <codex|claude>]\n  ndrstnd skill install [--force] [--agent <codex|claude>]\n  ndrstnd review [branch] [--base <branch>] [--uncommitted] [--repo <path>] [--conversation <path>] [--agent <codex|claude>] [--fresh] [--no-open]\n  ndrstnd --version\n\nWithout a branch, ndrstnd reviews the checked-out branch including uncommitted changes.\n--uncommitted reviews only the uncommitted working-tree changes (an alias for --base HEAD).\n--agent picks the analysis agent; without it ndrstnd uses NDRSTND_AGENT, then the Codex or Claude Code session it runs inside, then the first installed CLI, preferring Codex.\n--fresh re-analyzes even when a cached analysis exists for the same input.\n`);
+  process.stdout.write(`ndrstnd: understand agent-produced branch changes\n\nUsage:\n  ndrstnd auth <status|login> [--agent <codex|claude>]\n  ndrstnd skill install [--force] [--agent <codex|claude>]\n  ndrstnd review [branch] [--base <branch>] [--uncommitted] [--repo <path>] [--conversation <path>] [--agent <codex|claude>] [--fresh] [--no-open] [--diagnostic-include-agent-output]\n  ndrstnd --version\n\nWithout a branch, ndrstnd reviews the checked-out branch including uncommitted changes.\n--uncommitted reviews only the uncommitted working-tree changes (an alias for --base HEAD).\n--agent picks the analysis agent; without it ndrstnd uses NDRSTND_AGENT, then the Codex or Claude Code session it runs inside, then the first installed CLI, preferring Codex.\n--fresh re-analyzes even when a cached analysis exists for the same input.\n--diagnostic-include-agent-output includes raw agent responses in the failure diagnostic; share that file only through a private channel.\n`);
 }
 
-function fail(message: string): never {
-  process.stderr.write(`${message}\n`);
+function fail(message: string, instructions = formatDiagnosticInstructions(undefined)): never {
+  process.stderr.write(`${message}\n\n${instructions}\n`);
   process.exit(1);
 }

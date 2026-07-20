@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { INLINE_PATCH_BUDGET, PROSE_WORD_RANGES, analysisPrompt, buildPromptReviewInput, extractJson, parseAnalysisDocument } from "../src/server/analysis-core.js";
-import { analyzeWithAgent, analysisRepairPrompt, formatAnalysisHeartbeat, parseAnalysisResponse } from "../src/server/analyze.js";
+import { AnalysisFailure, analyzeWithAgent, analysisRepairPrompt, formatAnalysisHeartbeat, parseAnalysisResponse } from "../src/server/analyze.js";
 import type { ReviewAgent } from "../src/server/agent.js";
 import type { CollectedReviewInput } from "../src/server/git.js";
 
@@ -105,6 +105,38 @@ describe("analysis documents", () => {
     expect(repairPrompts).toHaveLength(2);
     expect(repairPrompts[1]).toContain("explicit named-object format");
     expect(repairPrompts[1]).toContain("forwardRefs is [{symbol,introducedByStepId}]");
+  });
+
+  it("retains every failed turn in the diagnostic trace", async () => {
+    const agent = {
+      id: "codex",
+      name: "Codex",
+      command: "codex",
+      loginArgs: [],
+      homeDirectory: () => "/tmp",
+      getAuthStatus: async () => ({ state: "signed-in", accountType: "test" }),
+      createClient: () => ({
+        startTextThread: async () => ({
+          send: async () => "not JSON",
+          close: async () => undefined,
+        }),
+        close: () => undefined,
+      }),
+    } as ReviewAgent;
+
+    let failure: unknown;
+    try {
+      await analyzeWithAgent(agent, input);
+    } catch (error) {
+      failure = error;
+    }
+    expect(failure).toBeInstanceOf(AnalysisFailure);
+    if (failure instanceof AnalysisFailure) {
+      expect(failure.trace.attempts).toHaveLength(3);
+      expect(failure.trace.attempts.every((attempt) => attempt.validation?.phase === "json-parsing")).toBe(true);
+      expect(failure.trace.attempts.every((attempt) => attempt.response?.sha256 !== undefined)).toBe(true);
+      expect(failure.trace.attempts.every((attempt) => attempt.rawResponse === "not JSON")).toBe(true);
+    }
   });
 
   it("keeps the repair prompt explicit about the named-object contract", () => {
