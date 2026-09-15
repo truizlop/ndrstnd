@@ -1,6 +1,6 @@
 {
   "name": "ndrstnd",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "private": false,
   "type": "module",
   "license": "Apache-2.0",
@@ -26,7 +26,8 @@
   "files": [
     "dist",
     "src/skill-assets",
-    "README.md"
+    "README.md",
+    "CHANGELOG.md"
   ],
   "engines": {
     "node": ">=22"

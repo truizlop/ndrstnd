@@ -6,10 +6,14 @@
 #   brew trust truizlop/ndrstnd
 #   brew install ndrstnd
 #
-# Cutting a release (tags are unprefixed, e.g. 0.1.0):
-#   1. Tag it:            git tag 0.1.0 && git push origin 0.1.0
-#   2. Compute the hash:  curl -L https://github.com/truizlop/ndrstnd/archive/refs/tags/0.1.0.tar.gz | shasum -a 256
-#   3. Replace the sha256 below, then commit and push.
+# Cutting the 0.2.0 release (tags are unprefixed):
+#   1. Commit and publish the 0.2.0 version, then tag it:
+#      git tag 0.2.0 && git push origin 0.2.0
+#   2. Compute the published archive hash:
+#      curl -L https://github.com/truizlop/ndrstnd/archive/refs/tags/0.2.0.tar.gz | shasum -a 256
+#   3. Change url and sha256 below to 0.2.0 and the verified hash, then commit and push.
+# Until those steps are complete, this formula intentionally stays on the last
+# published release so stable Homebrew installs remain verifiable.
 #
 # Until the first tag exists, only `brew install --HEAD ndrstnd` works.
 class Ndrstnd < Formula
